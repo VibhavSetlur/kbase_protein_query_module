@@ -1,0 +1,58 @@
+#
+# Protein Embedding Generator App Display
+#
+name: Generate Protein Embeddings
+
+tooltip: |
+    Generate a high-dimensional embedding for a protein using its sequence or UniProt ID, enabling downstream similarity search and network analysis.
+
+screenshots: []
+
+icon: embedding.png
+
+suggestions:
+    apps:
+        related:
+            [CheckProteinExistence, FindTopMatchesFromEmbedding]
+        next:
+            [FindTopMatchesFromEmbedding]
+    methods:
+        related:
+            []
+        next:
+            ["FindTopMatchesFromEmbedding"]
+
+parameters :
+    protein_id :
+        ui-name : |
+            Protein ID (UniProt)
+        short-hint : |
+            Enter the UniProt ID of the protein to generate an embedding for (optional if sequence is provided).
+    sequence :
+        ui-name : |
+            Protein Sequence
+        short-hint : |
+            Enter the amino acid sequence of the protein (optional if UniProt ID is provided).
+        long-hint  : |
+            Provide either a UniProt ID or a raw amino acid sequence. The app will generate a protein embedding using a state-of-the-art model (e.g., ESM-2).
+
+description : |
+
+    <p>This App generates a high-dimensional embedding for a protein, using either its UniProt ID or amino acid sequence. Embeddings capture structural and functional properties of proteins, and are used for similarity search, clustering, and network analysis in downstream steps.</p>
+
+    <ul>
+    <li><b>Input:</b> UniProt protein ID and/or protein sequence</li>
+    <li><b>Output:</b> Embedding vector and summary information</li>
+    </ul>
+
+    <p>Use this app after confirming your protein exists in the database, or to generate embeddings for novel proteins. The resulting embedding can be used in the <b>FindTopMatchesFromEmbedding</b> app to search for similar proteins.</p>
+
+publications :
+    -
+        display-text: |
+            Rives A, et al. Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences. PNAS. 2021.
+        link: https://www.pnas.org/doi/10.1073/pnas.2016239118
+    -
+        display-text: |
+            ESM-2 Model Documentation
+        link: https://github.com/facebookresearch/esm 

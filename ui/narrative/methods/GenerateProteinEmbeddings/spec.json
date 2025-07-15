@@ -1,0 +1,82 @@
+{
+    "ver": "0.0.1",
+    "authors": [
+        "yourname"
+    ],
+    "contact": "https://kbase.us/contact-us/",
+    "categories": [
+        "active",
+        "protein",
+        "embedding"
+    ],
+    "widgets": {
+        "input": null,
+        "output": null
+    },
+    "parameters": [
+        {
+            "id": "protein_id",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "validate_as": "regex",
+                "regex_constraint": "^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-Z0-9]{6,10}$",
+                "regex_error_message": "Please enter a valid UniProt accession (e.g., P12345, Q9H9K5, A0A024RBG1). Leave blank if providing a sequence."
+            }
+        },
+        {
+            "id": "sequence",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "textarea",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": ">ExampleProtein\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+            }
+        }
+    ],
+    "behavior": {
+        "service-mapping": {
+            "url": "",
+            "name": "kbase_protein_network_analysis_toolkit",
+            "method": "generate_protein_embedding",
+            "input_mapping": [
+                {
+                    "narrative_system_variable": "workspace",
+                    "target_property": "workspace_name"
+                },
+                {
+                    "input_parameter": "protein_id",
+                    "target_property": "protein_id"
+                },
+                {
+                    "input_parameter": "sequence",
+                    "target_property": "sequence"
+                }
+            ],
+            "output_mapping": [
+                {
+                    "service_method_output_path": [
+                        0,
+                        "embedding"
+                    ],
+                    "target_property": "embedding"
+                },
+                {
+                    "service_method_output_path": [
+                        0,
+                        "summary"
+                    ],
+                    "target_property": "summary"
+                }
+            ]
+        }
+    },
+    "job_id_output_field": "docker"
+}

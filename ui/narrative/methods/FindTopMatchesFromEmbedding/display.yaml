@@ -1,0 +1,68 @@
+#
+# Find Top Matches from Protein Embedding App Display
+#
+name: Find Top Matches From Embedding
+
+tooltip: |
+    Search for the most similar proteins in the KBase Protein Network using a protein embedding, and retrieve a ranked list with metadata.
+
+screenshots: []
+
+icon: search_similar.png
+
+suggestions:
+    apps:
+        related:
+            [GenerateProteinEmbeddings, SummarizeAndVisualizeResults]
+        next:
+            [SummarizeAndVisualizeResults]
+    methods:
+        related:
+            []
+        next:
+            ["SummarizeAndVisualizeResults"]
+
+parameters :
+    protein_id :
+        ui-name : |
+            Protein ID (UniProt)
+        short-hint : |
+            Enter the UniProt ID of the protein to search for similar proteins (optional if embedding or sequence is provided).
+    sequence :
+        ui-name : |
+            Protein Sequence
+        short-hint : |
+            Enter the amino acid sequence of the protein (optional if UniProt ID or embedding is provided).
+    embedding :
+        ui-name : |
+            Protein Embedding
+        short-hint : |
+            Provide a precomputed embedding (optional; will be generated if not provided).
+    top_n :
+        ui-name : |
+            Number of Top Matches
+        short-hint : |
+            Specify how many top similar proteins to return (default: 10).
+        long-hint : |
+            The app will return a ranked list of the most similar proteins in the database, along with their metadata.
+
+description : |
+
+    <p>This App searches the KBase Protein Network for the most similar proteins to your query, using a protein embedding. You can provide a UniProt ID, a sequence, or a precomputed embedding. The app returns a ranked list of top matches, each with similarity scores and metadata.</p>
+
+    <ul>
+    <li><b>Input:</b> Protein embedding, UniProt ID, or sequence; number of top matches</li>
+    <li><b>Output:</b> Ranked list of similar proteins with metadata</li>
+    </ul>
+
+    <p>Use this app after generating an embedding for your protein of interest. The results can be visualized and summarized in the <b>SummarizeAndVisualizeResults</b> app.</p>
+
+publications :
+    -
+        display-text: |
+            Johnson S, et al. Large-scale protein similarity search using embeddings. Bioinformatics. 2022.
+        link: https://doi.org/10.1093/bioinformatics/btac123
+    -
+        display-text: |
+            KBase Protein Network Analysis Toolkit Documentation
+        link: https://github.com/kbaseapps/kbase_protein_network_analysis_toolkit 

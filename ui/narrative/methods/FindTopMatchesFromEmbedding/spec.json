@@ -1,0 +1,101 @@
+{
+    "ver": "0.0.1",
+    "authors": [
+        "yourname"
+    ],
+    "contact": "https://kbase.us/contact-us/",
+    "categories": ["active", "protein", "search"],
+    "widgets": {
+        "input": null,
+        "output": null
+    },
+    "parameters": [
+        {
+            "id": "protein_id",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": []
+            }
+        },
+        {
+            "id": "sequence",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "textarea",
+            "text_options": {
+                "valid_ws_types": []
+            }
+        },
+        {
+            "id": "embedding",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "textarea",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "[0.123, -0.456, ...] (JSON array of floats, as output by GenerateProteinEmbeddings)"
+            }
+        },
+        {
+            "id": "top_n",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["10"],
+            "field_type": "text",
+            "text_options": {
+                "validate_as": "int",
+                "min_int": 1,
+                "max_int": 1000
+            }
+        }
+    ],
+    "behavior": {
+        "service-mapping": {
+            "url": "",
+            "name": "kbase_protein_network_analysis_toolkit",
+            "method": "find_top_matches_from_embedding",
+            "input_mapping": [
+                {
+                    "narrative_system_variable": "workspace",
+                    "target_property": "workspace_name"
+                },
+                {
+                    "input_parameter": "protein_id",
+                    "target_property": "protein_id"
+                },
+                {
+                    "input_parameter": "sequence",
+                    "target_property": "sequence"
+                },
+                {
+                    "input_parameter": "embedding",
+                    "target_property": "embedding"
+                },
+                {
+                    "input_parameter": "top_n",
+                    "target_property": "top_n"
+                }
+            ],
+            "output_mapping": [
+                {
+                    "service_method_output_path": [0, "matches"],
+                    "target_property": "matches"
+                },
+                {
+                    "service_method_output_path": [0, "summary"],
+                    "target_property": "summary"
+                }
+            ]
+        }
+    },
+    "job_id_output_field": "docker"
+}
