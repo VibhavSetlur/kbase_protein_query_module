@@ -29,6 +29,10 @@ for d in [families_dir, metadata_dir, indexes_fam_dir, indexes_meta_dir, indexes
 
 family_mapping = {}
 
+centroids = []
+eigenprotein_ids = []
+family_ids = []
+
 for fam in range(N_FAMILIES):
     family_id = f'family_{fam}'
     # Generate protein IDs
@@ -65,9 +69,26 @@ for fam in range(N_FAMILIES):
     # Update family mapping
     family_mapping[family_id] = f'families/{family_id}.faiss'
 
+    # Compute centroid and eigenprotein
+    centroid = embeddings.mean(axis=0)
+    dists = np.linalg.norm(embeddings - centroid, axis=1)
+    medoid_idx = np.argmin(dists)
+    eigenprotein_id = protein_ids[medoid_idx]
+    centroids.append(centroid)
+    eigenprotein_ids.append(eigenprotein_id)
+    family_ids.append(family_id)
+
 # Save family mapping JSON
 mapping_path = os.path.join(indexes_dir, 'family_mapping.json')
 with open(mapping_path, 'w') as f:
     json.dump(family_mapping, f, indent=2)
+
+# Save centroids and eigenprotein IDs
+centroids = np.stack(centroids)
+np.savez(os.path.join(DATA_DIR, 'family_centroids.npz'),
+         family_ids=np.array(family_ids),
+         centroids=centroids,
+         eigenprotein_ids=np.array(eigenprotein_ids))
+print(f"Saved family centroids and eigenprotein IDs to '{os.path.join(DATA_DIR, 'family_centroids.npz')}'")
 
 print(f"Dummy data generated in '{DATA_DIR}' for {N_FAMILIES} families.") 

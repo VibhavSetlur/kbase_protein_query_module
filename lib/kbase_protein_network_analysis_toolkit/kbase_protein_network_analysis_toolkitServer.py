@@ -347,6 +347,26 @@ class Application(object):
                              types=[dict])
         authurl = config.get(AUTH) if config else None
         self.auth_client = _KBaseAuth(authurl)
+        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.check_protein_existence,
+                             name='kbase_protein_network_analysis_toolkit.check_protein_existence',
+                             types=[dict])
+        self.method_authentication['kbase_protein_network_analysis_toolkit.check_protein_existence'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.generate_protein_embedding,
+                             name='kbase_protein_network_analysis_toolkit.generate_protein_embedding',
+                             types=[dict])
+        self.method_authentication['kbase_protein_network_analysis_toolkit.generate_protein_embedding'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.assign_family_fast,
+                             name='kbase_protein_network_analysis_toolkit.assign_family_fast',
+                             types=[dict])
+        self.method_authentication['kbase_protein_network_analysis_toolkit.assign_family_fast'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.find_top_matches_from_embedding,
+                             name='kbase_protein_network_analysis_toolkit.find_top_matches_from_embedding',
+                             types=[dict])
+        self.method_authentication['kbase_protein_network_analysis_toolkit.find_top_matches_from_embedding'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.summarize_and_visualize_results,
+                             name='kbase_protein_network_analysis_toolkit.summarize_and_visualize_results',
+                             types=[dict])
+        self.method_authentication['kbase_protein_network_analysis_toolkit.summarize_and_visualize_results'] = 'required'
 
     def __call__(self, environ, start_response):
         # Context object, equivalent to the perl impl CallContext

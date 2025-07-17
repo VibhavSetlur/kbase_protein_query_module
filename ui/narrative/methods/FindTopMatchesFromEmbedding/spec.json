@@ -11,37 +11,27 @@
     },
     "parameters": [
         {
-            "id": "protein_id",
-            "optional": true,
-            "advanced": false,
-            "allow_multiple": false,
-            "default_values": [""],
-            "field_type": "text",
-            "text_options": {
-                "valid_ws_types": []
-            }
-        },
-        {
-            "id": "sequence",
-            "optional": true,
-            "advanced": false,
-            "allow_multiple": false,
-            "default_values": [""],
-            "field_type": "textarea",
-            "text_options": {
-                "valid_ws_types": []
-            }
-        },
-        {
             "id": "embedding",
-            "optional": true,
-            "advanced": true,
+            "optional": false,
+            "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
             "field_type": "textarea",
             "text_options": {
                 "valid_ws_types": [],
                 "example": "[0.123, -0.456, ...] (JSON array of floats, as output by GenerateProteinEmbeddings)"
+            }
+        },
+        {
+            "id": "family_id",
+            "optional": false,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "FAM12345"
             }
         },
         {
@@ -64,36 +54,17 @@
             "name": "kbase_protein_network_analysis_toolkit",
             "method": "find_top_matches_from_embedding",
             "input_mapping": [
-                {
-                    "narrative_system_variable": "workspace",
-                    "target_property": "workspace_name"
-                },
-                {
-                    "input_parameter": "protein_id",
-                    "target_property": "protein_id"
-                },
-                {
-                    "input_parameter": "sequence",
-                    "target_property": "sequence"
-                },
-                {
-                    "input_parameter": "embedding",
-                    "target_property": "embedding"
-                },
-                {
-                    "input_parameter": "top_n",
-                    "target_property": "top_n"
-                }
+                { "narrative_system_variable": "workspace", "target_property": "workspace_name" },
+                { "input_parameter": "embedding", "target_property": "embedding" },
+                { "input_parameter": "family_id", "target_property": "family_id" },
+                { "input_parameter": "top_n", "target_property": "top_n" }
             ],
             "output_mapping": [
-                {
-                    "service_method_output_path": [0, "matches"],
-                    "target_property": "matches"
-                },
-                {
-                    "service_method_output_path": [0, "summary"],
-                    "target_property": "summary"
-                }
+                { "service_method_output_path": [0, "matches"], "target_property": "matches" },
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
+                { "service_method_output_path": [0, "family_id"], "target_property": "family_id" },
+                { "service_method_output_path": [0, "top_n"], "target_property": "top_n" },
+                { "service_method_output_path": [0, "similarity_stats"], "target_property": "similarity_stats" }
             ]
         }
     },

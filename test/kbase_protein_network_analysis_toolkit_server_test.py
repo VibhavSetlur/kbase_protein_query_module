@@ -53,15 +53,37 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
             print('Test workspace was deleted')
 
     # NOTE: According to Python unittest naming rules test method names should start from 'test'. # noqa
-    def test_your_method(self):
-        # Prepare test objects in workspace if needed using
-        # self.getWsClient().save_objects({'workspace': self.getWsName(),
-        #                                  'objects': []})
-        #
-        # Run your method by
-        # ret = self.getImpl().your_method(self.getContext(), parameters...)
-        #
-        # Check returned data with
-        # self.assertEqual(ret[...], ...) or other unittest methods
-        ret = self.serviceImpl.run_kbase_protein_network_analysis_toolkit(self.ctx, {'workspace_name': self.wsName,
-                                                             'parameter_1': 'Hello World!'})
+    def test_run_kbase_protein_network_analysis_toolkit(self):
+        params = {'workspace_name': self.wsName, 'parameter_1': 'Hello World!'}
+        ret = self.serviceImpl.run_kbase_protein_network_analysis_toolkit(self.ctx, params)
+        self.assertIsInstance(ret, list)
+        self.assertGreaterEqual(len(ret), 1)
+        output = ret[0]
+        self.assertIn('report_name', output)
+        self.assertIn('report_ref', output)
+        self.assertIn('input_parameters', output)
+        self.assertEqual(output['input_parameters'], params)
+        self.assertIn('summary', output)
+        self.assertIn('start_time', output)
+
+    def test_run_complete_workflow(self):
+        # This test will only check that the workflow runs and returns a report, not the full biological correctness
+        params = {
+            'workspace_name': self.wsName,
+            'query_sequence': 'MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ',
+            'query_protein_id': 'TEST_PROT',
+            'k_similar': 2,
+            'network_method': 'mutual_knn',
+            'save_results': False
+        }
+        ret = self.serviceImpl.run_complete_workflow(self.ctx, params)
+        self.assertIsInstance(ret, list)
+        self.assertGreaterEqual(len(ret), 1)
+        output = ret[0]
+        self.assertIn('report_name', output)
+        self.assertIn('report_ref', output)
+        self.assertIn('workflow_status', output)
+        self.assertIn(output['workflow_status'], ['success', 'error'])
+        self.assertIn('summary', output)
+        self.assertIn('input_parameters', output)
+        self.assertEqual(output['input_parameters'], params)

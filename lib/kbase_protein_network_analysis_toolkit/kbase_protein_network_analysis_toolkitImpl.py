@@ -43,6 +43,12 @@ class kbase_protein_network_analysis_toolkit:
         self.shared_folder = config['scratch']
         logging.basicConfig(format='%(created)s %(levelname)s: %(message)s',
                             level=logging.INFO)
+        self.family_assigner = None
+        from kbase_protein_network_analysis_toolkit.assign_protein_family import AssignProteinFamily
+        self.family_assigner = AssignProteinFamily()
+        centroid_path = os.path.join('data', 'family_centroids.npz')
+        if os.path.exists(centroid_path):
+            self.family_assigner.load_family_centroids(centroid_path)
         #END_CONSTRUCTOR
         pass
 
@@ -57,13 +63,20 @@ class kbase_protein_network_analysis_toolkit:
         # ctx is the context object
         # return variables are: output
         #BEGIN run_kbase_protein_network_analysis_toolkit
+        import time
+        start_time = time.time()
         report = KBaseReport(self.callback_url)
+        # Add more robust information to the report
+        report_text = f"KBase Protein Network Analysis Toolkit\n\nParameters:\n{params}\n\nAnalysis started."
         report_info = report.create({'report': {'objects_created':[],
-                                                'text_message': params['parameter_1']},
+                                                'text_message': report_text},
                                                 'workspace_name': params['workspace_name']})
         output = {
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
+            'input_parameters': params,
+            'start_time': start_time,
+            'summary': 'Analysis initialized. See report for details.'
         }
         #END run_kbase_protein_network_analysis_toolkit
 
@@ -81,10 +94,16 @@ class kbase_protein_network_analysis_toolkit:
         :returns: dict with 'report_name', 'report_ref', and existence info
         """
         #BEGIN check_protein_existence
+        import time
+        start_time = time.time()
         checker = ProteinExistenceChecker()
         result = checker.check_protein_existence(params['protein_id'])
         report = KBaseReport(self.callback_url)
         text = f"Protein {params['protein_id']} existence: {result['exists']}\n"
+        if result['exists']:
+            text += f"Family: {result['family_id']}\nMetadata: {result['metadata']}\n"
+        else:
+            text += "Protein not found in any family.\n"
         report_info = report.create({
             'report': {'objects_created': [], 'text_message': text},
             'workspace_name': params['workspace_name']
@@ -94,7 +113,10 @@ class kbase_protein_network_analysis_toolkit:
             'report_ref': report_info['ref'],
             'exists': result['exists'],
             'family_id': result['family_id'],
-            'metadata': result['metadata']
+            'metadata': result['metadata'],
+            'input_parameters': params,
+            'start_time': start_time,
+            'summary': text
         }
         #END check_protein_existence
         return [output]
@@ -106,6 +128,8 @@ class kbase_protein_network_analysis_toolkit:
         :returns: dict with 'embedding' and 'summary'
         """
         #BEGIN generate_protein_embedding
+        import time
+        start_time = time.time()
         generator = ProteinEmbeddingGenerator()
         sequence = params.get('sequence')
         if not sequence and 'protein_id' in params:
@@ -115,9 +139,40 @@ class kbase_protein_network_analysis_toolkit:
         summary = f"Generated embedding for protein. Shape: {embedding.shape}"
         output = {
             'embedding': embedding.tolist(),
-            'summary': summary
+            'summary': summary,
+            'input_parameters': params,
+            'start_time': start_time,
+            'embedding_norm': float((embedding**2).sum()**0.5),
+            'sequence_length': len(sequence)
         }
         #END generate_protein_embedding
+        return [output]
+    
+    def assign_family_fast(self, ctx, params):
+        """
+        Quickly assign a protein embedding to a family by similarity to the medoid (not classification).
+        :param params: dict with 'embedding' (list of floats), and 'workspace_name'
+        :returns: dict with 'family_id', 'confidence', and 'eigenprotein_id'
+        """
+        #BEGIN assign_family_fast
+        import time
+        import numpy as np
+        start_time = time.time()
+        embedding = params.get('embedding')
+        if embedding is None:
+            raise ValueError("Parameter 'embedding' is required.")
+        embedding_np = np.array(embedding)
+        # Use the family_assigner instance to assign the family
+        result = self.family_assigner.assign_family(embedding_np)
+        # result should be a dict with keys: 'family_id', 'confidence', 'eigenprotein_id'
+        output = {
+            'family_id': result['family_id'],
+            'confidence': float(result['confidence']),
+            'eigenprotein_id': result['eigenprotein_id'],
+            'input_parameters': params,
+            'start_time': start_time
+        }
+        #END assign_family_fast
         return [output]
 
     def find_top_matches_from_embedding(self, ctx, params):
@@ -127,9 +182,10 @@ class kbase_protein_network_analysis_toolkit:
         :returns: dict with 'matches' and 'summary'
         """
         #BEGIN find_top_matches_from_embedding
+        import time
+        start_time = time.time()
         embedding = params['embedding']
         top_n = params.get('top_n', 10)
-        # For demonstration, use HierarchicalIndex with default config
         index = HierarchicalIndex()
         # This assumes a family_id is provided or can be inferred; adjust as needed
         family_id = params.get('family_id')
@@ -145,7 +201,16 @@ class kbase_protein_network_analysis_toolkit:
         summary = f"Found {len(matches)} top matches in family {family_id}."
         output = {
             'matches': matches,
-            'summary': summary
+            'summary': summary,
+            'input_parameters': params,
+            'start_time': start_time,
+            'family_id': family_id,
+            'top_n': top_n,
+            'similarity_stats': {
+                'max': float(np.max(similarities)) if len(similarities) else None,
+                'min': float(np.min(similarities)) if len(similarities) else None,
+                'mean': float(np.mean(similarities)) if len(similarities) else None
+            }
         }
         #END find_top_matches_from_embedding
         return [output]
@@ -157,7 +222,8 @@ class kbase_protein_network_analysis_toolkit:
         :returns: dict with 'report_name' and 'report_ref'
         """
         #BEGIN summarize_and_visualize_results
-        # This is a placeholder; actual implementation would depend on result structure
+        import time
+        start_time = time.time()
         output_dir = params.get('output_dir', self.shared_folder)
         summary = f"Results summarized and visualized in {output_dir}."
         report = KBaseReport(self.callback_url)
@@ -167,7 +233,11 @@ class kbase_protein_network_analysis_toolkit:
         })
         output = {
             'report_name': report_info['name'],
-            'report_ref': report_info['ref']
+            'report_ref': report_info['ref'],
+            'input_parameters': params,
+            'start_time': start_time,
+            'output_dir': output_dir,
+            'summary': summary
         }
         #END summarize_and_visualize_results
         return [output]
@@ -179,6 +249,8 @@ class kbase_protein_network_analysis_toolkit:
         :returns: dict with 'report_name', 'report_ref', and workflow summary/results
         """
         #BEGIN run_complete_workflow
+        import time
+        start_time = time.time()
         query_sequence = params['query_sequence']
         query_protein_id = params.get('query_protein_id', 'QUERY_PROTEIN')
         k_similar = params.get('k_similar', 50)
@@ -205,6 +277,8 @@ class kbase_protein_network_analysis_toolkit:
             summary += f"Similar proteins found: {len(results.get('similar_proteins', []))}\n"
             summary += f"Network nodes: {results.get('network_properties', {}).get('num_nodes', 'N/A')}\n"
             summary += f"Network edges: {results.get('network_properties', {}).get('num_edges', 'N/A')}\n"
+            summary += f"Timing (s): {results.get('timing', {})}\n"
+            summary += f"Performance: {results.get('performance_metrics', {})}\n"
 
         report = KBaseReport(self.callback_url)
         report_info = report.create({
@@ -217,10 +291,34 @@ class kbase_protein_network_analysis_toolkit:
             'workflow_status': results.get('status'),
             'family_id': results.get('family_id'),
             'network_properties': results.get('network_properties'),
-            'similar_proteins': results.get('similar_proteins', [])
+            'similar_proteins': results.get('similar_proteins', []),
+            'input_parameters': params,
+            'start_time': start_time,
+            'timing': results.get('timing', {}),
+            'performance_metrics': results.get('performance_metrics', {}),
+            'summary': summary
         }
         #END run_complete_workflow
         return [output]
+
+    def assign_family_fast(self, ctx, params):
+        """
+        Quickly assign a query embedding to a family using precomputed centroids.
+        :param params: dict with 'embedding' (list or np.ndarray)
+        :returns: dict with 'family_id', 'confidence', and 'eigenprotein_id'
+        """
+        #BEGIN assign_family_fast
+        import numpy as np
+        embedding = np.array(params['embedding'])
+        family_id, confidence = self.family_assigner.predict_family(embedding)
+        idx = list(self.family_assigner.family_ids).index(family_id)
+        eigenprotein_id = self.family_assigner.eigenprotein_ids[idx]
+        return [{
+            'family_id': family_id,
+            'confidence': confidence,
+            'eigenprotein_id': eigenprotein_id
+        }]
+        #END assign_family_fast
 
     def status(self, ctx):
         #BEGIN_STATUS

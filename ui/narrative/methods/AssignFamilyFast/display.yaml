@@ -1,0 +1,49 @@
+#
+# Assign Protein Family App Display
+#
+name: Assign Protein Family
+
+tooltip: |
+    Quickly assign a protein embedding to a family by similarity to the medoid (not classification). Returns the family ID, confidence score, and medoid (eigenprotein) representative.
+
+screenshots: []
+
+icon: classify.png
+
+suggestions:
+    apps:
+        related:
+            [GenerateProteinEmbeddings, FindTopMatchesFromEmbedding]
+        next:
+            [FindTopMatchesFromEmbedding]
+    methods:
+        related:
+            []
+        next:
+            ["FindTopMatchesFromEmbedding"]
+
+parameters :
+    embedding :
+        ui-name : |
+            Protein Embedding
+        short-hint : |
+            Paste a protein embedding (JSON array of floats) to assign it to a family by similarity to the medoid.
+        long-hint  : |
+            The embedding should be a JSON array of floats, as output by the GenerateProteinEmbeddings app. The app will return the best-matching family, a confidence score, and the medoid (eigenprotein) representative.
+
+description : |
+
+    <p>This App assigns a protein embedding to a family by computing similarity to the medoid (not classification). It is extremely fast and ideal for quick lookup tasks.</p>
+
+    <ul>
+    <li><b>Input:</b> Protein embedding (JSON array of floats)</li>
+    <li><b>Output:</b> Family ID, confidence score, and medoid (eigenprotein) ID</li>
+    </ul>
+
+    <p>Use this app after generating an embedding for your protein of interest. The result can be used for downstream similarity search or network analysis.</p>
+
+publications :
+    -
+        display-text: |
+            KBase Protein Network Analysis Toolkit Documentation
+        link: https://github.com/kbaseapps/kbase_protein_network_analysis_toolkit 

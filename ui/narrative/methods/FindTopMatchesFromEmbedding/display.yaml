@@ -37,7 +37,12 @@ parameters :
         ui-name : |
             Protein Embedding
         short-hint : |
-            Provide a precomputed embedding (optional; will be generated if not provided).
+            Provide a precomputed embedding (JSON array of floats).
+    family_id :
+        ui-name : |
+            Family ID
+        short-hint : |
+            The family to search within (required).
     top_n :
         ui-name : |
             Number of Top Matches

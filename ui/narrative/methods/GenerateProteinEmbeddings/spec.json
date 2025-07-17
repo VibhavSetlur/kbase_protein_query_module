@@ -52,29 +52,15 @@
                     "target_property": "workspace_name"
                 },
                 {
-                    "input_parameter": "protein_id",
-                    "target_property": "protein_id"
-                },
-                {
                     "input_parameter": "sequence",
                     "target_property": "sequence"
                 }
             ],
             "output_mapping": [
-                {
-                    "service_method_output_path": [
-                        0,
-                        "embedding"
-                    ],
-                    "target_property": "embedding"
-                },
-                {
-                    "service_method_output_path": [
-                        0,
-                        "summary"
-                    ],
-                    "target_property": "summary"
-                }
+                { "service_method_output_path": [0, "embedding"], "target_property": "embedding" },
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
+                { "service_method_output_path": [0, "embedding_norm"], "target_property": "embedding_norm" },
+                { "service_method_output_path": [0, "sequence_length"], "target_property": "sequence_length" }
             ]
         }
     },

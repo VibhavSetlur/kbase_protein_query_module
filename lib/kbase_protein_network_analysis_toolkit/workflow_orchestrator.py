@@ -18,8 +18,8 @@ import time
 import gc
 
 from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
-from kbase_protein_network_analysis_toolkit.family_classifier import ProteinFamilyClassifier
-from kbase_protein_network_analysis_toolkit.similarity_index import FamilySpecificIndex, SimilarityIndex, HierarchicalIndex, StreamingIndex
+from kbase_protein_network_analysis_toolkit.assign_protein_family import AssignProteinFamily
+from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex, StreamingIndex
 from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
 from kbase_protein_network_analysis_toolkit.storage import ProteinStorage, MemoryEfficientLoader
 
@@ -46,7 +46,7 @@ class ProteinNetworkWorkflow:
         
         # Initialize components
         self.embedding_generator = None
-        self.family_classifier = None
+        self.assign_protein_family = None
         
         # Initialize storage components
         self.storage = None
@@ -376,23 +376,16 @@ class ProteinNetworkWorkflow:
         # Load family embeddings for network construction
         family_embeddings, family_protein_ids = self.storage.load_family_embeddings(family_id)
         
-        # Get embeddings for similar proteins
-        similar_protein_ids = [p['protein_id'] for p in similar_proteins]
-        similar_indices = [family_protein_ids.index(pid) for pid in similar_protein_ids if pid in family_protein_ids]
-        similar_embeddings = family_embeddings[similar_indices]
-        
-        # Create network builder
-        network_config = self.config.get('network', {})
-        builder = DynamicNetworkBuilder(**network_config)
-        
-        # Build network
-        G, properties = builder.build_network_from_similar_proteins(
-            similar_proteins=similar_proteins,
-            embeddings=similar_embeddings,
-            protein_ids=similar_protein_ids,
+        # Use create_localized_network to get both G and properties
+        from kbase_protein_network_analysis_toolkit.network_builder import create_localized_network
+        G, properties = create_localized_network(
             query_embedding=query_embedding,
             query_protein_id=query_protein_id,
-            method=network_method
+            similar_proteins=similar_proteins,
+            embeddings=family_embeddings,
+            protein_ids=family_protein_ids,
+            method=network_method,
+            **self.config.get('network', {})
         )
         
         logger.info(f"Built network with {len(G.nodes())} nodes and {len(G.edges())} edges")

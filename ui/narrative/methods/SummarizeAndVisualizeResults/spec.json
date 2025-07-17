@@ -41,28 +41,15 @@
             "name": "kbase_protein_network_analysis_toolkit",
             "method": "summarize_and_visualize_results",
             "input_mapping": [
-                {
-                    "narrative_system_variable": "workspace",
-                    "target_property": "workspace_name"
-                },
-                {
-                    "input_parameter": "search_results",
-                    "target_property": "search_results"
-                },
-                {
-                    "input_parameter": "output_dir",
-                    "target_property": "output_dir"
-                }
+                { "narrative_system_variable": "workspace", "target_property": "workspace_name" },
+                { "input_parameter": "search_results", "target_property": "search_results" },
+                { "input_parameter": "output_dir", "target_property": "output_dir" }
             ],
             "output_mapping": [
-                {
-                    "service_method_output_path": [0, "report_name"],
-                    "target_property": "report_name"
-                },
-                {
-                    "service_method_output_path": [0, "report_ref"],
-                    "target_property": "report_ref"
-                }
+                { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
+                { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
+                { "service_method_output_path": [0, "output_dir"], "target_property": "output_dir" }
             ]
         }
     },

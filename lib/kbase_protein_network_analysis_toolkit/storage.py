@@ -293,6 +293,17 @@ class ProteinStorage:
                 
                 yield embeddings, protein_ids
 
+    def load_metadata(self, family_id: str) -> pd.DataFrame:
+        """
+        Load metadata for a given family using CompressedMetadataStorage.
+        Args:
+            family_id: Family identifier
+        Returns:
+            Metadata DataFrame
+        """
+        meta_storage = CompressedMetadataStorage(metadata_dir=str(self.metadata_dir))
+        return meta_storage.load_metadata(family_id=family_id)
+
 
 class CompressedMetadataStorage:
     """
