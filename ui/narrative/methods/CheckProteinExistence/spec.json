@@ -21,7 +21,7 @@
                 "valid_ws_types": [],
                 "validate_as": "regex",
                 "regex_constraint": "^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-Z0-9]{6,10}$",
-                "regex_error_message": "Please enter a valid UniProt accession (e.g., P12345, Q9H9K5, A0A024RBG1)."
+                "regex_error_message": "Enter a valid UniProt accession (e.g., P12345)."
             }
         }
     ],

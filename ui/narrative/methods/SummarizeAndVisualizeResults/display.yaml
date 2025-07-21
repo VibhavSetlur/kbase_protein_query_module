@@ -4,7 +4,7 @@
 name: Summarize and Visualize Results
 
 tooltip: |
-    Generate a summary report, interactive plots, and downloadable files from protein similarity search results.
+    Summarize and visualize protein similarity search results with interactive plots and downloadable files.
 
 screenshots: []
 
@@ -24,28 +24,20 @@ suggestions:
 
 parameters :
     search_results :
-        ui-name : |
-            Search Results
-        short-hint : |
-            Provide the results from the FindTopMatchesFromEmbedding app.
-        long-hint  : |
-            The output from the similarity search app, containing the list of top matches and their metadata. This will be used to generate the summary report and visualizations.
+        ui-name : Search Results
+        short-hint : Output from FindTopMatchesFromEmbedding.
+        long-hint  : Provide the results from the similarity search app.
     output_dir :
-        ui-name : |
-            Output Directory
-        short-hint : |
-            Directory to save the summary report and downloadable files.
+        ui-name : Output Directory
+        short-hint : Directory to save the summary report and files.
 
 description : |
-
-    <p>This App takes the results of a protein similarity search and generates a comprehensive summary, including interactive network visualizations, tables, and downloadable files. It helps you interpret and share your protein search results.</p>
-
+    <p>Generate a summary report and interactive plots from protein similarity search results. Download files for further analysis.</p>
     <ul>
     <li><b>Input:</b> Search results from FindTopMatchesFromEmbedding</li>
-    <li><b>Output:</b> HTML/JSON report, interactive plots, and downloadable links</li>
+    <li><b>Output:</b> HTML/JSON report, plots, and downloadable files</li>
     </ul>
-
-    <p>Use this app as the final step in your protein analysis pipeline to summarize and visualize your findings.</p>
+    <p>Click <b>Summarize Results</b> to run.</p>
 
 publications :
     -

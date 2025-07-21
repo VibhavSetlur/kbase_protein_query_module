@@ -1,18 +1,15 @@
 #
 # Protein Existence Checker App Display
 #
-name: Check Protein Existence in KBase Protein Network
+name: Check Protein Existence
 
 tooltip: |
-    Quickly check if a protein (by UniProt ID) exists in the KBase Protein Network database and retrieve its family and metadata.
+    Quickly check if a UniProt protein exists in the KBase Protein Network and view its family and metadata.
 
 screenshots: []
 
 icon: search.png
 
-#
-# define a set of similar methods that might be useful to the user
-#
 suggestions:
     apps:
         related:
@@ -25,30 +22,19 @@ suggestions:
         next:
             ["GenerateProteinEmbeddings"]
 
-#
-# Configure the display and description of parameters
-#
 parameters :
     protein_id :
-        ui-name : |
-            Protein ID (UniProt)
-        short-hint : |
-            Enter the UniProt ID of the protein to check for existence in the database.
-        long-hint  : |
-            The UniProt accession or protein identifier. The app will search the KBase Protein Network for this protein and return its existence status, family, and available metadata.
+        ui-name : Protein ID (UniProt)
+        short-hint : Check if this UniProt ID exists in the KBase Protein Network.
+        long-hint  : Enter a valid UniProt accession (e.g., P12345).
 
 description : |
-
-    <p>This App allows you to quickly check if a protein, specified by its UniProt ID, exists in the KBase Protein Network Analysis Toolkit's database. If the protein is found, the app will return the family in which it is located and any available metadata (such as organism, function, and annotation details).</p>
-
-    <p>This is the first step in a modular protein analysis pipeline. You can use this app to verify the presence of your protein of interest before proceeding to generate embeddings, search for similar proteins, or visualize results.</p>
-
+    <p>Enter a UniProt ID to check if it exists in the KBase Protein Network. If found, you will see its family and metadata.</p>
     <ul>
     <li><b>Input:</b> UniProt protein ID (e.g., P12345)</li>
-    <li><b>Output:</b> Existence confirmation, family ID, and metadata (if found)</li>
+    <li><b>Output:</b> Existence status, family ID, and metadata</li>
     </ul>
-
-    <p>For more advanced analysis, use the <b>GenerateProteinEmbeddings</b> app to compute embeddings, or <b>FindTopMatchesFromEmbedding</b> to search for similar proteins.</p>
+    <p>Use this as the first step in your protein analysis workflow.</p>
 
 publications :
     -

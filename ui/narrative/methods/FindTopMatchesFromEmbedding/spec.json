@@ -19,7 +19,7 @@
             "field_type": "textarea",
             "text_options": {
                 "valid_ws_types": [],
-                "example": "[0.123, -0.456, ...] (JSON array of floats, as output by GenerateProteinEmbeddings)"
+                "example": "[0.123, -0.456, ...] (JSON array of floats)"
             }
         },
         {

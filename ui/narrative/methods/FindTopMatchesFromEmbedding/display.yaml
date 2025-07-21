@@ -4,7 +4,7 @@
 name: Find Top Matches From Embedding
 
 tooltip: |
-    Search for the most similar proteins in the KBase Protein Network using a protein embedding, and retrieve a ranked list with metadata.
+    Search for the most similar proteins in the KBase Protein Network using a protein embedding.
 
 screenshots: []
 
@@ -23,44 +23,25 @@ suggestions:
             ["SummarizeAndVisualizeResults"]
 
 parameters :
-    protein_id :
-        ui-name : |
-            Protein ID (UniProt)
-        short-hint : |
-            Enter the UniProt ID of the protein to search for similar proteins (optional if embedding or sequence is provided).
-    sequence :
-        ui-name : |
-            Protein Sequence
-        short-hint : |
-            Enter the amino acid sequence of the protein (optional if UniProt ID or embedding is provided).
     embedding :
-        ui-name : |
-            Protein Embedding
-        short-hint : |
-            Provide a precomputed embedding (JSON array of floats).
+        ui-name : Protein Embedding
+        short-hint : Paste a protein embedding (JSON array).
+        long-hint  : Use the output from GenerateProteinEmbeddings.
     family_id :
-        ui-name : |
-            Family ID
-        short-hint : |
-            The family to search within (required).
+        ui-name : Family ID
+        short-hint : Family to search within (required).
     top_n :
-        ui-name : |
-            Number of Top Matches
-        short-hint : |
-            Specify how many top similar proteins to return (default: 10).
-        long-hint : |
-            The app will return a ranked list of the most similar proteins in the database, along with their metadata.
+        ui-name : Number of Top Matches
+        short-hint : How many top similar proteins to return (default: 10).
+        long-hint  : Returns a ranked list of the most similar proteins.
 
 description : |
-
-    <p>This App searches the KBase Protein Network for the most similar proteins to your query, using a protein embedding. You can provide a UniProt ID, a sequence, or a precomputed embedding. The app returns a ranked list of top matches, each with similarity scores and metadata.</p>
-
+    <p>Find the most similar proteins to your query using a protein embedding. Returns a ranked list with metadata.</p>
     <ul>
-    <li><b>Input:</b> Protein embedding, UniProt ID, or sequence; number of top matches</li>
+    <li><b>Input:</b> Protein embedding, family ID, number of matches</li>
     <li><b>Output:</b> Ranked list of similar proteins with metadata</li>
     </ul>
-
-    <p>Use this app after generating an embedding for your protein of interest. The results can be visualized and summarized in the <b>SummarizeAndVisualizeResults</b> app.</p>
+    <p>Click <b>Find Matches</b> to run.</p>
 
 publications :
     -

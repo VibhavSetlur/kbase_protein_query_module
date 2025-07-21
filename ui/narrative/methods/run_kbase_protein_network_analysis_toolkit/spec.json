@@ -9,44 +9,87 @@
         "input": null,
         "output": null
     },
-    "parameters": [ 
+    "parameters": [
         {
-            "id": "parameter_1",
+            "id": "query_sequence",
+            "optional": false,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [ "" ],
+            "field_type": "textarea",
+            "text_options": {
+                "valid_ws_types": [ ],
+                "example": ">Example\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+            }
+        },
+        {
+            "id": "query_protein_id",
             "optional": true,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [ "" ],
             "field_type": "text",
             "text_options": {
-                "valid_ws_types": [ ]
+                "valid_ws_types": [ ],
+                "example": "P12345"
             }
+        },
+        {
+            "id": "k_similar",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [ "50" ],
+            "field_type": "text",
+            "text_options": {
+                "validate_as": "int",
+                "min_int": 1,
+                "max_int": 1000
+            }
+        },
+        {
+            "id": "network_method",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [ "mutual_knn" ],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "mutual_knn": "Mutual k-NN",
+                "threshold": "Similarity Threshold",
+                "hybrid": "Hybrid"
+            }
+        },
+        {
+            "id": "save_results",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [ "true" ],
+            "field_type": "checkbox"
         }
     ],
     "behavior": {
         "service-mapping": {
             "url": "",
             "name": "kbase_protein_network_analysis_toolkit",
-            "method": "run_kbase_protein_network_analysis_toolkit",
+            "method": "run_complete_workflow",
             "input_mapping": [
-                {
-                    "narrative_system_variable": "workspace",
-                    "target_property": "workspace_name"
-                },{
-                    "narrative_system_variable": "workspace_id",
-                    "target_property": "workspace_id"
-                },{
-                    "input_parameter": "parameter_1",
-                    "target_property": "parameter_1"
-                }
+                { "narrative_system_variable": "workspace", "target_property": "workspace_name" },
+                { "input_parameter": "query_sequence", "target_property": "query_sequence" },
+                { "input_parameter": "query_protein_id", "target_property": "query_protein_id" },
+                { "input_parameter": "k_similar", "target_property": "k_similar" },
+                { "input_parameter": "network_method", "target_property": "network_method" },
+                { "input_parameter": "save_results", "target_property": "save_results" }
             ],
             "output_mapping": [
-                {
-                    "service_method_output_path": [0,"report_name"],
-                    "target_property": "report_name"
-                },{
-                    "service_method_output_path": [0,"report_ref"],
-                    "target_property": "report_ref"
-                }
+                { "service_method_output_path": [0,"report_name"], "target_property": "report_name" },
+                { "service_method_output_path": [0,"report_ref"], "target_property": "report_ref" },
+                { "service_method_output_path": [0,"workflow_status"], "target_property": "workflow_status" },
+                { "service_method_output_path": [0,"family_id"], "target_property": "family_id" },
+                { "service_method_output_path": [0,"network_properties"], "target_property": "network_properties" },
+                { "service_method_output_path": [0,"similar_proteins"], "target_property": "similar_proteins" },
+                { "service_method_output_path": [0,"summary"], "target_property": "summary" }
             ]
         }
     },
