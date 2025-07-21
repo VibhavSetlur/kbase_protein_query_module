@@ -39,7 +39,9 @@ class kbase_protein_network_analysis_toolkit:
     # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
-        self.callback_url = os.environ['SDK_CALLBACK_URL']
+        self.callback_url = os.environ.get('SDK_CALLBACK_URL')
+        if self.callback_url is None:
+            raise RuntimeError('SDK_CALLBACK_URL environment variable must be set.')
         self.shared_folder = config['scratch']
         logging.basicConfig(format='%(created)s %(levelname)s: %(message)s',
                             level=logging.INFO)

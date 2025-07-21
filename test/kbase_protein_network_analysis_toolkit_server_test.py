@@ -15,6 +15,8 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if 'KB_AUTH_TOKEN' not in os.environ or not os.environ['KB_AUTH_TOKEN']:
+            os.environ['KB_AUTH_TOKEN'] = 'DUMMY_TOKEN'
         token = os.environ.get('KB_AUTH_TOKEN', None)
         config_file = os.environ.get('KB_DEPLOYMENT_CONFIG', None)
         cls.cfg = {}
@@ -41,6 +43,8 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         cls.wsClient = Workspace(cls.wsURL)
         cls.serviceImpl = kbase_protein_network_analysis_toolkit(cls.cfg)
         cls.scratch = cls.cfg['scratch']
+        if 'SDK_CALLBACK_URL' not in os.environ:
+            os.environ['SDK_CALLBACK_URL'] = 'http://dummy-callback-url'
         cls.callback_url = os.environ['SDK_CALLBACK_URL']
         suffix = int(time.time() * 1000)
         cls.wsName = "test_ContigFilter_" + str(suffix)

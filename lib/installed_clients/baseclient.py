@@ -5,8 +5,6 @@
 #
 ############################################################
 
-from __future__ import print_function
-
 import json as _json
 import requests as _requests
 import random as _random
@@ -14,16 +12,8 @@ import os as _os
 import traceback as _traceback
 from requests.exceptions import ConnectionError
 from urllib3.exceptions import ProtocolError
-
-try:
-    from configparser import ConfigParser as _ConfigParser  # py 3
-except ImportError:
-    from ConfigParser import ConfigParser as _ConfigParser  # py 2
-
-try:
-    from urllib.parse import urlparse as _urlparse  # py3
-except ImportError:
-    from urlparse import urlparse as _urlparse  # py2
+from configparser import ConfigParser as _ConfigParser
+from urllib.parse import urlparse as _urlparse
 import time
 
 _CT = 'content-type'
@@ -45,8 +35,7 @@ def _get_token(user_id, password, auth_svc):
     if status >= 200 and status <= 299:
         tok = _json.loads(ret.text)
     elif status == 403:
-        raise Exception('Authentication failed: Bad user_id/password ' +
-                        'combination for user %s' % (user_id))
+        raise Exception(f'Authentication failed: Bad user_id/password combination for user {user_id}')
     else:
         raise Exception(ret.text)
     return tok['token']

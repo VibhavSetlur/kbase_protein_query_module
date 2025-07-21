@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import datetime
 import json
@@ -19,10 +19,7 @@ from jsonrpcbase import ServerError as JSONServerError
 from biokbase import log
 from kbase_protein_network_analysis_toolkit.authclient import KBaseAuth as _KBaseAuth
 
-try:
-    from ConfigParser import ConfigParser
-except ImportError:
-    from configparser import ConfigParser
+from configparser import ConfigParser
 
 DEPLOY = 'KB_DEPLOYMENT_CONFIG'
 SERVICE = 'KB_SERVICE_NAME'
@@ -572,7 +569,7 @@ def stop_server():
 
 def process_async_cli(input_file_path, output_file_path, token):
     exit_code = 0
-    with open(input_file_path) as data_file:
+    with open(input_file_path, encoding='utf-8') as data_file:
         req = json.load(data_file)
     if 'version' not in req:
         req['version'] = '1.1'
@@ -614,7 +611,7 @@ def process_async_cli(input_file_path, output_file_path, token):
                 }
     if 'error' in resp:
         exit_code = 500
-    with open(output_file_path, "w") as f:
+    with open(output_file_path, "w", encoding='utf-8') as f:
         f.write(json.dumps(resp, cls=JSONObjectEncoder))
     return exit_code
 
