@@ -29,10 +29,10 @@ parameters :
         long-hint  : Paste the protein sequence (FASTA or plain).
     query_protein_id :
         ui-name : Protein ID (optional)
-        short-hint : Optional: Provide a UniProt ID for the query protein.
+        short-hint : "Optional: Provide a UniProt ID for the query protein."
     k_similar :
         ui-name : Number of Similar Proteins
-        short-hint : Number of top similar proteins to find (default: 50).
+        short-hint : "Number of top similar proteins to find (default: 50)."
     network_method :
         ui-name : Network Construction Method
         short-hint : Choose how to build the protein network.

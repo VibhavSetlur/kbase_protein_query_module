@@ -54,6 +54,10 @@
                 {
                     "input_parameter": "sequence",
                     "target_property": "sequence"
+                },
+                {
+                    "input_parameter": "protein_id",
+                    "target_property": "protein_id"
                 }
             ],
             "output_mapping": [

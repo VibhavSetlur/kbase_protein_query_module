@@ -32,7 +32,7 @@ parameters :
         short-hint : Family to search within (required).
     top_n :
         ui-name : Number of Top Matches
-        short-hint : How many top similar proteins to return (default: 10).
+        short-hint : "How many top similar proteins to return (default: 10)."
         long-hint  : Returns a ranked list of the most similar proteins.
 
 description : |

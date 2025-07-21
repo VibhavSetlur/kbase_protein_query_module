@@ -54,7 +54,7 @@
             "allow_multiple": false,
             "default_values": [ "mutual_knn" ],
             "field_type": "dropdown",
-            "dropdown_options": {
+            "options": {
                 "mutual_knn": "Mutual k-NN",
                 "threshold": "Similarity Threshold",
                 "hybrid": "Hybrid"
@@ -73,7 +73,7 @@
         "service-mapping": {
             "url": "",
             "name": "kbase_protein_network_analysis_toolkit",
-            "method": "run_complete_workflow",
+            "method": "run_kbase_protein_network_analysis_toolkit",
             "input_mapping": [
                 { "narrative_system_variable": "workspace", "target_property": "workspace_name" },
                 { "input_parameter": "query_sequence", "target_property": "query_sequence" },
