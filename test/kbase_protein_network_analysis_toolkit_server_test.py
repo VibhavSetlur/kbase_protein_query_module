@@ -70,6 +70,49 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         self.assertIn('summary', output)
         self.assertIn('start_time', output)
 
+    # Unit test wrappers for each unit test in test/unit_tests
+    def test_unit_assign_protein_family(self):
+        from test.unit_tests import test_assign_protein_family
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_assign_protein_family)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
+    def test_unit_check_existence(self):
+        from test.unit_tests import test_check_existence
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_check_existence)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
+    def test_unit_embedding_generator(self):
+        from test.unit_tests import test_embedding_generator
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_embedding_generator)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
+    def test_unit_network_builder(self):
+        from test.unit_tests import test_network_builder
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_network_builder)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
+    def test_unit_similarity_index(self):
+        from test.unit_tests import test_similarity_index
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_similarity_index)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
+    def test_unit_storage(self):
+        from test.unit_tests import test_storage
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_storage)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
+    def test_unit_workflow_orchestrator(self):
+        from test.unit_tests import test_workflow_orchestrator
+        suite = unittest.defaultTestLoader.loadTestsFromModule(test_workflow_orchestrator)
+        result = unittest.TextTestRunner().run(suite)
+        self.assertTrue(result.wasSuccessful())
+
     def test_run_complete_workflow(self):
         # This test will only check that the workflow runs and returns a report, not the full biological correctness
         params = {
