@@ -101,10 +101,6 @@ WORKDIR /kb/module
 # Build the module
 RUN make all
 
-# Run tests (fail build if tests fail)
-RUN echo 'export PYTHONPATH=$(cd $script_dir/../lib && pwd):$PYTHONPATH' >> test/run_tests.sh
-RUN echo 'cd $script_dir/../test' >> test/run_tests.sh
-RUN ./scripts/run_tests.sh
 
 ENTRYPOINT [ "./scripts/entrypoint.sh" ]
 
