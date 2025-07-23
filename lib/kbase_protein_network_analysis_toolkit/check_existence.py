@@ -40,11 +40,8 @@ class ProteinExistenceChecker:
         """
         if not protein_id:
             raise ValueError("Must provide a protein_id (UniProt ID).")
-        # Fast search: check each family's protein_ids using metadata index if available
         for family_id in self.family_list:
-            metadata_found = False
             try:
-                # Try using metadata index for fast lookup
                 if self.metadata_storage:
                     try:
                         metadata = self.metadata_storage.load_metadata(family_id=family_id, protein_ids=[protein_id])
@@ -55,30 +52,23 @@ class ProteinExistenceChecker:
                                 "metadata": metadata.iloc[0].to_dict()
                             }
                     except Exception:
-                        pass  # If metadata loading fails, fallback to HDF5
-                # Fallback: check protein_ids in HDF5
-                try:
-                    _, protein_ids = self.storage.load_family_embeddings(family_id)
-                    if protein_id in protein_ids:
-                        # Try to get metadata if possible
-                        meta = None
-                        if self.metadata_storage:
-                            try:
-                                meta_df = self.metadata_storage.load_metadata(family_id=family_id, protein_ids=[protein_id])
-                                if not meta_df.empty:
-                                    meta = meta_df.iloc[0].to_dict()
-                            except Exception:
-                                pass
-                        return {
-                            "exists": True,
-                            "family_id": family_id,
-                            "metadata": meta
-                        }
-                except Exception as e:
-                    logger.debug(f"Error loading HDF5 for family {family_id}: {e}")
-                    continue
+                        pass
+                _, protein_ids = self.storage.load_family_embeddings(family_id)
+                if protein_id in protein_ids:
+                    meta = None
+                    if self.metadata_storage:
+                        try:
+                            meta_df = self.metadata_storage.load_metadata(family_id=family_id, protein_ids=[protein_id])
+                            if not meta_df.empty:
+                                meta = meta_df.iloc[0].to_dict()
+                        except Exception:
+                            pass
+                    return {
+                        "exists": True,
+                        "family_id": family_id,
+                        "metadata": meta
+                    }
             except Exception as e:
                 logger.debug(f"Error checking family {family_id}: {e}")
                 continue
-        # Not found
         return {"exists": False, "family_id": None, "metadata": None} 

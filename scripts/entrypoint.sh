@@ -17,6 +17,16 @@ elif [ "${1}" = "async" ] ; then
   sh ./scripts/run_async.sh
 elif [ "${1}" = "init" ] ; then
   echo "Initialize module"
+  # Copy reference data to /data
+  cp -r ./data/* /data/
+  # Sanity check: ensure a key file exists (e.g., family_centroids.npz)
+  if [ -f /data/family_centroids.npz ]; then
+    touch /data/__READY__
+    echo "Reference data initialized and __READY__ file created."
+  else
+    echo "Sanity check failed: family_centroids.npz not found in /data."
+    exit 1
+  fi
 elif [ "${1}" = "bash" ] ; then
   bash
 elif [ "${1}" = "report" ] ; then

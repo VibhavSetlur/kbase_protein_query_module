@@ -76,6 +76,46 @@ class ProteinStorage:
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
     
+    def save_html_file(self, html_content: str, filename: str, subdir: Optional[str] = None) -> str:
+        """
+        Save an HTML file to the storage-managed directory structure.
+
+        Args:
+            html_content: The HTML content to write
+            filename: The name of the HTML file (should end with .html)
+            subdir: Optional subdirectory under the base_dir to store the file (e.g., 'results' or 'html_reports')
+        Returns:
+            The full path to the saved HTML file
+        """
+        if subdir:
+            output_dir = self.base_dir / subdir
+        else:
+            output_dir = self.base_dir / "results"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        html_path = output_dir / filename
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        logger.info(f"Saved HTML file to {html_path}")
+        return str(html_path)
+
+    def load_html_file(self, filename: str, subdir: Optional[str] = None) -> str:
+        """
+        Load an HTML file from the storage-managed directory structure.
+        Args:
+            filename: The name of the HTML file
+            subdir: Optional subdirectory under the base_dir to load from
+        Returns:
+            The HTML content as a string
+        """
+        if subdir:
+            html_path = self.base_dir / subdir / filename
+        else:
+            html_path = self.base_dir / "results" / filename
+        if not html_path.exists():
+            raise FileNotFoundError(f"HTML file not found: {html_path}")
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
     def store_family_embeddings(self, 
                                family_id: str,
                                embeddings: np.ndarray,
@@ -83,26 +123,21 @@ class ProteinStorage:
                                metadata: Optional[pd.DataFrame] = None) -> str:
         """
         Store embeddings for a protein family with chunking.
-        
         Args:
             family_id: Family identifier
-            embeddings: Embedding array (N x D)
+            embeddings: Embedding array (N x D//8, np.uint8)
             protein_ids: List of protein IDs
             metadata: Optional metadata DataFrame
-            
         Returns:
             Path to stored family file
         """
+        if embeddings.dtype != np.uint8:
+            raise ValueError("Embeddings must be np.uint8 for binary storage.")
         family_file = self.family_dir / f"family_{family_id}.h5"
-        
-        # Determine optimal chunk size based on embedding dimensions
         embedding_dim = embeddings.shape[1]
         num_proteins = embeddings.shape[0]
-        # Ensure chunk size does not exceed data shape in any dimension
         optimal_chunk_size = min(self.chunk_size, max(1, min(num_proteins, 10000 // embedding_dim)))
-        
         with h5py.File(family_file, 'w') as f:
-            # Store embeddings with chunking and compression
             f.create_dataset(
                 'embeddings',
                 data=embeddings,
@@ -111,8 +146,6 @@ class ProteinStorage:
                 compression_opts=self.compression_opts,
                 shuffle=True
             )
-            
-            # Store protein IDs
             f.create_dataset(
                 'protein_ids',
                 data=protein_ids,
@@ -121,24 +154,15 @@ class ProteinStorage:
                 compression=self.compression,
                 compression_opts=self.compression_opts
             )
-            
-            # Store metadata if provided
             if metadata is not None:
                 metadata_file = self.metadata_dir / f"family_{family_id}_metadata.parquet"
                 metadata.to_parquet(metadata_file, compression='gzip')
-                
-                # Store metadata reference
                 f.attrs['metadata_file'] = str(metadata_file)
-            
-            # Store family statistics
             f.attrs['num_proteins'] = len(protein_ids)
             f.attrs['embedding_dim'] = embedding_dim
             f.attrs['chunk_size'] = optimal_chunk_size
             f.attrs['compression'] = self.compression
-        
-        logger.info(f"Stored family {family_id}: {len(protein_ids)} proteins, "
-                   f"{embedding_dim} dimensions, {optimal_chunk_size} chunk size")
-        
+        logger.info(f"Stored family {family_id}: {len(protein_ids)} proteins, {embedding_dim} bytes, {optimal_chunk_size} chunk size")
         return str(family_file)
     
     def load_family_embeddings(self, 
@@ -174,73 +198,37 @@ class ProteinStorage:
         
         return embeddings, protein_ids
     
-    def create_family_index(self, 
-                           family_id: str,
-                           index_type: str = "faiss",
-                           **kwargs) -> str:
+    def create_family_index(self, family_id: str, **kwargs) -> str:
         """
-        Create and store similarity index for a family.
-        
+        Create and store FAISS IVF binary similarity index for a family.
         Args:
             family_id: Family identifier
-            index_type: Type of index ('faiss', 'annoy')
-            **kwargs: Index-specific parameters
-            
         Returns:
             Path to stored index file
         """
-        # Load family embeddings
+        import faiss
         embeddings, protein_ids = self.load_family_embeddings(family_id)
-        
-        # Create index
-        if index_type == "faiss":
-            import faiss
-            dimension = embeddings.shape[1]
-            
-            # Use IVF index for large families
-            if len(embeddings) > 10000:
-                nlist = min(100, len(embeddings) // 100)
-                quantizer = faiss.IndexFlatIP(dimension)
-                index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_INNER_PRODUCT)
-                index.train(embeddings)
-            else:
-                index = faiss.IndexFlatIP(dimension)
-            
-            index.add(embeddings)
-            
-            # Save index
-            index_file = self.index_dir / f"family_{family_id}.faiss"
-            faiss.write_index(index, str(index_file))
-            
-        elif index_type == "annoy":
-            from annoy import AnnoyIndex
-            dimension = embeddings.shape[1]
-            
-            index = AnnoyIndex(dimension, 'angular')
-            for i, embedding in enumerate(embeddings):
-                index.add_item(i, embedding)
-            
-            index.build(kwargs.get('n_trees', 100))
-            
-            # Save index
-            index_file = self.index_dir / f"family_{family_id}.ann"
-            index.save(str(index_file))
-        
-        # Save metadata
+        # Convert embeddings to binary (uint8) if not already
+        if embeddings.dtype != np.uint8:
+            raise ValueError("Embeddings must be np.uint8 for binary FAISS indexing.")
+        dimension = embeddings.shape[1] * 8  # D in bits
+        nlist = min(100, len(embeddings) // 10) or 1
+        quantizer = faiss.IndexBinaryFlat(dimension)
+        index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
+        index.train(embeddings)
+        index.add(embeddings)
+        index_file = self.index_dir / f"family_{family_id}.faissbin"
+        faiss.write_index(index, str(index_file))
         metadata = {
             'protein_ids': protein_ids,
-            'index_type': index_type,
-            'dimension': embeddings.shape[1],
+            'index_type': 'faiss_binary',
+            'dimension': dimension,
             'num_proteins': len(protein_ids)
         }
-        
         metadata_file = self.index_dir / f"family_{family_id}_metadata.json"
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
-        
-        logger.info(f"Created {index_type} index for family {family_id}: "
-                   f"{len(protein_ids)} proteins")
-        
+        logger.info(f"Created FAISS IVF binary index for family {family_id}: {len(protein_ids)} proteins, {dimension} bits")
         return str(index_file)
     
     def get_family_list(self) -> List[str]:

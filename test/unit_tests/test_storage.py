@@ -19,10 +19,14 @@ class TestProteinStorage(unittest.TestCase):
         shutil.rmtree(self.temp_dir)
 
     def test_store_and_load_family(self):
-        self.storage.store_family_embeddings(self.family_id, self.embeddings, self.protein_ids, self.metadata)
-        emb, ids = self.storage.load_family_embeddings(self.family_id)
-        self.assertEqual(len(ids), 4)
-        np.testing.assert_array_almost_equal(emb, self.embeddings)
+        N = 10
+        D = 320  # must be multiple of 8
+        embeddings = np.random.randint(0, 256, size=(N, D // 8), dtype=np.uint8)
+        protein_ids = [f'prot_{i}' for i in range(N)]
+        self.storage.store_family_embeddings('test_family', embeddings, protein_ids)
+        loaded_embeddings, loaded_ids = self.storage.load_family_embeddings('test_family')
+        assert np.array_equal(embeddings, loaded_embeddings)
+        assert protein_ids == loaded_ids
 
     def test_chunking(self):
         self.storage.store_family_embeddings(self.family_id, self.embeddings, self.protein_ids)

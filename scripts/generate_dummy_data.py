@@ -8,10 +8,10 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 # Configurable parameters
-N_FAMILIES = 3
-N_PROTEINS_PER_FAMILY = 10
+N_FAMILIES = 50
+N_PROTEINS_PER_FAMILY = 500
 MODEL_NAME = 'esm2_t6_8M_UR50D'  # Smallest ESM2 model
-EMBEDDING_DIM = 320  # Embedding dimension for esm2_t6_8M_UR50D
+EMBEDDING_DIM = 320  # Embedding dimension for esm2_t6_8M_UR50D (must be multiple of 8)
 DATA_DIR = 'data'
 
 np.random.seed(42)
@@ -37,8 +37,8 @@ for fam in range(N_FAMILIES):
     family_id = f'family_{fam}'
     # Generate protein IDs
     protein_ids = [f'{family_id}_prot_{i}' for i in range(N_PROTEINS_PER_FAMILY)]
-    # Generate random embeddings
-    embeddings = np.random.randn(N_PROTEINS_PER_FAMILY, EMBEDDING_DIM).astype(np.float32)
+    # Generate random binary embeddings (np.uint8, shape [N, D//8])
+    embeddings = np.random.randint(0, 256, size=(N_PROTEINS_PER_FAMILY, EMBEDDING_DIM // 8), dtype=np.uint8)
     # Save HDF5 file
     h5_path = os.path.join(families_dir, f'{family_id}.h5')
     with h5py.File(h5_path, 'w') as f:
@@ -46,7 +46,7 @@ for fam in range(N_FAMILIES):
         dt = h5py.string_dtype(encoding='utf-8')
         f.create_dataset('protein_ids', data=np.array(protein_ids, dtype=object), dtype=dt)
         f.attrs['num_proteins'] = N_PROTEINS_PER_FAMILY
-        f.attrs['embedding_dim'] = EMBEDDING_DIM
+        f.attrs['embedding_dim'] = EMBEDDING_DIM // 8
         f.attrs['chunk_size'] = N_PROTEINS_PER_FAMILY
         f.attrs['compression'] = 'gzip'
         f.attrs['metadata_file'] = os.path.join('metadata', f'{family_id}_metadata.parquet')
@@ -61,17 +61,38 @@ for fam in range(N_FAMILIES):
     meta_path = os.path.join(metadata_dir, f'{family_id}_metadata.parquet')
     table = pa.Table.from_pandas(metadata)
     pq.write_table(table, meta_path)
-    # Build FAISS index
-    index = faiss.IndexFlatL2(EMBEDDING_DIM)
-    index.add(embeddings)
-    faiss_path = os.path.join(indexes_fam_dir, f'{family_id}.faiss')
-    faiss.write_index(index, faiss_path)
+    # Build FAISS IVF binary index (use flat for small families)
+    dimension = EMBEDDING_DIM
+    nlist = min(100, N_PROTEINS_PER_FAMILY // 10) or 1
+    # FAISS IVF requires at least 39*nlist training points
+    if N_PROTEINS_PER_FAMILY < 39 * nlist:
+        # Too few points for IVF, use flat index
+        index = faiss.IndexBinaryFlat(dimension)
+        index.add(embeddings)
+    else:
+        quantizer = faiss.IndexBinaryFlat(dimension)
+        index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
+        index.train(embeddings)
+        index.add(embeddings)
+    faiss_path = os.path.join(indexes_fam_dir, f'{family_id}.faissbin')
+    print(f"Writing index for {family_id}: type={type(index)}, is_trained={getattr(index, 'is_trained', 'N/A')}, ntotal={getattr(index, 'ntotal', 'N/A')}")
+    if hasattr(index, 'is_trained') and not index.is_trained:
+        raise RuntimeError(f"Index for {family_id} is not trained!")
+    if getattr(index, 'ntotal', 1) == 0:
+        raise RuntimeError(f"Index for {family_id} is empty!")
+    try:
+        faiss.write_index_binary(index, str(faiss_path))
+    except Exception as e:
+        print(f"Failed to write index for {family_id}: {e}")
+        raise
     # Update family mapping
-    family_mapping[family_id] = f'families/{family_id}.faiss'
-
-    # Compute centroid and eigenprotein
-    centroid = embeddings.mean(axis=0)
-    dists = np.linalg.norm(embeddings - centroid, axis=1)
+    family_mapping[family_id] = f'families/{family_id}.faissbin'
+    # Compute centroid (bitwise majority)
+    centroid = np.unpackbits(embeddings, axis=1).mean(axis=0) > 0.5
+    centroid = centroid.astype(np.uint8)
+    # Find eigenprotein (closest to centroid in Hamming distance)
+    unpacked = np.unpackbits(embeddings, axis=1)
+    dists = np.sum(unpacked != centroid, axis=1)
     medoid_idx = np.argmin(dists)
     eigenprotein_id = protein_ids[medoid_idx]
     centroids.append(centroid)

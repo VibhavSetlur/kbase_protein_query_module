@@ -15,7 +15,6 @@ from typing import Dict, List, Tuple, Optional, Union, Iterator
 import logging
 from pathlib import Path
 import faiss
-from annoy import AnnoyIndex
 import h5py
 from collections import defaultdict
 
@@ -97,227 +96,61 @@ class HierarchicalIndex:
         with open(mapping_file, 'w') as f:
             json.dump(self.family_mapping, f, indent=2)
     
-    def create_family_index(self, 
-                           family_id: str,
-                           embeddings: np.ndarray,
-                           protein_ids: List[str],
-                           **kwargs) -> str:
-        """
-        Create optimized index for a protein family.
-        
-        Args:
-            family_id: Family identifier
-            embeddings: Embedding array
-            protein_ids: List of protein IDs
-            **kwargs: Additional parameters
-            
-        Returns:
-            Path to created index file
-        """
-        dimension = embeddings.shape[1]
+    def create_family_index(self, family_id: str, embeddings: np.ndarray, protein_ids: List[str], **kwargs) -> str:
+        dimension = embeddings.shape[1] * 8  # bits
         num_proteins = len(embeddings)
-        
-        # Normalize embeddings
-        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
-        
-        if self.index_type == "faiss":
-            index_file = self._create_faiss_index(
-                family_id, embeddings_norm, protein_ids, dimension, num_proteins, **kwargs
-            )
-        elif self.index_type == "annoy":
-            index_file = self._create_annoy_index(
-                family_id, embeddings_norm, protein_ids, dimension, **kwargs
-            )
-        else:
-            raise ValueError(f"Unsupported index type: {self.index_type}")
-        
-        # Update family mapping
-        self.family_mapping[family_id] = str(index_file)
-        self._save_family_mapping()
-        
-        return index_file
-    
-    def _create_faiss_index(self, 
-                           family_id: str,
-                           embeddings: np.ndarray,
-                           protein_ids: List[str],
-                           dimension: int,
-                           num_proteins: int,
-                           **kwargs) -> str:
-        """Create FAISS index with quantization."""
-        index_file = self.base_dir / "families" / f"family_{family_id}.faiss"
-        
-        # Choose index type based on size and requirements
-        if num_proteins < 10000:
-            # Small family: use flat index
-            index = faiss.IndexFlatIP(dimension)
-        elif self.quantization == "pq" and dimension >= self.pq_m * 4:
-            # Large family with high dimension: use Product Quantization
-            index = faiss.IndexPQ(dimension, self.pq_m, self.pq_bits, faiss.METRIC_INNER_PRODUCT)
-        elif self.quantization == "sq":
-            # Use Scalar Quantization
-            index = faiss.IndexScalarQuantizer(dimension, faiss.ScalarQuantizer.QT_8bit, faiss.METRIC_INNER_PRODUCT)
-        else:
-            # Use IVF with flat quantizer
-            nlist = min(100, num_proteins // 100)
-            quantizer = faiss.IndexFlatIP(dimension)
-            index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_INNER_PRODUCT)
-            
-            # Train the index
-            index.train(embeddings)
-        
-        # Add vectors to index
+        if embeddings.dtype != np.uint8:
+            raise ValueError("Embeddings must be np.uint8 for binary FAISS indexing.")
+        nlist = min(100, num_proteins // 10) or 1
+        quantizer = faiss.IndexBinaryFlat(dimension)
+        index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
+        index.train(embeddings)
         index.add(embeddings)
-        
-        # Save index
+        index_file = self.base_dir / "families" / f"family_{family_id}.faissbin"
         faiss.write_index(index, str(index_file))
-        
-        # Save metadata
         metadata = {
             'protein_ids': protein_ids,
             'dimension': dimension,
             'num_proteins': num_proteins,
-            'index_type': 'faiss',
-            'quantization': self.quantization,
-            'pq_m': self.pq_m if self.quantization == "pq" else None,
-            'pq_bits': self.pq_bits if self.quantization == "pq" else None
+            'index_type': 'faiss_binary'
         }
-        
         metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
-        
-        logger.info(f"Created FAISS index for family {family_id}: "
-                   f"{num_proteins} proteins, {dimension} dimensions, "
-                   f"quantization: {self.quantization}")
-        
+        logger.info(f"Created FAISS IVF binary index for family {family_id}: {num_proteins} proteins, {dimension} bits")
+        self.family_mapping[family_id] = str(index_file)
+        self._save_family_mapping()
         return str(index_file)
-    
-    def _create_annoy_index(self, 
-                           family_id: str,
-                           embeddings: np.ndarray,
-                           protein_ids: List[str],
-                           dimension: int,
-                           **kwargs) -> str:
-        """Create Annoy index."""
-        index_file = self.base_dir / "families" / f"family_{family_id}.ann"
-        
-        # Create Annoy index
-        index = AnnoyIndex(dimension, 'angular')
-        
-        for i, embedding in enumerate(embeddings):
-            index.add_item(i, embedding)
-        
-        # Build index
-        n_trees = kwargs.get('n_trees', 100)
-        index.build(n_trees)
-        
-        # Save index
-        index.save(str(index_file))
-        
-        # Save metadata
-        metadata = {
-            'protein_ids': protein_ids,
-            'dimension': dimension,
-            'num_proteins': len(protein_ids),
-            'index_type': 'annoy',
-            'n_trees': n_trees
-        }
-        
-        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
-        with open(metadata_file, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        
-        logger.info(f"Created Annoy index for family {family_id}: "
-                   f"{len(protein_ids)} proteins, {dimension} dimensions")
-        
-        return str(index_file)
-    
+
     def _get_cached_index(self, family_id: str):
-        """Get index from cache or load it."""
         if family_id in self._family_cache:
-            # Update cache order
             self._cache_order.remove(family_id)
             self._cache_order.append(family_id)
             return self._family_cache[family_id]
-        
-        # Load index
         if family_id not in self.family_mapping:
             raise ValueError(f"Family {family_id} not found in index mapping")
-        
         index_file = self.family_mapping[family_id]
         metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
-        
-        # Load metadata
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
-        
-        # Load index
-        if metadata['index_type'] == 'faiss':
-            index = faiss.read_index(index_file)
-        elif metadata['index_type'] == 'annoy':
-            index = AnnoyIndex(metadata['dimension'], 'angular')
-            index.load(index_file)
-        
-        # Cache the index
+        index = faiss.read_index_binary(index_file)
         self._family_cache[family_id] = (index, metadata)
         self._cache_order.append(family_id)
-        
-        # Remove oldest entry if cache is full
         if len(self._family_cache) > self.cache_size:
             oldest_family = self._cache_order.pop(0)
             del self._family_cache[oldest_family]
-        
         return index, metadata
-    
-    def search_family(self, 
-                     family_id: str,
-                     query_embedding: np.ndarray,
-                     top_k: int = 50,
-                     **kwargs) -> Tuple[np.ndarray, List[str]]:
-        """
-        Search within a specific family.
-        
-        Args:
-            family_id: Family identifier
-            query_embedding: Query embedding vector
-            top_k: Number of results to return
-            **kwargs: Additional search parameters
-            
-        Returns:
-            Tuple of (similarities, protein_ids)
-        """
+
+    def search_family(self, family_id: str, query_embedding: np.ndarray, top_k: int = 50, **kwargs) -> Tuple[np.ndarray, List[str]]:
         index, metadata = self._get_cached_index(family_id)
-        
-        # Normalize query embedding
-        query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-8)
-        
-        if metadata['index_type'] == 'faiss':
-            # FAISS search
-            if isinstance(index, faiss.IndexIVF):
-                # Set number of probes for IVF index
-                nprobe = kwargs.get('nprobe', 10)
-                index.nprobe = nprobe
-            
-            similarities, indices = index.search(query_norm.reshape(1, -1), top_k)
-            similarities = similarities[0]
-            indices = indices[0]
-            
-            # Get protein IDs
-            protein_ids = [metadata['protein_ids'][i] for i in indices if i != -1]
-            similarities = similarities[:len(protein_ids)]
-            
-        elif metadata['index_type'] == 'annoy':
-            # Annoy search
-            indices, distances = index.get_nns_by_vector(
-                query_norm, top_k, include_distances=True
-            )
-            
-            # Convert distances to similarities
-            similarities = 1.0 - np.array(distances)
-            protein_ids = [metadata['protein_ids'][i] for i in indices]
-        
-        return similarities, protein_ids
+        if query_embedding.dtype != np.uint8:
+            raise ValueError("Query embedding must be np.uint8 for binary FAISS search.")
+        D, I = index.search(query_embedding.reshape(1, -1), top_k)
+        D = D[0]
+        I = I[0]
+        protein_ids = [metadata['protein_ids'][i] for i in I if i != -1]
+        D = D[:len(protein_ids)]
+        return D, protein_ids
     
     def search_all_families(self, 
                            query_embedding: np.ndarray,

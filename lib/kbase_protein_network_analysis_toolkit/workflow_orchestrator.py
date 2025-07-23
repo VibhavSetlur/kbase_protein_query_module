@@ -291,67 +291,36 @@ class ProteinNetworkWorkflow:
                                           family_id: str,
                                           k: int = 50) -> List[Dict]:
         """
-        Perform optimized similarity search within family.
-        
+        Perform optimized similarity search within family using binary IVF FAISS.
         Args:
-            query_embedding: Query protein embedding
+            query_embedding: Query protein embedding (np.uint8, shape [D//8])
             family_id: Family ID to search within
             k: Number of similar proteins to retrieve
-            
         Returns:
             List of similar proteins with metadata
         """
         logger.info(f"Performing optimized similarity search for top {k} proteins in family {family_id}...")
-        
-        # Use hierarchical index if available
         if self.hierarchical_index:
             try:
-                similarities, protein_ids = self.hierarchical_index.search_family(
+                if query_embedding.dtype != np.uint8:
+                    raise ValueError("Query embedding must be np.uint8 for binary FAISS search.")
+                D, protein_ids = self.hierarchical_index.search_family(
                     family_id, query_embedding, top_k=k
                 )
-                
-                # Convert to result format
                 similar_proteins = []
-                for i, (similarity, protein_id) in enumerate(zip(similarities, protein_ids)):
+                for i, (dist, protein_id) in enumerate(zip(D, protein_ids)):
                     protein_result = {
                         'protein_id': protein_id,
-                        'similarity_score': float(similarity),
+                        'similarity_score': int(dist),  # Hamming distance
                         'rank': i + 1
                     }
                     similar_proteins.append(protein_result)
-                
-                logger.info(f"Found {len(similar_proteins)} similar proteins using hierarchical index")
+                logger.info(f"Found {len(similar_proteins)} similar proteins using binary FAISS index")
                 return similar_proteins
-                
             except Exception as e:
-                logger.warning(f"Hierarchical index search failed: {e}, falling back to streaming search")
-        
-        # Fallback to streaming search
-        logger.info("Using streaming search as fallback")
-        
-        # Load family embeddings
-        family_embeddings, family_protein_ids = self.storage.load_family_embeddings(family_id)
-        
-        # Normalize query embedding
-        query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-8)
-        
-        # Compute similarities
-        similarities = np.dot(family_embeddings, query_norm)
-        
-        # Get top k results
-        top_indices = np.argsort(similarities)[::-1][:k]
-        
-        similar_proteins = []
-        for i, idx in enumerate(top_indices):
-            protein_result = {
-                'protein_id': family_protein_ids[idx],
-                'similarity_score': float(similarities[idx]),
-                'rank': i + 1
-            }
-            similar_proteins.append(protein_result)
-        
-        logger.info(f"Found {len(similar_proteins)} similar proteins using streaming search")
-        return similar_proteins
+                logger.warning(f"Hierarchical index search failed: {e}")
+        logger.error("No valid binary FAISS index found for search.")
+        return []
     
     def build_optimized_network(self, query_embedding: np.ndarray,
                                query_protein_id: str,
@@ -471,6 +440,26 @@ class ProteinNetworkWorkflow:
                 'network_properties': network_properties
             }
             results['timing']['network_construction'] = time.time() - step_start
+
+            # --- Generate interactive network HTML file ---
+            # Use a dedicated directory for HTML reports
+            html_dir = self.config.get('storage', {}).get('output_dir', 'results')
+            html_filename = f"network_{query_protein_id}_{int(time.time())}.html"
+            # Generate the HTML file using DynamicNetworkBuilder and storage
+            builder = DynamicNetworkBuilder(**self.config.get('network', {}))
+            fig, _ = builder.create_interactive_visualization(
+                embeddings=family_embeddings,
+                protein_ids=family_protein_ids,
+                metadata_df=family_metadata,
+                query_embedding=query_embedding,
+                query_protein_id=query_protein_id,
+                output_file=os.path.join(html_dir, html_filename),
+                storage=self.storage
+            )
+            # Get the full path from storage (guaranteed to exist)
+            html_file_path = self.storage.base_dir / html_dir / html_filename if not os.path.isabs(html_dir) else Path(html_dir) / html_filename
+            results['network_html_file'] = str(html_file_path)
+            results['family_metadata'] = family_metadata
             
             # Store results
             results['query_embedding'] = query_embedding

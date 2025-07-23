@@ -64,7 +64,11 @@
                 { "service_method_output_path": [0, "summary"], "target_property": "summary" },
                 { "service_method_output_path": [0, "family_id"], "target_property": "family_id" },
                 { "service_method_output_path": [0, "top_n"], "target_property": "top_n" },
-                { "service_method_output_path": [0, "similarity_stats"], "target_property": "similarity_stats" }
+                { "service_method_output_path": [0, "similarity_stats"], "target_property": "similarity_stats" },
+                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
+                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
+                { "service_method_output_path": [0, "validation_status"], "target_property": "validation_status" },
+                { "service_method_output_path": [0, "error"], "target_property": "error" }
             ]
         }
     },

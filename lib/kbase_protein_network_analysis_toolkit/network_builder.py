@@ -131,6 +131,15 @@ def create_kamada_kawai_layout(G, seed=42):
     pos = nx.kamada_kawai_layout(G_weighted, weight='weight')
     return pos
 
+def compute_hamming_distance_matrix(embeddings):
+    """Compute Hamming distance matrix for binary embeddings (np.uint8)."""
+    unpacked = np.unpackbits(embeddings, axis=1)
+    n = unpacked.shape[0]
+    D = np.zeros((n, n), dtype=int)
+    for i in range(n):
+        D[i] = np.sum(unpacked[i] != unpacked, axis=1)
+    return D
+
 
 # ==============================================================================
 # 2. MAIN VISUALIZATION FUNCTION
@@ -145,7 +154,8 @@ def visualize_interactive_protein_network(
     id_column: str = 'Entry',
     query_embedding: np.ndarray = None,
     query_protein_id: str = None,
-    output_file: Optional[str] = None
+    output_file: Optional[str] = None,
+    storage: Optional[object] = None  # Accept ProteinStorage instance
 ):
     """
     Generates a highly interactive visualization of protein network based on embeddings.
@@ -466,7 +476,15 @@ def visualize_interactive_protein_network(
         output_dir = os.path.dirname(output_file)
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
-        fig.write_html(output_file)
+        # If a storage instance is provided, use it
+        if storage is not None:
+            # Use the filename and subdir from output_file
+            filename = os.path.basename(output_file)
+            subdir = os.path.relpath(output_dir, str(storage.base_dir)) if output_dir else None
+            fig_html = fig.to_html(full_html=True)
+            storage.save_html_file(fig_html, filename, subdir=subdir)
+        else:
+            fig.write_html(output_file)
         logger.info(f"Interactive visualization saved to: {output_file}")
 
     # --- 6. Display the Figure ---
@@ -781,7 +799,8 @@ class DynamicNetworkBuilder:
                                        metadata_df: pd.DataFrame,
                                        query_embedding: Optional[np.ndarray] = None,
                                        query_protein_id: Optional[str] = None,
-                                       output_file: Optional[str] = None) -> Tuple[Optional[object], Optional[nx.Graph]]:
+                                       output_file: Optional[str] = None,
+                                       storage: Optional[object] = None) -> Tuple[Optional[object], Optional[nx.Graph]]:
         """
         Create an interactive visualization of the protein network.
         
@@ -792,7 +811,7 @@ class DynamicNetworkBuilder:
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
             output_file: Optional path to save the visualization as HTML
-            
+            storage: Optional ProteinStorage instance for managed saving
         Returns:
             Tuple of (Plotly figure, NetworkX graph)
         """
@@ -805,7 +824,8 @@ class DynamicNetworkBuilder:
             id_column=None,  # Use index instead of column name
             query_embedding=query_embedding,
             query_protein_id=query_protein_id,
-            output_file=output_file
+            output_file=output_file,
+            storage=storage
         )
     
     def analyze_network_properties(self, G: nx.Graph) -> Dict:

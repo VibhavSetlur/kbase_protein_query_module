@@ -23,11 +23,13 @@ class TestProteinNetworkWorkflow(unittest.TestCase):
         embedding_generator = ProteinEmbeddingGenerator(model_name='esm2_t6_8M_UR50D', device='cpu')
         embedding_dim = embedding_generator.get_embedding_dim() if hasattr(embedding_generator, 'get_embedding_dim') else 320
         # Create a fake family in storage
+        self.family_id = 'test_family'
+        self.N = 10
+        self.D = 320  # must be multiple of 8
+        self.embeddings = np.random.randint(0, 256, size=(self.N, self.D // 8), dtype=np.uint8)
+        self.protein_ids = [f'prot_{i}' for i in range(self.N)]
         from kbase_protein_network_analysis_toolkit.storage import ProteinStorage
-        self.storage = ProteinStorage(base_dir=self.temp_dir)
-        self.family_id = 'FAMW'
-        self.protein_ids = ['X1', 'X2', 'X3']
-        self.embeddings = np.random.randn(3, embedding_dim).astype(np.float32)
+        self.storage = ProteinStorage(base_dir='test_data')
         self.storage.store_family_embeddings(self.family_id, self.embeddings, self.protein_ids)
 
     def tearDown(self):

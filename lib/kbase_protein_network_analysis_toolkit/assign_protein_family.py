@@ -44,27 +44,25 @@ class AssignProteinFamily:
 
     def assign_family(self, embedding: Union[np.ndarray, list, Any]) -> Dict[str, Any]:
         """
-        Assign a query embedding to the closest family centroid using cosine similarity.
-
+        Assign a query embedding to the closest family centroid using Hamming distance (binary).
         Args:
-            embedding: Query protein embedding (list or np.ndarray)
-
+            embedding: Query protein embedding (list or np.ndarray, np.uint8 expected)
         Returns:
             Dict with keys: 'family_id', 'confidence', 'eigenprotein_id'
         """
         if self.centroids is None or self.family_ids is None or self.eigenprotein_ids is None:
             raise ValueError("Family centroids and IDs must be loaded before assignment.")
-        emb = np.array(embedding, dtype=np.float32)
-        emb_norm = emb / (np.linalg.norm(emb) + 1e-8)
-        centroids_norm = self.centroids / (np.linalg.norm(self.centroids, axis=1, keepdims=True) + 1e-8)
-        sims = np.dot(centroids_norm, emb_norm)
-        idx = int(np.argmax(sims))
+        emb = np.array(embedding, dtype=np.uint8)
+        emb_bits = np.unpackbits(emb)
+        centroids_bits = np.array([np.unpackbits(c) for c in self.centroids])
+        dists = np.sum(centroids_bits != emb_bits, axis=1)
+        idx = int(np.argmin(dists))
         result = {
             'family_id': str(self.family_ids[idx]),
-            'confidence': float(sims[idx]),
+            'confidence': float(-dists[idx]),  # negative Hamming distance as confidence
             'eigenprotein_id': str(self.eigenprotein_ids[idx])
         }
-        logger.debug(f"Assigned embedding to family {result['family_id']} (confidence={result['confidence']:.3f})")
+        logger.debug(f"Assigned embedding to family {result['family_id']} (Hamming distance={-result['confidence']:.3f})")
         return result
 
     def predict_family(self, embedding: Union[np.ndarray, list, Any]) -> (str, float):
