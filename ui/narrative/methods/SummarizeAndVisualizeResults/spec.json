@@ -11,15 +11,15 @@
     },
     "parameters": [
         {
-            "id": "search_results",
+            "id": "top_matches_result_ref",
             "optional": false,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
-            "field_type": "textarea",
+            "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": [],
-                "example": "Output JSON from FindTopMatchesFromEmbedding (matches and summary)"
+                "valid_ws_types": ["KBaseProtein.TopMatchesResult"],
+                "example": "Select a previous top matches result."
             }
         },
         {
@@ -42,18 +42,14 @@
             "method": "summarize_and_visualize_results",
             "input_mapping": [
                 { "narrative_system_variable": "workspace", "target_property": "workspace_name" },
-                { "input_parameter": "search_results", "target_property": "search_results" },
+                { "input_parameter": "top_matches_result_ref", "target_property": "top_matches_result_ref" },
                 { "input_parameter": "output_dir", "target_property": "output_dir" }
             ],
             "output_mapping": [
                 { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
                 { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
-                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
-                { "service_method_output_path": [0, "output_dir"], "target_property": "output_dir" },
-                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
-                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
-                { "service_method_output_path": [0, "validation_status"], "target_property": "validation_status" },
-                { "service_method_output_path": [0, "error"], "target_property": "error" }
+                { "service_method_output_path": [0, "summary_result"], "target_property": "summary_result" },
+                { "service_method_output_path": [0, "summary_result_ref"], "target_property": "summary_result_ref" }
             ]
         }
     },

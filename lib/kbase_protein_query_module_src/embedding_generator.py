@@ -60,15 +60,22 @@ class ProteinEmbeddingGenerator:
         try:
             logger.info(f"Loading ESM-2 model: {self.model_name}")
             
+            # Always use local path for esm2_t6_8M_UR50D
+            local_model_dir = "data/esm2_t6_8M_UR50D_local"
+            if self.model_name == "esm2_t6_8M_UR50D":
+                model_path = local_model_dir
+            else:
+                model_path = f"facebook/{self.model_name}"
+
             # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(f"facebook/{self.model_name}")
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             
             # Determine appropriate dtype based on device
             model_dtype = torch.float16 if self.device.type == 'cuda' else torch.float32
             
             # Load model with proper dtype for large models
             self.model = EsmModel.from_pretrained(
-                f"facebook/{self.model_name}", 
+                model_path, 
                 torch_dtype=model_dtype
             )
             self.model = self.model.to(self.device)

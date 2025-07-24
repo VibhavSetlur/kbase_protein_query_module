@@ -23,9 +23,9 @@ suggestions:
             ["SummarizeAndVisualizeResults"]
 
 parameters :
-    embedding :
+    embedding_ref :
         ui-name : Protein Embedding
-        short-hint : Paste a protein embedding (JSON array).
+        short-hint : Select a protein embedding result object.
         long-hint  : Use the output from GenerateProteinEmbeddings.
     family_id :
         ui-name : Family ID

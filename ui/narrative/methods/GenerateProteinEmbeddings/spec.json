@@ -61,14 +61,10 @@
                 }
             ],
             "output_mapping": [
-                { "service_method_output_path": [0, "embedding"], "target_property": "embedding" },
-                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
-                { "service_method_output_path": [0, "embedding_norm"], "target_property": "embedding_norm" },
-                { "service_method_output_path": [0, "sequence_length"], "target_property": "sequence_length" },
-                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
-                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
-                { "service_method_output_path": [0, "validation_status"], "target_property": "validation_status" },
-                { "service_method_output_path": [0, "error"], "target_property": "error" }
+                { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
+                { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
+                { "service_method_output_path": [0, "embedding_result"], "target_property": "embedding_result" },
+                { "service_method_output_path": [0, "embedding_result_ref"], "target_property": "embedding_result_ref" }
             ]
         }
     },

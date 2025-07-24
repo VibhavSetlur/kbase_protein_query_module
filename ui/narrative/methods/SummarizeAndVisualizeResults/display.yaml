@@ -23,9 +23,9 @@ suggestions:
             []
 
 parameters :
-    search_results :
-        ui-name : Search Results
-        short-hint : Output from FindTopMatchesFromEmbedding.
+    top_matches_result_ref :
+        ui-name : Top Matches Result
+        short-hint : Select a top matches result object from FindTopMatchesFromEmbedding.
         long-hint  : Provide the results from the similarity search app.
     output_dir :
         ui-name : Output Directory

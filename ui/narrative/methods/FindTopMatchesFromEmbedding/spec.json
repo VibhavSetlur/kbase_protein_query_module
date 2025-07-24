@@ -11,15 +11,15 @@
     },
     "parameters": [
         {
-            "id": "embedding",
+            "id": "embedding_ref",
             "optional": false,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
-            "field_type": "textarea",
+            "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": [],
-                "example": "[0.123, -0.456, ...] (JSON array of floats)"
+                "valid_ws_types": ["KBaseProtein.ProteinEmbeddingResult"],
+                "example": "Select a previously generated embedding."
             }
         },
         {
@@ -55,20 +55,15 @@
             "method": "find_top_matches_from_embedding",
             "input_mapping": [
                 { "narrative_system_variable": "workspace", "target_property": "workspace_name" },
-                { "input_parameter": "embedding", "target_property": "embedding" },
+                { "input_parameter": "embedding_ref", "target_property": "embedding_ref" },
                 { "input_parameter": "family_id", "target_property": "family_id" },
                 { "input_parameter": "top_n", "target_property": "top_n" }
             ],
             "output_mapping": [
-                { "service_method_output_path": [0, "matches"], "target_property": "matches" },
-                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
-                { "service_method_output_path": [0, "family_id"], "target_property": "family_id" },
-                { "service_method_output_path": [0, "top_n"], "target_property": "top_n" },
-                { "service_method_output_path": [0, "similarity_stats"], "target_property": "similarity_stats" },
-                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
-                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
-                { "service_method_output_path": [0, "validation_status"], "target_property": "validation_status" },
-                { "service_method_output_path": [0, "error"], "target_property": "error" }
+                { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
+                { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
+                { "service_method_output_path": [0, "top_matches_result"], "target_property": "top_matches_result" },
+                { "service_method_output_path": [0, "top_matches_result_ref"], "target_property": "top_matches_result_ref" }
             ]
         }
     },

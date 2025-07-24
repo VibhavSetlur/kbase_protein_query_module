@@ -26,6 +26,14 @@ module kbase_protein_query_module {
         float start_time;
         string summary;
     } CheckProteinExistenceResults;
+    typedef structure {
+        string input_id;
+        string input_type;
+        int exists;
+        string matched_id;
+        string matched_db;
+        mapping<string, string> metadata;
+    } ProteinExistenceResult;
     funcdef check_protein_existence(mapping<string, UnspecifiedObject> params) returns (CheckProteinExistenceResults output) authentication required;
 
     /*
@@ -80,4 +88,30 @@ module kbase_protein_query_module {
     } SummarizeAndVisualizeResultsResults;
     funcdef summarize_and_visualize_results(mapping<string, UnspecifiedObject> params) returns (SummarizeAndVisualizeResultsResults output) authentication required;
 
+    typedef structure {
+        string input_id;
+        string input_type;
+        string embedding_ref;
+        list<float> embedding;
+        string model_name;
+        string pooling_method;
+        mapping<string, string> metadata;
+    } ProteinEmbeddingResult;
+
+    typedef structure {
+        string input_id;
+        string input_type;
+        string embedding_ref;
+        string assigned_family_id;
+        float similarity_score;
+        mapping<string, string> metadata;
+    } ProteinFamilyAssignmentResult;
+
+    typedef structure {
+        string input_id;
+        string input_type;
+        string top_matches_result_ref;
+        string summary_html;
+        mapping<string, string> metadata;
+    } SummarizeVisualizeResult;
 };
