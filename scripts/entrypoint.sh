@@ -1,6 +1,8 @@
 #!/bin/bash
 
-. /kb/deployment/user-env.sh
+if [ -f /kb/deployment/user-env.sh ]; then
+  . /kb/deployment/user-env.sh
+fi
 
 python3 ./scripts/prepare_deploy_cfg.py ./deploy.cfg ./work/config.properties
 

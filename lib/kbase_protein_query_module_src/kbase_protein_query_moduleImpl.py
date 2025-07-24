@@ -4,6 +4,7 @@ import logging
 import os
 
 from installed_clients.KBaseReportClient import KBaseReport
+from installed_clients.WorkspaceClient import Workspace
 
 from kbase_protein_query_module_src.check_existence import ProteinExistenceChecker
 from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
@@ -56,33 +57,27 @@ class kbase_protein_query_module:
 
     def generate_protein_embedding(self, ctx, params):
         """
-        Generate a protein embedding from a sequence or protein_id.
-        :param params: dict with 'sequence' or 'protein_id', and 'workspace_name'
-        :returns: dict with 'embedding' and 'summary'
+        Generate a protein embedding from an amino acid sequence.
+        :param params: dict with 'sequence' (required) and 'workspace_name' (optional)
+        :returns: dict with 'report_name', 'report_ref', 'embedding_result', 'embedding_result_ref'
         """
         #BEGIN generate_protein_embedding
         import time
+        import uuid
         start_time = time.time()
         validation_status = "success"
         error = None
         sequence = params.get('sequence')
-        protein_id = params.get('protein_id')
-        if not sequence and not protein_id:
+        workspace_name = params.get('workspace_name')
+        if not sequence or not isinstance(sequence, str) or not sequence.strip():
             validation_status = "error"
-            error = "At least one of 'sequence' or 'protein_id' must be provided."
+            error = "Parameter 'sequence' must be a non-empty string."
             summary = f"Validation failed: {error}"
             return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
-        if protein_id and not sequence:
-            validation_status = "error"
-            error = "Protein sequence lookup by protein_id is not implemented. Please provide 'sequence'."
-            summary = f"Validation failed: {error}"
-            return [{
+                'report_name': None,
+                'report_ref': None,
+                'embedding_result': None,
+                'embedding_result_ref': None,
                 'status': validation_status,
                 'error': error,
                 'input_parameters': params,
@@ -92,15 +87,83 @@ class kbase_protein_query_module:
         generator = ProteinEmbeddingGenerator()
         embedding = generator.generate_embedding(sequence)
         summary = f"Generated embedding for protein. Shape: {embedding.shape}"
-        output = {
+        # Save embedding as a workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        embedding_obj_name = f"embedding_result_{uuid.uuid4().hex[:8]}"
+        embedding_obj_type = "KBaseProtein.ProteinEmbeddingResult"
+        embedding_obj_data = {
             'embedding': embedding.tolist(),
+            'sequence': sequence,
             'summary': summary,
             'input_parameters': params,
-            'start_time': start_time,
             'embedding_norm': float((embedding**2).sum()**0.5),
             'sequence_length': len(sequence),
-            'validation_status': validation_status,
-            'error': error
+            'created_at': start_time
+        }
+        try:
+            save_ret = ws.save_objects({
+                'workspace': workspace_name,
+                'objects': [{
+                    'type': embedding_obj_type,
+                    'data': embedding_obj_data,
+                    'name': embedding_obj_name
+                }]
+            })
+            embedding_result_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+        except Exception as e:
+            validation_status = "error"
+            error = f"Failed to save embedding object: {str(e)}"
+            return [{
+                'report_name': None,
+                'report_ref': None,
+                'embedding_result': None,
+                'embedding_result_ref': None,
+                'status': validation_status,
+                'error': error,
+                'input_parameters': params,
+                'start_time': start_time,
+                'summary': error
+            }]
+        # Create a KBase report
+        report = KBaseReport(self.callback_url)
+        report_text = summary
+        try:
+            report_info = report.create({
+                'report': {
+                    'objects_created': [{
+                        'ref': embedding_result_ref,
+                        'description': 'Protein embedding result'
+                    }],
+                    'text_message': report_text
+                },
+                'workspace_name': workspace_name
+            })
+            report_name = report_info['name']
+            report_ref = report_info['ref']
+        except Exception as e:
+            validation_status = "error"
+            error = f"Failed to create report: {str(e)}"
+            return [{
+                'report_name': None,
+                'report_ref': None,
+                'embedding_result': embedding_obj_data,
+                'embedding_result_ref': embedding_result_ref,
+                'status': validation_status,
+                'error': error,
+                'input_parameters': params,
+                'start_time': start_time,
+                'summary': error
+            }]
+        output = {
+            'report_name': report_name,
+            'report_ref': report_ref,
+            'embedding_result': embedding_obj_data,
+            'embedding_result_ref': embedding_result_ref,
+            'status': validation_status,
+            'error': error,
+            'input_parameters': params,
+            'start_time': start_time,
+            'summary': summary
         }
         #END generate_protein_embedding
         return [output]
@@ -465,25 +528,6 @@ class kbase_protein_query_module:
         }
         #END run_complete_workflow
         return [output]
-
-    def assign_family_fast(self, ctx, params):
-        """
-        Quickly assign a query embedding to a family using precomputed centroids.
-        :param params: dict with 'embedding' (list or np.ndarray)
-        :returns: dict with 'family_id', 'confidence', and 'eigenprotein_id'
-        """
-        #BEGIN assign_family_fast
-        import numpy as np
-        embedding = np.array(params['embedding'])
-        family_id, confidence = self.family_assigner.predict_family(embedding)
-        idx = list(self.family_assigner.family_ids).index(family_id)
-        eigenprotein_id = self.family_assigner.eigenprotein_ids[idx]
-        return [{
-            'family_id': family_id,
-            'confidence': confidence,
-            'eigenprotein_id': eigenprotein_id
-        }]
-        #END assign_family_fast
 
     def status(self, ctx):
         #BEGIN_STATUS

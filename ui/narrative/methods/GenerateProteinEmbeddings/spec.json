@@ -15,22 +15,8 @@
     },
     "parameters": [
         {
-            "id": "protein_id",
-            "optional": true,
-            "advanced": false,
-            "allow_multiple": false,
-            "default_values": [""],
-            "field_type": "text",
-            "text_options": {
-                "valid_ws_types": [],
-                "validate_as": "regex",
-                "regex_constraint": "^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-Z0-9]{6,10}$",
-                "regex_error_message": "Enter a valid UniProt accession (e.g., P12345). Leave blank if providing a sequence."
-            }
-        },
-        {
             "id": "sequence",
-            "optional": true,
+            "optional": false,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
@@ -54,10 +40,6 @@
                 {
                     "input_parameter": "sequence",
                     "target_property": "sequence"
-                },
-                {
-                    "input_parameter": "protein_id",
-                    "target_property": "protein_id"
                 }
             ],
             "output_mapping": [

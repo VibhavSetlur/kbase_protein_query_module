@@ -23,9 +23,6 @@ suggestions:
             ["FindTopMatchesFromEmbedding"]
 
 parameters :
-    protein_id :
-        ui-name : Protein ID (UniProt)
-        short-hint : Enter a UniProt ID (optional).
     sequence :
         ui-name : Protein Sequence
         short-hint : Enter the amino acid sequence (optional).
