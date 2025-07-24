@@ -165,8 +165,10 @@ class kbase_protein_query_module:
             'start_time': start_time,
             'summary': summary
         }
-        #END generate_protein_embedding
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method generate_protein_embedding must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END generate_protein_embedding
 
     def assign_family_fast(self, ctx, params):
         """
@@ -216,8 +218,10 @@ class kbase_protein_query_module:
             'error': error,
             'summary': f"Assigned to family {result['family_id']} with confidence {result['confidence']:.3f}."
         }
-        #END assign_family_fast
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method assign_family_fast must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END assign_family_fast
 
     def check_protein_existence(self, ctx, params):
         """
@@ -280,8 +284,10 @@ class kbase_protein_query_module:
             'validation_status': validation_status,
             'error': error
         }
-        #END check_protein_existence
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method check_protein_existence must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END check_protein_existence
 
     def find_top_matches_from_embedding(self, ctx, params):
         """
@@ -366,8 +372,10 @@ class kbase_protein_query_module:
             'validation_status': validation_status,
             'error': error
         }
-        #END find_top_matches_from_embedding
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method find_top_matches_from_embedding must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END find_top_matches_from_embedding
 
     def summarize_and_visualize_results(self, ctx, params):
         """
@@ -421,8 +429,10 @@ class kbase_protein_query_module:
             'validation_status': validation_status,
             'error': error
         }
-        #END summarize_and_visualize_results
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method summarize_and_visualize_results must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END summarize_and_visualize_results
 
     def run_complete_workflow(self, ctx, params):
         """
@@ -526,8 +536,10 @@ class kbase_protein_query_module:
             'validation_status': validation_status,
             'error': error
         }
-        #END run_complete_workflow
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method run_complete_workflow must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END run_complete_workflow
 
     def status(self, ctx):
         #BEGIN_STATUS
@@ -578,14 +590,10 @@ class kbase_protein_query_module:
             'validation_status': validation_status,
             'error': error
         }
-        #END run_kbase_protein_query_module
-
-        # At some point might do deeper type checking...
-        # if not isinstance(output, dict):
-        #     raise ValueError('Method run_kbase_protein_query_module return value ' +
-        #                      'output is not type dict as required.')
-        # return the results
+        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
+            raise ValueError('Method run_kbase_protein_query_module must return a dict or list of dicts as required by KBase.')
         return [output]
+        #END run_kbase_protein_query_module
 
     def _generate_detailed_html_report(self, results, output_html_path):
         """

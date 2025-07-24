@@ -21,7 +21,8 @@ from installed_clients.KBaseReportClient import KBaseReport
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
         }
-#END run_kbase_protein_network_analysis_toolkit
+        return output
+        #END run_kbase_protein_network_analysis_toolkit
 #BEGIN_STATUS
         returnVal = {'state': "OK",
                      'message': "",
