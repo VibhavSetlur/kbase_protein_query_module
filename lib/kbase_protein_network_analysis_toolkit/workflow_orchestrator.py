@@ -46,7 +46,7 @@ class ProteinNetworkWorkflow:
         
         # Initialize components
         self.embedding_generator = None
-        self.assign_protein_family = None
+        self.assign_protein_family = AssignProteinFamily()
         
         # Initialize storage components
         self.storage = None
@@ -56,6 +56,13 @@ class ProteinNetworkWorkflow:
         
         # Load pre-computed data if available
         self._load_precomputed_data()
+        
+        # Load centroids for assignment
+        centroids_path = self.config.get('storage', {}).get('centroids_path', None)
+        if centroids_path is None:
+            centroids_path = str(self.storage.base_dir / "family_centroids_binary.npz")
+        if os.path.exists(centroids_path):
+            self.assign_protein_family.load_family_centroids(centroids_path)
         
         # Performance monitoring
         self.performance_metrics = {}
@@ -194,70 +201,15 @@ class ProteinNetworkWorkflow:
     
     def classify_query_family(self, query_embedding: np.ndarray) -> Tuple[str, float]:
         """
-        Classify query protein into a family using storage.
-        
+        Classify query protein into a family using binary FAISS IVF (Hamming search on binary centroids).
         Args:
-            query_embedding: Query protein embedding
-            
+            query_embedding: Query protein embedding (must be np.float32)
         Returns:
             Tuple of (family_id, confidence_score)
         """
-        if not self.available_families:
-            raise ValueError("No families available in storage")
-        
-        logger.info("Classifying query protein into family...")
-        
-        # Normalize query embedding
-        query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-8)
-        
-        # Search across all families to find the best match
-        best_family = None
-        best_similarity = -1.0
-        
-        # Use hierarchical index if available
-        if self.hierarchical_index:
-            logger.info("Using hierarchical index for family classification")
-            
-            # Search all families
-            family_results = self.hierarchical_index.search_all_families(
-                query_norm,
-                top_k=1,
-                max_families=100  # Limit for performance
-            )
-            
-            if family_results:
-                # Get the best result
-                best_family, similarities, protein_ids = family_results[0]
-                best_similarity = similarities[0] if len(similarities) > 0 else 0.0
-                
-        else:
-            logger.info("Using streaming search for family classification")
-            
-            # Use streaming search as fallback
-            # This is more memory-intensive but works without hierarchical index
-            for family_id in self.available_families[:50]:  # Limit for performance
-                try:
-                    family_embeddings, family_protein_ids = self.storage.load_family_embeddings(family_id)
-                    
-                    # Compute similarity to family centroid
-                    family_centroid = np.mean(family_embeddings, axis=0)
-                    family_centroid_norm = family_centroid / (np.linalg.norm(family_centroid) + 1e-8)
-                    
-                    similarity = np.dot(query_norm, family_centroid_norm)
-                    
-                    if similarity > best_similarity:
-                        best_similarity = similarity
-                        best_family = family_id
-                        
-                except Exception as e:
-                    logger.warning(f"Error processing family {family_id}: {e}")
-                    continue
-        
-        if best_family is None:
-            raise ValueError("Could not classify query into any family")
-        
-        logger.info(f"Query classified into family {best_family} with confidence {best_similarity:.3f}")
-        return best_family, best_similarity
+        logger.info("Classifying query protein into family using binary FAISS IVF centroids...")
+        result = self.assign_protein_family.assign_family(query_embedding)
+        return result['family_id'], result['confidence']
     
     def load_family_subset(self, family_id: str) -> Tuple[np.ndarray, List[str], pd.DataFrame]:
         """
@@ -291,36 +243,36 @@ class ProteinNetworkWorkflow:
                                           family_id: str,
                                           k: int = 50) -> List[Dict]:
         """
-        Perform optimized similarity search within family using binary IVF FAISS.
+        Perform optimized similarity search within family using FAISS IVF float32 only.
         Args:
-            query_embedding: Query protein embedding (np.uint8, shape [D//8])
+            query_embedding: Query protein embedding (np.float32, shape [D])
             family_id: Family ID to search within
             k: Number of similar proteins to retrieve
         Returns:
             List of similar proteins with metadata
         """
-        logger.info(f"Performing optimized similarity search for top {k} proteins in family {family_id}...")
-        if self.hierarchical_index:
-            try:
-                if query_embedding.dtype != np.uint8:
-                    raise ValueError("Query embedding must be np.uint8 for binary FAISS search.")
-                D, protein_ids = self.hierarchical_index.search_family(
-                    family_id, query_embedding, top_k=k
-                )
-                similar_proteins = []
-                for i, (dist, protein_id) in enumerate(zip(D, protein_ids)):
-                    protein_result = {
-                        'protein_id': protein_id,
-                        'similarity_score': int(dist),  # Hamming distance
-                        'rank': i + 1
-                    }
-                    similar_proteins.append(protein_result)
-                logger.info(f"Found {len(similar_proteins)} similar proteins using binary FAISS index")
-                return similar_proteins
-            except Exception as e:
-                logger.warning(f"Hierarchical index search failed: {e}")
-        logger.error("No valid binary FAISS index found for search.")
-        return []
+        logger.info(f"Performing optimized similarity search for top {k} proteins in family {family_id} using FAISS IVF float32...")
+        if self.hierarchical_index is None:
+            raise RuntimeError("FAISS hierarchical index is required for similarity search.")
+        if query_embedding.dtype != np.float32:
+            raise ValueError("Query embedding must be np.float32 for float FAISS search.")
+        try:
+            D, protein_ids = self.hierarchical_index.search_family_float(
+                family_id, query_embedding, top_k=k
+            )
+            similar_proteins = []
+            for i, (dist, protein_id) in enumerate(zip(D, protein_ids)):
+                protein_result = {
+                    'protein_id': protein_id,
+                    'similarity_score': float(-dist),  # negative L2 distance for compatibility
+                    'rank': i + 1
+                }
+                similar_proteins.append(protein_result)
+            logger.info(f"Found {len(similar_proteins)} similar proteins using FAISS IVF float32 index")
+            return similar_proteins
+        except Exception as e:
+            logger.error(f"FAISS IVF float32 index search failed: {e}")
+            raise RuntimeError(f"FAISS IVF float32 index search failed: {e}")
     
     def build_optimized_network(self, query_embedding: np.ndarray,
                                query_protein_id: str,
@@ -328,35 +280,30 @@ class ProteinNetworkWorkflow:
                                family_id: str,
                                network_method: str = "mutual_knn") -> Tuple[nx.Graph, Dict]:
         """
-        Build optimized network using family-specific data.
-        
+        Build optimized network using family-specific data and FAISS IVF float32.
         Args:
             query_embedding: Query protein embedding
             query_protein_id: Query protein ID
             similar_proteins: List of similar proteins
             family_id: Family ID
             network_method: Network construction method
-            
         Returns:
             Tuple of (NetworkX graph, network properties)
         """
-        logger.info(f"Building optimized network for family {family_id}...")
-        
-        # Load family embeddings for network construction
+        logger.info(f"Building optimized network for family {family_id} using FAISS IVF float32...")
         family_embeddings, family_protein_ids = self.storage.load_family_embeddings(family_id)
-        
-        # Use create_localized_network to get both G and properties
-        from kbase_protein_network_analysis_toolkit.network_builder import create_localized_network
-        G, properties = create_localized_network(
-            query_embedding=query_embedding,
-            query_protein_id=query_protein_id,
-            similar_proteins=similar_proteins,
-            embeddings=family_embeddings,
-            protein_ids=family_protein_ids,
-            method=network_method,
-            **self.config.get('network', {})
-        )
-        
+        from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
+        builder = DynamicNetworkBuilder(**self.config.get('network', {}))
+        G = None
+        if network_method == "mutual_knn":
+            G = builder.build_mutual_knn_network(family_embeddings, family_protein_ids, family_id=family_id, index=self.hierarchical_index)
+        elif network_method == "threshold":
+            G = builder.build_threshold_network(family_embeddings, family_protein_ids, family_id=family_id, index=self.hierarchical_index)
+        elif network_method == "hybrid":
+            G = builder.build_hybrid_network(family_embeddings, family_protein_ids, family_id=family_id, index=self.hierarchical_index)
+        else:
+            raise ValueError(f"Unknown network method: {network_method}")
+        properties = builder.analyze_network_properties(G)
         logger.info(f"Built network with {len(G.nodes())} nodes and {len(G.edges())} edges")
         return G, properties
     

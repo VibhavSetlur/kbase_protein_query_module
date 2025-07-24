@@ -17,3 +17,6 @@ package-dir = {"" = "lib"}
 
 [tool.setuptools.packages.find]
 where = ["lib"] 
+
+[tool.poetry.dependencies]
+pytest = "*" 

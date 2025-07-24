@@ -15,7 +15,7 @@ class TestProteinExistenceChecker(unittest.TestCase):
         # Create a small family with embeddings and metadata
         self.family_id = 'FAM1'
         self.protein_ids = ['P00001', 'P00002', 'P00003']
-        self.embeddings = np.random.randn(3, 8).astype(np.float32)
+        self.embeddings = np.random.randint(0, 256, size=(3, 8), dtype=np.uint8)
         self.metadata = pd.DataFrame({
             'Protein names': ['Alpha', 'Beta', 'Gamma'],
             'Organism': ['E. coli', 'E. coli', 'E. coli']

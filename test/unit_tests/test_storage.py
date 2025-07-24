@@ -12,7 +12,7 @@ class TestProteinStorage(unittest.TestCase):
         self.storage = ProteinStorage(base_dir=self.temp_dir, chunk_size=2)
         self.family_id = 'FAM2'
         self.protein_ids = ['A', 'B', 'C', 'D']
-        self.embeddings = np.random.randn(4, 4).astype(np.float32)
+        self.embeddings = np.random.randint(0, 256, size=(4, 4), dtype=np.uint8)
         self.metadata = pd.DataFrame({'desc': ['a', 'b', 'c', 'd']}, index=self.protein_ids)
 
     def tearDown(self):

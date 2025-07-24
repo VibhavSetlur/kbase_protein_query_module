@@ -6,6 +6,7 @@ import faiss
 import json
 import pyarrow as pa
 import pyarrow.parquet as pq
+import shutil
 
 # Configurable parameters
 N_FAMILIES = 50
@@ -23,6 +24,14 @@ indexes_meta_dir = os.path.join(DATA_DIR, 'indexes', 'metadata')
 indexes_dir = os.path.join(DATA_DIR, 'indexes')
 cache_dir = os.path.join(DATA_DIR, 'cache')
 
+# Remove all existing data to avoid duplicates
+if os.path.exists(DATA_DIR):
+    for root, dirs, files in os.walk(DATA_DIR, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            shutil.rmtree(os.path.join(root, name))
+
 # Create directories
 for d in [families_dir, metadata_dir, indexes_fam_dir, indexes_meta_dir, indexes_dir, cache_dir]:
     os.makedirs(d, exist_ok=True)
@@ -33,12 +42,18 @@ centroids = []
 eigenprotein_ids = []
 family_ids = []
 
+# Generate distinct centroids for each family
+FAMILY_CENTROIDS = np.random.normal(0, 5, size=(N_FAMILIES, EMBEDDING_DIM)).astype(np.float32)
+FAMILY_SPREAD = 0.5  # Standard deviation for within-family variation
+
 for fam in range(N_FAMILIES):
     family_id = f'family_{fam}'
     # Generate protein IDs
     protein_ids = [f'{family_id}_prot_{i}' for i in range(N_PROTEINS_PER_FAMILY)]
-    # Generate random binary embeddings (np.uint8, shape [N, D//8])
-    embeddings = np.random.randint(0, 256, size=(N_PROTEINS_PER_FAMILY, EMBEDDING_DIM // 8), dtype=np.uint8)
+    # Generate a unique centroid for this family
+    centroid = FAMILY_CENTROIDS[fam]
+    # Generate embeddings clustered around the centroid
+    embeddings = centroid + np.random.normal(0, FAMILY_SPREAD, size=(N_PROTEINS_PER_FAMILY, EMBEDDING_DIM)).astype(np.float32)
     # Save HDF5 file
     h5_path = os.path.join(families_dir, f'{family_id}.h5')
     with h5py.File(h5_path, 'w') as f:
@@ -46,10 +61,11 @@ for fam in range(N_FAMILIES):
         dt = h5py.string_dtype(encoding='utf-8')
         f.create_dataset('protein_ids', data=np.array(protein_ids, dtype=object), dtype=dt)
         f.attrs['num_proteins'] = N_PROTEINS_PER_FAMILY
-        f.attrs['embedding_dim'] = EMBEDDING_DIM // 8
+        f.attrs['embedding_dim'] = EMBEDDING_DIM
         f.attrs['chunk_size'] = N_PROTEINS_PER_FAMILY
         f.attrs['compression'] = 'gzip'
         f.attrs['metadata_file'] = os.path.join('metadata', f'{family_id}_metadata.parquet')
+        f.attrs['embedding_dtype'] = 'float32'
     # Create metadata DataFrame
     metadata = pd.DataFrame({
         'protein_id': protein_ids,
@@ -61,41 +77,35 @@ for fam in range(N_FAMILIES):
     meta_path = os.path.join(metadata_dir, f'{family_id}_metadata.parquet')
     table = pa.Table.from_pandas(metadata)
     pq.write_table(table, meta_path)
-    # Build FAISS IVF binary index (use flat for small families)
+    # Build FAISS IVF float index
     dimension = EMBEDDING_DIM
     nlist = min(100, N_PROTEINS_PER_FAMILY // 10) or 1
-    # FAISS IVF requires at least 39*nlist training points
-    if N_PROTEINS_PER_FAMILY < 39 * nlist:
-        # Too few points for IVF, use flat index
-        index = faiss.IndexBinaryFlat(dimension)
-        index.add(embeddings)
-    else:
-        quantizer = faiss.IndexBinaryFlat(dimension)
-        index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
-        index.train(embeddings)
-        index.add(embeddings)
-    faiss_path = os.path.join(indexes_fam_dir, f'{family_id}.faissbin')
-    print(f"Writing index for {family_id}: type={type(index)}, is_trained={getattr(index, 'is_trained', 'N/A')}, ntotal={getattr(index, 'ntotal', 'N/A')}")
+    quantizer = faiss.IndexFlatL2(dimension)
+    index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
+    index.train(embeddings)
+    index.add(embeddings)
+    faiss_path = os.path.join(indexes_fam_dir, f'{family_id}.faiss')
+    print(f"Writing float index for {family_id}: type={type(index)}, is_trained={getattr(index, 'is_trained', 'N/A')}, ntotal={getattr(index, 'ntotal', 'N/A')}")
     if hasattr(index, 'is_trained') and not index.is_trained:
         raise RuntimeError(f"Index for {family_id} is not trained!")
     if getattr(index, 'ntotal', 1) == 0:
         raise RuntimeError(f"Index for {family_id} is empty!")
     try:
-        faiss.write_index_binary(index, str(faiss_path))
+        faiss.write_index(index, str(faiss_path))
     except Exception as e:
-        print(f"Failed to write index for {family_id}: {e}")
+        print(f"Failed to write float index for {family_id}: {e}")
         raise
     # Update family mapping
-    family_mapping[family_id] = f'families/{family_id}.faissbin'
-    # Compute centroid (bitwise majority)
-    centroid = np.unpackbits(embeddings, axis=1).mean(axis=0) > 0.5
-    centroid = centroid.astype(np.uint8)
-    # Find eigenprotein (closest to centroid in Hamming distance)
-    unpacked = np.unpackbits(embeddings, axis=1)
-    dists = np.sum(unpacked != centroid, axis=1)
+    family_mapping[family_id] = f'families/{family_id}.faiss'
+    # Compute centroid (mean of float32)
+    centroid_actual = embeddings.mean(axis=0)
+    centroid_bin = (centroid_actual > 0).astype(np.uint8)
+    centroid_bin_packed = np.packbits(centroid_bin)
+    # Find eigenprotein (closest to centroid in L2)
+    dists = np.linalg.norm(embeddings - centroid_actual, axis=1)
     medoid_idx = np.argmin(dists)
     eigenprotein_id = protein_ids[medoid_idx]
-    centroids.append(centroid)
+    centroids.append(centroid_bin_packed)
     eigenprotein_ids.append(eigenprotein_id)
     family_ids.append(family_id)
 
@@ -106,10 +116,10 @@ with open(mapping_path, 'w') as f:
 
 # Save centroids and eigenprotein IDs
 centroids = np.stack(centroids)
-np.savez(os.path.join(DATA_DIR, 'family_centroids.npz'),
+np.savez_compressed(os.path.join(DATA_DIR, 'family_centroids_binary.npz'),
          family_ids=np.array(family_ids),
          centroids=centroids,
          eigenprotein_ids=np.array(eigenprotein_ids))
-print(f"Saved family centroids and eigenprotein IDs to '{os.path.join(DATA_DIR, 'family_centroids.npz')}'")
+print(f"Saved family centroids and eigenprotein IDs to '{os.path.join(DATA_DIR, 'family_centroids_binary.npz')}'")
 
 print(f"Dummy data generated in '{DATA_DIR}' for {N_FAMILIES} families.") 

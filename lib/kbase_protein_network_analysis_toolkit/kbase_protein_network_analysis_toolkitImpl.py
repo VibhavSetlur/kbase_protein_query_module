@@ -107,8 +107,8 @@ class kbase_protein_network_analysis_toolkit:
 
     def assign_family_fast(self, ctx, params):
         """
-        Quickly assign a protein embedding to a family by similarity to the medoid (not classification).
-        :param params: dict with 'embedding' (list of floats), and 'workspace_name'
+        Quickly assign a protein embedding to a family by similarity to the medoid (binary Hamming distance only).
+        :param params: dict with 'embedding' (list of uint8), and 'workspace_name'
         :returns: dict with 'family_id', 'confidence', and 'eigenprotein_id'
         """
         #BEGIN assign_family_fast
@@ -118,9 +118,9 @@ class kbase_protein_network_analysis_toolkit:
         validation_status = "success"
         error = None
         embedding = params.get('embedding')
-        if embedding is None or not isinstance(embedding, list) or not embedding or not all(isinstance(x, (float, int)) for x in embedding):
+        if embedding is None or not isinstance(embedding, list) or not embedding or not all(isinstance(x, (int, np.integer)) for x in embedding):
             validation_status = "error"
-            error = "Parameter 'embedding' must be a non-empty list of numbers."
+            error = "Parameter 'embedding' must be a non-empty list of uint8 integers."
             summary = f"Validation failed: {error}"
             return [{
                 'status': validation_status,
@@ -129,8 +129,20 @@ class kbase_protein_network_analysis_toolkit:
                 'start_time': start_time,
                 'summary': summary
             }]
-        embedding_np = np.array(embedding)
-        result = self.family_assigner.assign_family(embedding_np)
+        embedding_np = np.array(embedding, dtype=np.uint8)
+        try:
+            result = self.family_assigner.assign_family(embedding_np)
+        except Exception as e:
+            validation_status = "error"
+            error = str(e)
+            summary = f"Assignment failed: {error}"
+            return [{
+                'status': validation_status,
+                'error': error,
+                'input_parameters': params,
+                'start_time': start_time,
+                'summary': summary
+            }]
         output = {
             'family_id': result['family_id'],
             'confidence': float(result['confidence']),
@@ -210,8 +222,8 @@ class kbase_protein_network_analysis_toolkit:
 
     def find_top_matches_from_embedding(self, ctx, params):
         """
-        Find top matches for a given protein embedding.
-        :param params: dict with 'embedding', 'top_n', and 'workspace_name'
+        Find top matches for a given protein embedding (binary FAISS only).
+        :param params: dict with 'embedding' (list of uint8), 'top_n', and 'workspace_name'
         :returns: dict with 'matches' and 'summary'
         """
         #BEGIN find_top_matches_from_embedding
@@ -223,9 +235,9 @@ class kbase_protein_network_analysis_toolkit:
         embedding = params.get('embedding')
         family_id = params.get('family_id')
         top_n = params.get('top_n', 10)
-        if embedding is None or not isinstance(embedding, list) or not embedding or not all(isinstance(x, (float, int)) for x in embedding):
+        if embedding is None or not isinstance(embedding, list) or not embedding or not all(isinstance(x, (int, np.integer)) for x in embedding):
             validation_status = "error"
-            error = "Parameter 'embedding' must be a non-empty list of numbers."
+            error = "Parameter 'embedding' must be a non-empty list of uint8 integers."
             summary = f"Validation failed: {error}"
             return [{
                 'status': validation_status,
@@ -257,8 +269,20 @@ class kbase_protein_network_analysis_toolkit:
                 'summary': summary
             }]
         index = HierarchicalIndex()
-        embedding_np = np.array(embedding)
-        similarities, protein_ids = index.search_family(family_id, embedding_np, top_k=top_n)
+        embedding_np = np.array(embedding, dtype=np.uint8)
+        try:
+            similarities, protein_ids = index.search_family(family_id, embedding_np, top_k=top_n)
+        except Exception as e:
+            validation_status = "error"
+            error = str(e)
+            summary = f"Similarity search failed: {error}"
+            return [{
+                'status': validation_status,
+                'error': error,
+                'input_parameters': params,
+                'start_time': start_time,
+                'summary': summary
+            }]
         matches = [
             {'protein_id': pid, 'similarity': float(sim)}
             for pid, sim in zip(protein_ids, similarities)

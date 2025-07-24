@@ -125,14 +125,14 @@ class ProteinStorage:
         Store embeddings for a protein family with chunking.
         Args:
             family_id: Family identifier
-            embeddings: Embedding array (N x D//8, np.uint8)
+            embeddings: Embedding array (N x D, np.float32 or np.uint8)
             protein_ids: List of protein IDs
             metadata: Optional metadata DataFrame
         Returns:
             Path to stored family file
         """
-        if embeddings.dtype != np.uint8:
-            raise ValueError("Embeddings must be np.uint8 for binary storage.")
+        if embeddings.dtype not in [np.uint8, np.float32]:
+            raise ValueError("Embeddings must be np.uint8 (binary) or np.float32 (float) for storage.")
         family_file = self.family_dir / f"family_{family_id}.h5"
         embedding_dim = embeddings.shape[1]
         num_proteins = embeddings.shape[0]
@@ -162,7 +162,8 @@ class ProteinStorage:
             f.attrs['embedding_dim'] = embedding_dim
             f.attrs['chunk_size'] = optimal_chunk_size
             f.attrs['compression'] = self.compression
-        logger.info(f"Stored family {family_id}: {len(protein_ids)} proteins, {embedding_dim} bytes, {optimal_chunk_size} chunk size")
+            f.attrs['embedding_dtype'] = str(embeddings.dtype)
+        logger.info(f"Stored family {family_id}: {len(protein_ids)} proteins, {embedding_dim} dim, {optimal_chunk_size} chunk size, dtype={embeddings.dtype}")
         return str(family_file)
     
     def load_family_embeddings(self, 
@@ -230,6 +231,117 @@ class ProteinStorage:
             json.dump(metadata, f, indent=2)
         logger.info(f"Created FAISS IVF binary index for family {family_id}: {len(protein_ids)} proteins, {dimension} bits")
         return str(index_file)
+    
+    def create_family_index_float(self, family_id: str, nlist: int = 10) -> str:
+        """
+        Create and store FAISS IVF float32 similarity index for a family.
+        Args:
+            family_id: Family identifier
+            nlist: Number of clusters for IVF
+        Returns:
+            Path to stored index file
+        """
+        import faiss
+        family_file = self.family_dir / f"family_{family_id}.h5"
+        if not family_file.exists():
+            raise FileNotFoundError(f"Family file not found: {family_file}")
+        with h5py.File(family_file, 'r') as f:
+            embeddings = f['embeddings'][:]
+            protein_ids = [pid.decode('utf-8') if isinstance(pid, bytes) else pid for pid in f['protein_ids'][:]]
+            if embeddings.dtype != np.float32:
+                raise ValueError("Embeddings must be np.float32 for float FAISS indexing.")
+        dimension = embeddings.shape[1]
+        nlist = min(nlist, max(1, len(embeddings)//10))
+        quantizer = faiss.IndexFlatL2(dimension)
+        index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
+        index.train(embeddings)
+        index.add(embeddings)
+        index_file = self.index_dir / f"family_{family_id}.faiss"
+        faiss.write_index(index, str(index_file))
+        metadata = {
+            'protein_ids': protein_ids,
+            'index_type': 'faiss_float',
+            'dimension': dimension,
+            'num_proteins': len(protein_ids)
+        }
+        metadata_file = self.index_dir / f"family_{family_id}_float_metadata.json"
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        logger.info(f"Created FAISS IVF float index for family {family_id}: {len(protein_ids)} proteins, {dimension} dim")
+        return str(index_file)
+    
+    def create_family_centroid_binary(self, output_npz: str = None) -> str:
+        """
+        Compute and save binary centroids for all families from float32 means.
+        Args:
+            output_npz: Optional output .npz path
+        Returns:
+            Path to saved .npz file
+        """
+        family_ids = self.get_family_list()
+        centroids = []
+        eigenprotein_ids = []
+        for fam in family_ids:
+            family_file = self.family_dir / f"family_{fam}.h5"
+            with h5py.File(family_file, 'r') as f:
+                embeddings = f['embeddings'][:]
+                protein_ids = [pid.decode('utf-8') if isinstance(pid, bytes) else pid for pid in f['protein_ids'][:]]
+                if embeddings.dtype != np.float32:
+                    raise ValueError(f"Family {fam} embeddings must be float32 for centroid computation.")
+            centroid = embeddings.mean(axis=0)
+            # Binarize: sign(x) > 0 → 1, else 0
+            centroid_bin = (centroid > 0).astype(np.uint8)
+            # Pack bits to uint8
+            centroid_bin_packed = np.packbits(centroid_bin)
+            # Find eigenprotein (closest to centroid in L2)
+            dists = np.linalg.norm(embeddings - centroid, axis=1)
+            medoid_idx = int(np.argmin(dists))
+            eigenprotein_ids.append(protein_ids[medoid_idx])
+            centroids.append(centroid_bin_packed)
+        family_ids_arr = np.array(family_ids)
+        centroids_arr = np.stack(centroids)
+        eigenprotein_ids_arr = np.array(eigenprotein_ids)
+        if output_npz is None:
+            output_npz = self.base_dir / "family_centroids_binary.npz"
+        np.savez_compressed(output_npz, family_ids=family_ids_arr, centroids=centroids_arr, eigenprotein_ids=eigenprotein_ids_arr)
+        logger.info(f"Saved binary centroids for {len(family_ids)} families to {output_npz}")
+        return str(output_npz)
+    
+    def assign_family(self, query_vector: np.ndarray, centroids_npz: str = None) -> dict:
+        """
+        Assign a float32 query vector to the closest family using binary centroid Hamming search.
+        Args:
+            query_vector: Query embedding (float32, shape [D])
+            centroids_npz: Optional path to centroids .npz
+        Returns:
+            Dict with keys: 'family_id', 'confidence', 'eigenprotein_id'
+        """
+        import faiss
+        if query_vector.dtype != np.float32:
+            raise ValueError("Query vector must be float32 for assignment.")
+        if centroids_npz is None:
+            centroids_npz = self.base_dir / "family_centroids_binary.npz"
+        data = np.load(centroids_npz, allow_pickle=True)
+        family_ids = data['family_ids']
+        centroids = data['centroids']
+        eigenprotein_ids = data['eigenprotein_ids']
+        # Binarize query: sign(x) > 0 → 1, else 0, then packbits
+        query_bin = (query_vector > 0).astype(np.uint8)
+        query_bin_packed = np.packbits(query_bin)
+        # Use FAISS IndexBinaryFlat for Hamming search
+        d = centroids.shape[1] * 8
+        index = faiss.IndexBinaryFlat(d)
+        index.add(centroids)
+        D, I = index.search(query_bin_packed.reshape(1, -1), 1)
+        idx = int(I[0][0])
+        confidence = float(-D[0][0])  # negative Hamming distance
+        result = {
+            'family_id': str(family_ids[idx]),
+            'confidence': confidence,
+            'eigenprotein_id': str(eigenprotein_ids[idx])
+        }
+        logger.info(f"Assigned query to family {result['family_id']} (confidence={confidence})")
+        return result
     
     def get_family_list(self) -> List[str]:
         """Get list of all available families."""

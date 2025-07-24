@@ -10,9 +10,6 @@ service-language:
 module-version:
     0.0.1
 
-data-version:
-    0.0.1
-
 owners:
     [vibhavsetlur]
 

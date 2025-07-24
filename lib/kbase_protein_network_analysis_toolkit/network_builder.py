@@ -12,7 +12,8 @@ from typing import List, Dict, Tuple, Optional, Union
 import logging
 from tqdm import tqdm
 import os
-from sklearn.metrics.pairwise import cosine_similarity
+import faiss
+from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex
 
 logger = logging.getLogger(__name__)
 
@@ -538,176 +539,117 @@ class DynamicNetworkBuilder:
     def build_mutual_knn_network(self, embeddings: np.ndarray,
                                protein_ids: List[str],
                                query_embedding: Optional[np.ndarray] = None,
-                               query_protein_id: Optional[str] = None) -> nx.Graph:
+                               query_protein_id: Optional[str] = None,
+                               family_id: Optional[str] = None,
+                               index: Optional[HierarchicalIndex] = None) -> nx.Graph:
         """
-        Build a mutual k-nearest neighbors network.
-        
+        Build a mutual k-nearest neighbors network using FAISS IVF float32.
         Args:
-            embeddings: Protein embeddings array
+            embeddings: Protein embeddings array (float32)
             protein_ids: List of protein IDs
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
-            
+            family_id: Family ID for index lookup
+            index: HierarchicalIndex instance
         Returns:
             NetworkX graph
         """
-        logger.info("Building mutual k-NN network...")
-        
-        # Add query protein if provided
-        if query_embedding is not None:
-            embeddings = np.vstack([embeddings, query_embedding])
-            protein_ids = protein_ids + [query_protein_id or "QUERY_PROTEIN"]
-        
-        # Normalize embeddings
-        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
-        
-        # Compute similarity matrix
-        similarity_matrix = cosine_similarity(embeddings_norm)
-        
-        # Build mutual k-NN graph
+        logger.info("Building mutual k-NN network using FAISS IVF float32...")
+        if index is None or family_id is None:
+            raise ValueError("Must provide HierarchicalIndex and family_id for FAISS search.")
         G = nx.Graph()
-        
-        # Add all nodes
-        for protein_id in protein_ids:
-            G.add_node(protein_id)
-        
-        # Find k-nearest neighbors for each node
-        n_nodes = len(protein_ids)
-        for i in range(n_nodes):
-            # Get similarities to all other nodes
-            similarities = similarity_matrix[i]
-            
-            # Find top k neighbors (excluding self)
-            neighbor_indices = np.argsort(similarities)[::-1][1:self.k_neighbors+1]
-            
-            for j in neighbor_indices:
-                if similarities[j] >= self.similarity_threshold:
-                    # Check if this is a mutual edge
-                    if self.mutual_knn:
-                        # Check if j also has i as one of its top k neighbors
-                        j_similarities = similarity_matrix[j]
-                        j_neighbors = np.argsort(j_similarities)[::-1][1:self.k_neighbors+1]
-                        
-                        if i in j_neighbors and j_similarities[i] >= self.similarity_threshold:
-                            G.add_edge(protein_ids[i], protein_ids[j], 
-                                     weight=similarities[j])
-                    else:
-                        # Add directed edge
-                        G.add_edge(protein_ids[i], protein_ids[j], 
-                                 weight=similarities[j])
-        
-        # Ensure network size constraints
-        if len(G.nodes()) < self.min_network_size:
-            logger.warning(f"Network too small ({len(G.nodes())} nodes), adding more edges")
-            self._expand_network(G, similarity_matrix, protein_ids)
-        
-        if len(G.nodes()) > self.max_network_size:
-            logger.warning(f"Network too large ({len(G.nodes())} nodes), trimming")
-            self._trim_network(G, query_protein_id)
-        
-        logger.info(f"Built network with {len(G.nodes())} nodes and {len(G.edges())} edges")
+        for i, pid in enumerate(protein_ids):
+            G.add_node(pid)
+        for i, pid in enumerate(protein_ids):
+            query = embeddings[i].astype(np.float32)
+            try:
+                D, I = index.search_family_float(family_id, query, self.k_neighbors+1)
+            except Exception as e:
+                logger.error(f"FAISS search failed for {pid}: {e}")
+                continue
+            for dist, idx in zip(D, I):
+                if idx == i or idx == -1:
+                    continue
+                neighbor_id = protein_ids[idx]
+                G.add_edge(pid, neighbor_id, weight=float(dist))
         return G
     
     def build_threshold_network(self, embeddings: np.ndarray,
                               protein_ids: List[str],
                               query_embedding: Optional[np.ndarray] = None,
-                              query_protein_id: Optional[str] = None) -> nx.Graph:
+                              query_protein_id: Optional[str] = None,
+                              family_id: Optional[str] = None,
+                              index: Optional[HierarchicalIndex] = None) -> nx.Graph:
         """
-        Build a network using similarity threshold.
-        
+        Build a network using FAISS IVF float32 and L2 threshold.
         Args:
-            embeddings: Protein embeddings array
+            embeddings: Protein embeddings array (float32)
             protein_ids: List of protein IDs
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
-            
+            family_id: Family ID for index lookup
+            index: HierarchicalIndex instance
         Returns:
             NetworkX graph
         """
-        logger.info("Building threshold-based network...")
-        
-        # Add query protein if provided
-        if query_embedding is not None:
-            embeddings = np.vstack([embeddings, query_embedding])
-            protein_ids = protein_ids + [query_protein_id or "QUERY_PROTEIN"]
-        
-        # Normalize embeddings
-        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
-        
-        # Compute similarity matrix
-        similarity_matrix = cosine_similarity(embeddings_norm)
-        
-        # Build graph
+        logger.info("Building threshold-based network using FAISS IVF float32...")
+        if index is None or family_id is None:
+            raise ValueError("Must provide HierarchicalIndex and family_id for FAISS search.")
         G = nx.Graph()
-        
-        # Add all nodes
-        for protein_id in protein_ids:
-            G.add_node(protein_id)
-        
-        # Add edges above threshold
-        n_nodes = len(protein_ids)
-        for i in range(n_nodes):
-            for j in range(i+1, n_nodes):
-                similarity = similarity_matrix[i, j]
-                if similarity >= self.similarity_threshold:
-                    G.add_edge(protein_ids[i], protein_ids[j], weight=similarity)
-        
-        logger.info(f"Built network with {len(G.nodes())} nodes and {len(G.edges())} edges")
+        for i, pid in enumerate(protein_ids):
+            G.add_node(pid)
+        for i, pid in enumerate(protein_ids):
+            query = embeddings[i].astype(np.float32)
+            try:
+                D, I = index.search_family_float(family_id, query, len(protein_ids))
+            except Exception as e:
+                logger.error(f"FAISS search failed for {pid}: {e}")
+                continue
+            for dist, idx in zip(D, I):
+                if idx == i or idx == -1:
+                    continue
+                if dist <= self.similarity_threshold:
+                    neighbor_id = protein_ids[idx]
+                    G.add_edge(pid, neighbor_id, weight=float(dist))
         return G
     
     def build_hybrid_network(self, embeddings: np.ndarray,
                            protein_ids: List[str],
                            query_embedding: Optional[np.ndarray] = None,
-                           query_protein_id: Optional[str] = None) -> nx.Graph:
+                           query_protein_id: Optional[str] = None,
+                           family_id: Optional[str] = None,
+                           index: Optional[HierarchicalIndex] = None) -> nx.Graph:
         """
-        Build a hybrid network combining k-NN and threshold methods.
-        
+        Build a hybrid network combining k-NN and threshold using FAISS IVF float32.
         Args:
-            embeddings: Protein embeddings array
+            embeddings: Protein embeddings array (float32)
             protein_ids: List of protein IDs
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
-            
+            family_id: Family ID for index lookup
+            index: HierarchicalIndex instance
         Returns:
             NetworkX graph
         """
-        logger.info("Building hybrid network...")
-        
-        # Add query protein if provided
-        if query_embedding is not None:
-            embeddings = np.vstack([embeddings, query_embedding])
-            protein_ids = protein_ids + [query_protein_id or "QUERY_PROTEIN"]
-        
-        # Normalize embeddings
-        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
-        
-        # Compute similarity matrix
-        similarity_matrix = cosine_similarity(embeddings_norm)
-        
-        # Build graph
+        logger.info("Building hybrid network using FAISS IVF float32...")
+        if index is None or family_id is None:
+            raise ValueError("Must provide HierarchicalIndex and family_id for FAISS search.")
         G = nx.Graph()
-        
-        # Add all nodes
-        for protein_id in protein_ids:
-            G.add_node(protein_id)
-        
-        # Add edges using hybrid approach
-        n_nodes = len(protein_ids)
-        for i in range(n_nodes):
-            # Get similarities to all other nodes
-            similarities = similarity_matrix[i]
-            
-            # Find top k neighbors
-            neighbor_indices = np.argsort(similarities)[::-1][1:self.k_neighbors+1]
-            
-            for j in neighbor_indices:
-                similarity = similarities[j]
-                
-                # Add edge if it meets threshold OR is in top k
-                if similarity >= self.similarity_threshold:
-                    G.add_edge(protein_ids[i], protein_ids[j], weight=similarity)
-        
-        logger.info(f"Built hybrid network with {len(G.nodes())} nodes and {len(G.edges())} edges")
+        for i, pid in enumerate(protein_ids):
+            G.add_node(pid)
+        for i, pid in enumerate(protein_ids):
+            query = embeddings[i].astype(np.float32)
+            try:
+                D, I = index.search_family_float(family_id, query, self.k_neighbors+1)
+            except Exception as e:
+                logger.error(f"FAISS search failed for {pid}: {e}")
+                continue
+            for dist, idx in zip(D, I):
+                if idx == i or idx == -1:
+                    continue
+                if dist <= self.similarity_threshold or idx < self.k_neighbors:
+                    neighbor_id = protein_ids[idx]
+                    G.add_edge(pid, neighbor_id, weight=float(dist))
         return G
     
     def _expand_network(self, G: nx.Graph, similarity_matrix: np.ndarray, 

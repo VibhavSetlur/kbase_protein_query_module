@@ -107,7 +107,7 @@ class HierarchicalIndex:
         index.train(embeddings)
         index.add(embeddings)
         index_file = self.base_dir / "families" / f"family_{family_id}.faissbin"
-        faiss.write_index(index, str(index_file))
+        faiss.write_index_binary(index, str(index_file))
         metadata = {
             'protein_ids': protein_ids,
             'dimension': dimension,
@@ -118,6 +118,32 @@ class HierarchicalIndex:
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
         logger.info(f"Created FAISS IVF binary index for family {family_id}: {num_proteins} proteins, {dimension} bits")
+        self.family_mapping[family_id] = str(index_file)
+        self._save_family_mapping()
+        return str(index_file)
+
+    def create_family_index_float(self, family_id: str, embeddings: np.ndarray, protein_ids: List[str], nlist: int = 10) -> str:
+        import faiss
+        if embeddings.dtype != np.float32:
+            raise ValueError("Embeddings must be np.float32 for float FAISS indexing.")
+        dimension = embeddings.shape[1]
+        nlist = min(nlist, max(1, len(embeddings)//10))
+        quantizer = faiss.IndexFlatL2(dimension)
+        index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
+        index.train(embeddings)
+        index.add(embeddings)
+        index_file = self.base_dir / "families" / f"family_{family_id}.faiss"
+        faiss.write_index(index, str(index_file))
+        metadata = {
+            'protein_ids': protein_ids,
+            'dimension': dimension,
+            'num_proteins': len(protein_ids),
+            'index_type': 'faiss_float'
+        }
+        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_float_metadata.json"
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        logger.info(f"Created FAISS IVF float index for family {family_id}: {len(protein_ids)} proteins, {dimension} dim")
         self.family_mapping[family_id] = str(index_file)
         self._save_family_mapping()
         return str(index_file)
@@ -133,7 +159,7 @@ class HierarchicalIndex:
         metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
-        index = faiss.read_index_binary(index_file)
+        index = faiss.read_index_binary(str(index_file))
         self._family_cache[family_id] = (index, metadata)
         self._cache_order.append(family_id)
         if len(self._family_cache) > self.cache_size:
@@ -145,6 +171,24 @@ class HierarchicalIndex:
         index, metadata = self._get_cached_index(family_id)
         if query_embedding.dtype != np.uint8:
             raise ValueError("Query embedding must be np.uint8 for binary FAISS search.")
+        D, I = index.search(query_embedding.reshape(1, -1), top_k)
+        D = D[0]
+        I = I[0]
+        protein_ids = [metadata['protein_ids'][i] for i in I if i != -1]
+        D = D[:len(protein_ids)]
+        return D, protein_ids
+    
+    def search_family_float(self, family_id: str, query_embedding: np.ndarray, top_k: int = 50) -> Tuple[np.ndarray, List[str]]:
+        import faiss
+        index_file = self.base_dir / "families" / f"family_{family_id}.faiss"
+        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_float_metadata.json"
+        if not index_file.exists() or not metadata_file.exists():
+            raise FileNotFoundError(f"Float index or metadata missing for family {family_id}")
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+        index = faiss.read_index(str(index_file))
+        if query_embedding.dtype != np.float32:
+            raise ValueError("Query embedding must be np.float32 for float FAISS search.")
         D, I = index.search(query_embedding.reshape(1, -1), top_k)
         D = D[0]
         I = I[0]
