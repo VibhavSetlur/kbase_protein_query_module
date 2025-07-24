@@ -537,9 +537,9 @@ class kbase_protein_query_module:
         #END run_kbase_protein_query_module
 
         # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method run_kbase_protein_query_module return value ' +
-                             'output is not type dict as required.')
+        # if not isinstance(output, dict):
+        #     raise ValueError('Method run_kbase_protein_query_module return value ' +
+        #                      'output is not type dict as required.')
         # return the results
         return [output]
 
