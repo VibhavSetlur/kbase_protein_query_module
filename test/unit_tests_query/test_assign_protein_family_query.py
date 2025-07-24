@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import tempfile
 import os
-from kbase_protein_network_analysis_toolkit.assign_protein_family import AssignProteinFamily
+from kbase_protein_query_module_src.assign_protein_family import AssignProteinFamily
 
 class TestAssignProteinFamily(unittest.TestCase):
     def setUp(self):

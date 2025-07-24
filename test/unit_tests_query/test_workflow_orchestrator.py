@@ -5,7 +5,7 @@ import os
 import yaml
 import numpy as np
 from unittest.mock import patch, MagicMock
-from kbase_protein_network_analysis_toolkit.workflow_orchestrator import ProteinNetworkWorkflow
+from kbase_protein_query_module_src.workflow_orchestrator import ProteinNetworkWorkflow
 
 # Dummy HierarchicalIndex for patching
 class DummyHierarchicalIndex:
@@ -34,7 +34,7 @@ class TestProteinNetworkWorkflow(unittest.TestCase):
         with open(self.config_file, 'w') as f:
             yaml.dump(config, f)
         # Determine embedding dimension from the model
-        from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
+        from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
         embedding_generator = ProteinEmbeddingGenerator(model_name='esm2_t6_8M_UR50D', device='cpu')
         embedding_dim = embedding_generator.get_embedding_dim() if hasattr(embedding_generator, 'get_embedding_dim') else 320
         # Create a fake family in storage
@@ -43,15 +43,15 @@ class TestProteinNetworkWorkflow(unittest.TestCase):
         self.D = 320  # must be multiple of 8
         self.embeddings = np.random.randint(0, 256, size=(self.N, self.D // 8), dtype=np.uint8)
         self.protein_ids = [f'prot_{i}' for i in range(self.N)]
-        from kbase_protein_network_analysis_toolkit.storage import ProteinStorage
+        from kbase_protein_query_module_src.storage import ProteinStorage
         self.storage = ProteinStorage(base_dir=self.temp_dir)
         self.storage.store_family_embeddings(self.family_id, self.embeddings, self.protein_ids)
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
 
-    @patch('kbase_protein_network_analysis_toolkit.workflow_orchestrator.HierarchicalIndex', DummyHierarchicalIndex)
-    @patch('kbase_protein_network_analysis_toolkit.workflow_orchestrator.AssignProteinFamily')
+    @patch('kbase_protein_query_module_src.workflow_orchestrator.HierarchicalIndex', DummyHierarchicalIndex)
+    @patch('kbase_protein_query_module_src.workflow_orchestrator.AssignProteinFamily')
     def test_end_to_end_workflow(self, mock_assigner):
         # Patch assign_family to always return test_family
         mock_assigner.return_value.assign_family.return_value = {'family_id': 'test_family', 'confidence': 1.0, 'eigenprotein_id': 'prot_0'}

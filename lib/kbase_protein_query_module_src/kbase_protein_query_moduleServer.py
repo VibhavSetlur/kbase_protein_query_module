@@ -17,7 +17,7 @@ from jsonrpcbase import JSONRPCService, InvalidParamsError, KeywordError, \
 from jsonrpcbase import ServerError as JSONServerError
 
 from biokbase import log
-from kbase_protein_network_analysis_toolkit.authclient import KBaseAuth as _KBaseAuth
+from kbase_protein_query_module_src.authclient import KBaseAuth as _KBaseAuth
 
 from configparser import ConfigParser
 
@@ -42,14 +42,14 @@ def get_config():
     retconfig = {}
     config = ConfigParser()
     config.read(get_config_file())
-    for nameval in config.items(get_service_name() or 'kbase_protein_network_analysis_toolkit'):
+    for nameval in config.items(get_service_name() or 'kbase_protein_query_module'):
         retconfig[nameval[0]] = nameval[1]
     return retconfig
 
 config = get_config()
 
-from kbase_protein_network_analysis_toolkit.kbase_protein_network_analysis_toolkitImpl import kbase_protein_network_analysis_toolkit  # noqa @IgnorePep8
-impl_kbase_protein_network_analysis_toolkit = kbase_protein_network_analysis_toolkit(config)
+from kbase_protein_query_module_src.kbase_protein_query_moduleImpl import kbase_protein_query_module  # noqa @IgnorePep8
+impl_kbase_protein_query_module = kbase_protein_query_module(config)
 
 
 class JSONObjectEncoder(json.JSONEncoder):
@@ -324,7 +324,7 @@ class Application(object):
                                    context['method'], context['call_id'])
 
     def __init__(self):
-        submod = get_service_name() or 'kbase_protein_network_analysis_toolkit'
+        submod = get_service_name() or 'kbase_protein_query_module'
         self.userlog = log.log(
             submod, ip_address=True, authuser=True, module=True, method=True,
             call_id=True, changecallback=self.logcallback,
@@ -335,35 +335,35 @@ class Application(object):
         self.serverlog.set_log_level(6)
         self.rpc_service = JSONRPCServiceCustom()
         self.method_authentication = dict()
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.run_kbase_protein_network_analysis_toolkit,
-                             name='kbase_protein_network_analysis_toolkit.run_kbase_protein_network_analysis_toolkit',
+        self.rpc_service.add(impl_kbase_protein_query_module.run_kbase_protein_query_module,
+                             name='kbase_protein_query_module.run_kbase_protein_query_module',
                              types=[dict])
-        self.method_authentication['kbase_protein_network_analysis_toolkit.run_kbase_protein_network_analysis_toolkit'] = 'required'  # noqa
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.status,
-                             name='kbase_protein_network_analysis_toolkit.status',
+        self.method_authentication['kbase_protein_query_module.run_kbase_protein_query_module'] = 'required'  # noqa
+        self.rpc_service.add(impl_kbase_protein_query_module.status,
+                             name='kbase_protein_query_module.status',
                              types=[dict])
         authurl = config.get(AUTH) if config else None
         self.auth_client = _KBaseAuth(authurl)
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.check_protein_existence,
-                             name='kbase_protein_network_analysis_toolkit.check_protein_existence',
+        self.rpc_service.add(impl_kbase_protein_query_module.check_protein_existence,
+                             name='kbase_protein_query_module.check_protein_existence',
                              types=[dict])
-        self.method_authentication['kbase_protein_network_analysis_toolkit.check_protein_existence'] = 'required'
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.generate_protein_embedding,
-                             name='kbase_protein_network_analysis_toolkit.generate_protein_embedding',
+        self.method_authentication['kbase_protein_query_module.check_protein_existence'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_query_module.generate_protein_embedding,
+                             name='kbase_protein_query_module.generate_protein_embedding',
                              types=[dict])
-        self.method_authentication['kbase_protein_network_analysis_toolkit.generate_protein_embedding'] = 'required'
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.assign_family_fast,
-                             name='kbase_protein_network_analysis_toolkit.assign_family_fast',
+        self.method_authentication['kbase_protein_query_module.generate_protein_embedding'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_query_module.assign_family_fast,
+                             name='kbase_protein_query_module.assign_family_fast',
                              types=[dict])
-        self.method_authentication['kbase_protein_network_analysis_toolkit.assign_family_fast'] = 'required'
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.find_top_matches_from_embedding,
-                             name='kbase_protein_network_analysis_toolkit.find_top_matches_from_embedding',
+        self.method_authentication['kbase_protein_query_module.assign_family_fast'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_query_module.find_top_matches_from_embedding,
+                             name='kbase_protein_query_module.find_top_matches_from_embedding',
                              types=[dict])
-        self.method_authentication['kbase_protein_network_analysis_toolkit.find_top_matches_from_embedding'] = 'required'
-        self.rpc_service.add(impl_kbase_protein_network_analysis_toolkit.summarize_and_visualize_results,
-                             name='kbase_protein_network_analysis_toolkit.summarize_and_visualize_results',
+        self.method_authentication['kbase_protein_query_module.find_top_matches_from_embedding'] = 'required'
+        self.rpc_service.add(impl_kbase_protein_query_module.summarize_and_visualize_results,
+                             name='kbase_protein_query_module.summarize_and_visualize_results',
                              types=[dict])
-        self.method_authentication['kbase_protein_network_analysis_toolkit.summarize_and_visualize_results'] = 'required'
+        self.method_authentication['kbase_protein_query_module.summarize_and_visualize_results'] = 'required'
 
     def __call__(self, environ, start_response):
         # Context object, equivalent to the perl impl CallContext
@@ -415,7 +415,7 @@ class Application(object):
                             err = JSONServerError()
                             err.data = (
                                 'Authentication required for ' +
-                                'kbase_protein_network_analysis_toolkit ' +
+                                'kbase_protein_query_module ' +
                                 'but no authentication header was passed')
                             raise err
                         elif token is None and auth_req == 'optional':

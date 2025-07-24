@@ -5,21 +5,21 @@ import os
 
 from installed_clients.KBaseReportClient import KBaseReport
 
-from kbase_protein_network_analysis_toolkit.check_existence import ProteinExistenceChecker
-from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
-from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex
-from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
-from kbase_protein_network_analysis_toolkit.workflow_orchestrator import ProteinNetworkWorkflow
+from kbase_protein_query_module_src.check_existence import ProteinExistenceChecker
+from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
+from kbase_protein_query_module_src.similarity_index import HierarchicalIndex
+from kbase_protein_query_module_src.network_builder import DynamicNetworkBuilder
+from kbase_protein_query_module_src.workflow_orchestrator import ProteinNetworkWorkflow
 #END_HEADER
 
 
-class kbase_protein_network_analysis_toolkit:
+class kbase_protein_query_module:
     '''
     Module Name:
-    kbase_protein_network_analysis_toolkit
+    kbase_protein_query_module
 
     Module Description:
-    A KBase module: kbase_protein_network_analysis_toolkit
+    A KBase module: kbase_protein_query_module
     '''
 
     ######## WARNING FOR GEVENT USERS ####### noqa
@@ -46,7 +46,7 @@ class kbase_protein_network_analysis_toolkit:
         logging.basicConfig(format='%(created)s %(levelname)s: %(message)s',
                             level=logging.INFO)
         self.family_assigner = None
-        from kbase_protein_network_analysis_toolkit.assign_protein_family import AssignProteinFamily
+        from kbase_protein_query_module_src.assign_protein_family import AssignProteinFamily
         self.family_assigner = AssignProteinFamily()
         centroid_path = os.path.join('data', 'family_centroids.npz')
         if os.path.exists(centroid_path):
@@ -495,7 +495,7 @@ class kbase_protein_network_analysis_toolkit:
         #END_STATUS
         return [returnVal]
 
-    def run_kbase_protein_network_analysis_toolkit(self, ctx, params):
+    def run_kbase_protein_query_module(self, ctx, params):
         """
         This example function accepts any number of parameters and returns results in a KBaseReport
         :param params: instance of mapping from String to unspecified object
@@ -504,7 +504,7 @@ class kbase_protein_network_analysis_toolkit:
         """
         # ctx is the context object
         # return variables are: output
-        #BEGIN run_kbase_protein_network_analysis_toolkit
+        #BEGIN run_kbase_protein_query_module
         import time
         start_time = time.time()
         validation_status = "success"
@@ -534,11 +534,11 @@ class kbase_protein_network_analysis_toolkit:
             'validation_status': validation_status,
             'error': error
         }
-        #END run_kbase_protein_network_analysis_toolkit
+        #END run_kbase_protein_query_module
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):
-            raise ValueError('Method run_kbase_protein_network_analysis_toolkit return value ' +
+            raise ValueError('Method run_kbase_protein_query_module return value ' +
                              'output is not type dict as required.')
         # return the results
         return [output]

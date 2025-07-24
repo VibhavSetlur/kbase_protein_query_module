@@ -1,6 +1,6 @@
-# kbase_protein_network_analysis_toolkit
+# KBase Protein Query Module
 
-This repository contains the KBase Protein Network Analysis Toolkit, a modular suite for large-scale protein network analysis, embedding generation, family assignment, and efficient storage/indexing. The toolkit is designed for scalability and integration with the KBase platform.
+This repository contains the KBase Protein Query Module, a modular suite for large-scale protein network analysis, embedding generation, family assignment, and efficient storage/indexing. The toolkit is designed for scalability and integration with the KBase platform.
 
 ## Repository Structure
 
@@ -25,9 +25,9 @@ This repository contains the KBase Protein Network Analysis Toolkit, a modular s
 
 - For module usage in other SDK modules:
   ```bash
-  kb-sdk install kbase_protein_network_analysis_toolkit
+  kb-sdk install kbase_protein_query_module
   ```
-- For app usage, see the [KBase catalog page](https://narrative.kbase.us/#catalog/modules/kbase_protein_network_analysis_toolkit).
+- For app usage, see the [KBase catalog page](https://narrative.kbase.us/#catalog/modules/kbase_protein_query_module).
 
 ## Documentation
 

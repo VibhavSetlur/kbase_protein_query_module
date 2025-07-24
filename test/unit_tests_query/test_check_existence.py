@@ -4,8 +4,8 @@ import shutil
 import os
 import pandas as pd
 import numpy as np
-from kbase_protein_network_analysis_toolkit.check_existence import ProteinExistenceChecker
-from kbase_protein_network_analysis_toolkit.storage import ProteinStorage, CompressedMetadataStorage
+from kbase_protein_query_module_src.check_existence import ProteinExistenceChecker
+from kbase_protein_query_module_src.storage import ProteinStorage, CompressedMetadataStorage
 
 class TestProteinExistenceChecker(unittest.TestCase):
     def setUp(self):

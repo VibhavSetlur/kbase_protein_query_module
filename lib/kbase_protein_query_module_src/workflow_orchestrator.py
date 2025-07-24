@@ -17,11 +17,11 @@ from pathlib import Path
 import time
 import gc
 
-from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
-from kbase_protein_network_analysis_toolkit.assign_protein_family import AssignProteinFamily
-from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex, StreamingIndex
-from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
-from kbase_protein_network_analysis_toolkit.storage import ProteinStorage, MemoryEfficientLoader
+from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
+from kbase_protein_query_module_src.assign_protein_family import AssignProteinFamily
+from kbase_protein_query_module_src.similarity_index import HierarchicalIndex, StreamingIndex
+from kbase_protein_query_module_src.network_builder import DynamicNetworkBuilder
+from kbase_protein_query_module_src.storage import ProteinStorage, MemoryEfficientLoader
 
 logger = logging.getLogger(__name__)
 
@@ -292,7 +292,7 @@ class ProteinNetworkWorkflow:
         """
         logger.info(f"Building optimized network for family {family_id} using FAISS IVF float32...")
         family_embeddings, family_protein_ids = self.storage.load_family_embeddings(family_id)
-        from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
+        from kbase_protein_query_module_src.network_builder import DynamicNetworkBuilder
         builder = DynamicNetworkBuilder(**self.config.get('network', {}))
         G = None
         if network_method == "mutual_knn":

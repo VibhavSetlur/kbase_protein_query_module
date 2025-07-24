@@ -13,7 +13,7 @@ import logging
 from tqdm import tqdm
 import os
 import faiss
-from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex
+from kbase_protein_query_module_src.similarity_index import HierarchicalIndex
 
 logger = logging.getLogger(__name__)
 

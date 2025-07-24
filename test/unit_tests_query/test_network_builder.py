@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import os
 from unittest.mock import MagicMock
-from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
-from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex
+from kbase_protein_query_module_src.network_builder import DynamicNetworkBuilder
+from kbase_protein_query_module_src.similarity_index import HierarchicalIndex
 
 class TestNetworkBuilder(unittest.TestCase):
     def setUp(self):
@@ -46,7 +46,7 @@ class TestNetworkBuilder(unittest.TestCase):
     def test_visualization(self):
         # Only test that it runs and produces a file
         out = 'test_network.html'
-        from kbase_protein_network_analysis_toolkit.network_builder import visualize_interactive_protein_network
+        from kbase_protein_query_module_src.network_builder import visualize_interactive_protein_network
         fig, G = visualize_interactive_protein_network(self.embeddings, self.protein_ids, self.metadata, query_embedding=self.query_emb, query_protein_id=self.query_id, output_file=out)
         self.assertIsNotNone(fig)
         self.assertTrue(os.path.exists(out))

@@ -3,7 +3,7 @@ import tempfile
 import shutil
 import numpy as np
 import os
-from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex, StreamingIndex
+from kbase_protein_query_module_src.similarity_index import HierarchicalIndex, StreamingIndex
 
 class TestSimilarityIndex(unittest.TestCase):
     def setUp(self):

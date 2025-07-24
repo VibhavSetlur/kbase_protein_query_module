@@ -28,7 +28,7 @@
     "behavior": {
         "service-mapping": {
             "url": "",
-            "name": "kbase_protein_network_analysis_toolkit",
+            "name": "kbase_protein_query_module",
             "method": "check_protein_existence",
             "input_mapping": [
                 {

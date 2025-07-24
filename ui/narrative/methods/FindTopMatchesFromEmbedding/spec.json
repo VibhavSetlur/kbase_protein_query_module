@@ -51,7 +51,7 @@
     "behavior": {
         "service-mapping": {
             "url": "",
-            "name": "kbase_protein_network_analysis_toolkit",
+            "name": "kbase_protein_query_module",
             "method": "find_top_matches_from_embedding",
             "input_mapping": [
                 { "narrative_system_variable": "workspace", "target_property": "workspace_name" },

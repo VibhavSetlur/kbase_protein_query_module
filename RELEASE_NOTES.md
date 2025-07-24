@@ -1,4 +1,4 @@
-# kbase_protein_network_analysis_toolkit release notes
+# kbase_protein_query_module release notes
 =========================================
 
 0.1.0

@@ -44,7 +44,7 @@
     "behavior": {
         "service-mapping": {
             "url": "",
-            "name": "kbase_protein_network_analysis_toolkit",
+            "name": "kbase_protein_query_module",
             "method": "generate_protein_embedding",
             "input_mapping": [
                 {

@@ -4,7 +4,7 @@ import shutil
 import os
 import pandas as pd
 import numpy as np
-from kbase_protein_network_analysis_toolkit.storage import ProteinStorage, CompressedMetadataStorage
+from kbase_protein_query_module_src.storage import ProteinStorage, CompressedMetadataStorage
 
 class TestProteinStorage(unittest.TestCase):
     def setUp(self):
@@ -42,7 +42,7 @@ class TestProteinStorage(unittest.TestCase):
         self.assertEqual(list(loaded.index), ['A', 'C'])
 
     def test_artificial_families(self):
-        from kbase_protein_network_analysis_toolkit.storage import _create_artificial_families
+        from kbase_protein_query_module_src.storage import _create_artificial_families
         ids = [f'P{i:05d}' for i in range(7)]
         fams = list(_create_artificial_families(ids, max_family_size=3))
         self.assertEqual(len(fams), 3)

@@ -1,8 +1,8 @@
 module-name:
-    kbase_protein_network_analysis_toolkit
+    kbase_protein_query_module
 
 module-description:
-    A KBase module
+    A KBase module for protein querying, including similarity search, embedding generation, family assignment, and network analysis.
 
 service-language:
     python

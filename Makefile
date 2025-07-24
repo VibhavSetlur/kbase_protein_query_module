@@ -1,7 +1,7 @@
-SERVICE = kbase_protein_network_analysis_toolkit
-SERVICE_CAPS = kbase_protein_network_analysis_toolkit
-SPEC_FILE = kbase_protein_network_analysis_toolkit.spec
-URL = https://kbase.us/services/kbase_protein_network_analysis_toolkit
+SERVICE = kbase_protein_query_module
+SERVICE_CAPS = kbase_protein_query_module
+SPEC_FILE = kbase_protein_query_module.spec
+URL = https://kbase.us/services/kbase_protein_query_module
 DIR = $(shell pwd)
 LIB_DIR = lib
 SCRIPTS_DIR = scripts

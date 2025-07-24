@@ -1,4 +1,4 @@
-Unit tests for kbase_protein_network_analysis_toolkit modules.
+Unit tests for kbase_protein_query_module modules.
 
 To run all unit tests:
 

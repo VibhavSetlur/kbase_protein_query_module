@@ -26,7 +26,7 @@
     "behavior": {
         "service-mapping": {
             "url": "",
-            "name": "kbase_protein_network_analysis_toolkit",
+            "name": "kbase_protein_query_module",
             "method": "assign_family_fast",
             "input_mapping": [
                 {

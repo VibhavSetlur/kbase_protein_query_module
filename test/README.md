@@ -5,7 +5,7 @@ This directory contains scripts and files needed to test your module's code.
 ## Structure
 
 - `unit_tests/`: Unit tests for each main module in the toolkit.
-- `kbase_protein_network_analysis_toolkit_server_test.py`: Integration and functional tests for the main KBase server implementation.
+- `kbase_protein_query_module_query_server_test.py`: Integration and functional tests for the main KBase server implementation.
 
 ## Running Tests
 

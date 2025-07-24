@@ -4,14 +4,14 @@ import time
 import unittest
 from configparser import ConfigParser
 
-from kbase_protein_network_analysis_toolkit.kbase_protein_network_analysis_toolkitImpl import kbase_protein_network_analysis_toolkit
-from kbase_protein_network_analysis_toolkit.kbase_protein_network_analysis_toolkitServer import MethodContext
-from kbase_protein_network_analysis_toolkit.authclient import KBaseAuth as _KBaseAuth
+from kbase_protein_query_module_src.kbase_protein_query_moduleImpl import kbase_protein_query_module
+from kbase_protein_query_module_src.kbase_protein_query_moduleServer import MethodContext
+from kbase_protein_query_module_src.authclient import KBaseAuth as _KBaseAuth
 
 from installed_clients.WorkspaceClient import Workspace
 
 
-class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
+class kbase_protein_query_moduleTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -22,7 +22,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         cls.cfg = {}
         config = ConfigParser()
         config.read(config_file)
-        for nameval in config.items('kbase_protein_network_analysis_toolkit'):
+        for nameval in config.items('kbase_protein_query_module'):
             cls.cfg[nameval[0]] = nameval[1]
         # Getting username from Auth profile for token
         authServiceUrl = cls.cfg['auth-service-url']
@@ -34,14 +34,14 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         cls.ctx.update({'token': token,
                         'user_id': user_id,
                         'provenance': [
-                            {'service': 'kbase_protein_network_analysis_toolkit',
+                            {'service': 'kbase_protein_query_module',
                              'method': 'please_never_use_it_in_production',
                              'method_params': []
                              }],
                         'authenticated': 1})
         cls.wsURL = cls.cfg['workspace-url']
         cls.wsClient = Workspace(cls.wsURL)
-        cls.serviceImpl = kbase_protein_network_analysis_toolkit(cls.cfg)
+        cls.serviceImpl = kbase_protein_query_module(cls.cfg)
         cls.scratch = cls.cfg['scratch']
         if 'SDK_CALLBACK_URL' not in os.environ:
             os.environ['SDK_CALLBACK_URL'] = 'http://dummy-callback-url'
@@ -57,9 +57,9 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
             print('Test workspace was deleted')
 
     # NOTE: According to Python unittest naming rules test method names should start from 'test'. # noqa
-    def test_run_kbase_protein_network_analysis_toolkit(self):
+    def test_run_kbase_protein_query_module(self):
         params = {'workspace_name': self.wsName, 'parameter_1': 'Hello World!'}
-        ret = self.serviceImpl.run_kbase_protein_network_analysis_toolkit(self.ctx, params)
+        ret = self.serviceImpl.run_kbase_protein_query_module(self.ctx, params)
         self.assertIsInstance(ret, list)
         self.assertGreaterEqual(len(ret), 1)
         output = ret[0]
@@ -75,7 +75,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         import numpy as np
         import tempfile
         import os
-        from kbase_protein_network_analysis_toolkit.assign_protein_family import AssignProteinFamily
+        from kbase_protein_query_module_src.assign_protein_family import AssignProteinFamily
         temp_dir = tempfile.mkdtemp()
         try:
             centroid_file = os.path.join(temp_dir, 'family_centroids.npz')
@@ -111,8 +111,8 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         import os
         import pandas as pd
         import numpy as np
-        from kbase_protein_network_analysis_toolkit.check_existence import ProteinExistenceChecker
-        from kbase_protein_network_analysis_toolkit.storage import ProteinStorage, CompressedMetadataStorage
+        from kbase_protein_query_module_src.check_existence import ProteinExistenceChecker
+        from kbase_protein_query_module_src.storage import ProteinStorage, CompressedMetadataStorage
         temp_dir = tempfile.mkdtemp()
         try:
             storage = ProteinStorage(base_dir=temp_dir)
@@ -159,7 +159,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
 
     def test_embedding_generator(self):
         import numpy as np
-        from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
+        from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
         generator = ProteinEmbeddingGenerator(model_name="esm2_t6_8M_UR50D", device="cpu")
         seq = "MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
         emb = generator.generate_embedding(seq, pooling_method="mean")
@@ -182,8 +182,8 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         import pandas as pd
         import os
         from unittest.mock import MagicMock
-        from kbase_protein_network_analysis_toolkit.network_builder import DynamicNetworkBuilder
-        from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex
+        from kbase_protein_query_module_src.network_builder import DynamicNetworkBuilder
+        from kbase_protein_query_module_src.similarity_index import HierarchicalIndex
         embeddings = np.random.randint(0, 256, size=(10, 8), dtype=np.uint8)
         protein_ids = [f"P{i:03d}" for i in range(10)]
         metadata = pd.DataFrame({
@@ -212,7 +212,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         self.assertIn('density', props)
         self.assertIn('average_degree', props)
         out = 'test_network.html'
-        from kbase_protein_network_analysis_toolkit.network_builder import visualize_interactive_protein_network
+        from kbase_protein_query_module_src.network_builder import visualize_interactive_protein_network
         fig, G = visualize_interactive_protein_network(embeddings, protein_ids, metadata, query_embedding=query_emb, query_protein_id=query_id, output_file=out)
         self.assertIsNotNone(fig)
         self.assertTrue(os.path.exists(out))
@@ -223,7 +223,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         import shutil
         import numpy as np
         import os
-        from kbase_protein_network_analysis_toolkit.similarity_index import HierarchicalIndex, StreamingIndex
+        from kbase_protein_query_module_src.similarity_index import HierarchicalIndex, StreamingIndex
         temp_dir = tempfile.mkdtemp()
         try:
             embeddings = np.random.randint(0, 256, size=(10, 8), dtype=np.uint8)
@@ -260,7 +260,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         import os
         import pandas as pd
         import numpy as np
-        from kbase_protein_network_analysis_toolkit.storage import ProteinStorage, CompressedMetadataStorage
+        from kbase_protein_query_module_src.storage import ProteinStorage, CompressedMetadataStorage
         temp_dir = tempfile.mkdtemp()
         try:
             storage = ProteinStorage(base_dir=temp_dir, chunk_size=2)
@@ -280,7 +280,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
             meta_storage.store_metadata(metadata, family_id=family_id)
             loaded = meta_storage.load_metadata(family_id=family_id, protein_ids=['A', 'C'])
             self.assertEqual(list(loaded.index), ['A', 'C'])
-            from kbase_protein_network_analysis_toolkit.storage import _create_artificial_families
+            from kbase_protein_query_module_src.storage import _create_artificial_families
             ids = [f'P{i:05d}' for i in range(7)]
             fams = list(_create_artificial_families(ids, max_family_size=3))
             self.assertEqual(len(fams), 3)
@@ -296,7 +296,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
         import os
         import yaml
         import numpy as np
-        from kbase_protein_network_analysis_toolkit.workflow_orchestrator import ProteinNetworkWorkflow
+        from kbase_protein_query_module_src.workflow_orchestrator import ProteinNetworkWorkflow
         temp_dir = tempfile.mkdtemp()
         try:
             config_file = os.path.join(temp_dir, 'config.yaml')
@@ -307,10 +307,10 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
             }
             with open(config_file, 'w') as f:
                 yaml.dump(config, f)
-            from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
+            from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
             embedding_generator = ProteinEmbeddingGenerator(model_name='esm2_t6_8M_UR50D', device='cpu')
             embedding_dim = embedding_generator.get_embedding_dim() if hasattr(embedding_generator, 'get_embedding_dim') else 320
-            from kbase_protein_network_analysis_toolkit.storage import ProteinStorage
+            from kbase_protein_query_module_src.storage import ProteinStorage
             storage = ProteinStorage(base_dir=temp_dir)
             family_id = 'FAMW'
             protein_ids = ['X1', 'X2', 'X3']
@@ -331,7 +331,7 @@ class kbase_protein_network_analysis_toolkitTest(unittest.TestCase):
             else:
                 self.assertIn('error', result)
             with self.assertRaises(FileNotFoundError):
-                from kbase_protein_network_analysis_toolkit.workflow_orchestrator import ProteinNetworkWorkflow
+                from kbase_protein_query_module_src.workflow_orchestrator import ProteinNetworkWorkflow
                 ProteinNetworkWorkflow(config_file='nonexistent.yaml')
         finally:
             shutil.rmtree(temp_dir)

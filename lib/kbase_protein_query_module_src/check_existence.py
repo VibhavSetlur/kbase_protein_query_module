@@ -9,7 +9,7 @@ Integrates with the storage and workflow modules for seamless pipeline use.
 import logging
 from typing import Optional, Dict, Any
 import pandas as pd
-from kbase_protein_network_analysis_toolkit.storage import ProteinStorage
+from kbase_protein_query_module_src.storage import ProteinStorage
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class ProteinExistenceChecker:
         self.family_list = self.storage.get_family_list()
         self.metadata_storage = None
         try:
-            from kbase_protein_network_analysis_toolkit.storage import CompressedMetadataStorage
+            from kbase_protein_query_module_src.storage import CompressedMetadataStorage
             self.metadata_storage = CompressedMetadataStorage(metadata_dir=str(self.storage.metadata_dir))
         except Exception as e:
             logger.warning(f"Could not initialize CompressedMetadataStorage: {e}")

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from kbase_protein_network_analysis_toolkit.embedding_generator import ProteinEmbeddingGenerator
+from kbase_protein_query_module_src.embedding_generator import ProteinEmbeddingGenerator
 
 class TestProteinEmbeddingGenerator(unittest.TestCase):
     @classmethod
