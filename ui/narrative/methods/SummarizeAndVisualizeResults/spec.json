@@ -18,7 +18,7 @@
             "default_values": [""],
             "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": ["KBaseProtein.TopMatchesResult"],
+                "valid_ws_types": ["kbase_protein_query_module.FindTopMatchesFromEmbeddingResults"],
                 "example": "Select a previous top matches result."
             }
         },
@@ -48,8 +48,10 @@
             "output_mapping": [
                 { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
                 { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
-                { "service_method_output_path": [0, "summary_result"], "target_property": "summary_result" },
-                { "service_method_output_path": [0, "summary_result_ref"], "target_property": "summary_result_ref" }
+                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
+                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
+                { "service_method_output_path": [0, "output_dir"], "target_property": "output_dir" },
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" }
             ]
         }
     },

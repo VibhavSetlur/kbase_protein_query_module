@@ -1,0 +1,608 @@
+# -*- coding: utf-8 -*-
+#BEGIN_HEADER
+import logging
+import os
+
+from installed_clients.KBaseReportClient import KBaseReport
+from installed_clients.WorkspaceClient import Workspace
+
+from .src.check_existence import ProteinExistenceChecker
+from .src.embedding_generator import ProteinEmbeddingGenerator
+from .src.similarity_index import HierarchicalIndex
+from .src.network_builder import DynamicNetworkBuilder
+from .src.workflow_orchestrator import ProteinNetworkWorkflow
+#END_HEADER
+
+
+class kbase_protein_query_module:
+    '''
+    Module Name:
+    kbase_protein_query_module
+
+    Module Description:
+    A KBase module: kbase_protein_query_module
+    '''
+
+    ######## WARNING FOR GEVENT USERS ####### noqa
+    # Since asynchronous IO can lead to methods - even the same method -
+    # interrupting each other, you must be *very* careful when using global
+    # state. A method could easily clobber the state set by another while
+    # the latter method is running.
+    ######################################### noqa
+    VERSION = "0.0.1"
+    GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
+    GIT_COMMIT_HASH = "ffc0b6e9413e90c7388d4cc8221a931da79147c4"
+
+    #BEGIN_CLASS_HEADER
+    #END_CLASS_HEADER
+
+    # config contains contents of config file in a hash or None if it couldn't
+    # be found
+    def __init__(self, config):
+        #BEGIN_CONSTRUCTOR
+        self.callback_url = os.environ.get('SDK_CALLBACK_URL')
+        if self.callback_url is None:
+            raise RuntimeError('SDK_CALLBACK_URL environment variable must be set.')
+        self.shared_folder = config['scratch']
+        logging.basicConfig(format='%(created)s %(levelname)s: %(message)s',
+                            level=logging.INFO)
+        self.family_assigner = None
+        from .src.assign_protein_family import AssignProteinFamily
+        self.family_assigner = AssignProteinFamily()
+        centroid_path = os.path.join('data', 'family_centroids.npz')
+        if os.path.exists(centroid_path):
+            self.family_assigner.load_family_centroids(centroid_path)
+        #END_CONSTRUCTOR
+        pass
+
+
+    def run_kbase_protein_query_module(self, ctx, params):
+        """
+        This example function accepts any number of parameters and returns results in a KBaseReport
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "ReportResults" -> structure: parameter
+           "report_name" of String, parameter "report_ref" of String
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN run_kbase_protein_query_module
+        import time
+        start_time = time.time()
+        
+        # Validate input parameters
+        if not isinstance(params, dict):
+            raise ValueError("Input parameters must be a dictionary.")
+        
+        report = KBaseReport(self.callback_url)
+        report_text = f"KBase Protein Network Analysis Toolkit\n\nParameters:\n{params}\n\nAnalysis started."
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [],
+            'workspace_name': params.get('workspace_name', 'UNKNOWN')
+        })
+        
+        # Return the result according to KIDL spec
+        output = {
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref']
+        }
+        
+        return output
+        #END run_kbase_protein_query_module
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method run_kbase_protein_query_module return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+
+    def check_protein_existence(self, ctx, params):
+        """
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "CheckProteinExistenceResults" (Check if a
+           protein exists in the storage system.) -> structure: parameter
+           "report_name" of String, parameter "report_ref" of String,
+           parameter "exists" of Long, parameter "family_id" of String,
+           parameter "metadata" of mapping from String to unspecified object,
+           parameter "input_parameters" of mapping from String to unspecified
+           object, parameter "start_time" of Double, parameter "summary" of
+           String
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN check_protein_existence
+        import time
+        import re
+        start_time = time.time()
+        protein_id = params.get('protein_id')
+        
+        # Validate input parameters
+        if not protein_id or not isinstance(protein_id, str) or not protein_id.strip():
+            raise ValueError("Parameter 'protein_id' must be a non-empty string.")
+        
+        # Optional: UniProt regex validation
+        uniprot_regex = r"^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-Z0-9]{6,10}$"
+        if not re.match(uniprot_regex, protein_id):
+            raise ValueError("Parameter 'protein_id' does not match expected UniProt format.")
+        
+        checker = ProteinExistenceChecker()
+        result = checker.check_protein_existence(protein_id)
+        
+        # Create report
+        report = KBaseReport(self.callback_url)
+        text = f"""
+        Protein Existence Check Results
+        
+        Protein ID: {protein_id}
+        Exists: {result['exists']}
+        """
+        if result['exists']:
+            text += f"Family ID: {result['family_id']}\n"
+            text += f"Metadata: {result['metadata']}\n"
+        else:
+            text += "Protein not found in any family.\n"
+        
+        report_info = report.create_extended_report({
+            'message': text,
+            'objects_created': [],
+            'workspace_name': params['workspace_name']
+        })
+        
+        # Return the result according to KIDL spec and UI expectations
+        output = {
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref'],
+            'existence_result': result,
+            'existence_result_ref': None,  # No workspace object saved for existence check
+            'exists': result['exists'],
+            'family_id': result['family_id'],
+            'metadata': result['metadata'],
+            'input_parameters': params,
+            'start_time': start_time,
+            'summary': text
+        }
+        
+        return output
+        #END check_protein_existence
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method check_protein_existence return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+
+    def generate_protein_embedding(self, ctx, params):
+        """
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "GenerateProteinEmbeddingResults"
+           (Generate a protein embedding from a sequence.) -> structure:
+           parameter "embedding" of list of Double, parameter "summary" of
+           String, parameter "input_parameters" of mapping from String to
+           unspecified object, parameter "start_time" of Double, parameter
+           "embedding_norm" of Double, parameter "sequence_length" of Long
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN generate_protein_embedding
+        import time
+        import uuid
+        start_time = time.time()
+        sequence = params.get('sequence')
+        workspace_name = params.get('workspace_name')
+        
+        # Validate input parameters
+        if not sequence or not isinstance(sequence, str) or not sequence.strip():
+            raise ValueError("Parameter 'sequence' must be a non-empty string.")
+        
+        # Generate embedding
+        generator = ProteinEmbeddingGenerator()
+        embedding = generator.generate_embedding(sequence)
+        summary = f"Generated embedding for protein. Shape: {embedding.shape}"
+        
+        # Calculate embedding norm
+        embedding_norm = float((embedding**2).sum()**0.5)
+        sequence_length = len(sequence)
+        
+        # Save embedding as workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        embedding_obj_name = f"protein_embedding_{uuid.uuid4().hex[:8]}"
+        embedding_obj_type = "KBaseProtein.ProteinEmbeddingResult"
+        embedding_obj_data = {
+            'input_id': sequence[:50] + "..." if len(sequence) > 50 else sequence,
+            'input_type': 'sequence',
+            'embedding_ref': None,  # Self-reference
+            'embedding': embedding.tolist(),
+            'model_name': 'esm2_t6_8M_UR50D',
+            'pooling_method': 'mean',
+            'metadata': {
+                'sequence_length': sequence_length,
+                'embedding_norm': embedding_norm,
+                'created_at': start_time,
+                'summary': summary
+            }
+        }
+        
+        try:
+            save_ret = ws.save_objects({
+                'workspace': workspace_name,
+                'objects': [{
+                    'type': embedding_obj_type,
+                    'data': embedding_obj_data,
+                    'name': embedding_obj_name
+                }]
+            })
+            embedding_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+        except Exception as e:
+            raise ValueError(f"Failed to save embedding object: {str(e)}")
+        
+        # Create report
+        report = KBaseReport(self.callback_url)
+        report_text = f"""
+        Protein Embedding Generation Results
+        
+        Summary: {summary}
+        Sequence Length: {sequence_length}
+        Embedding Norm: {embedding_norm:.4f}
+        Embedding Shape: {embedding.shape}
+        
+        The embedding has been saved as a workspace object and can be used for further analysis.
+        """
+        
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [{
+                'ref': embedding_ref,
+                'description': 'Protein embedding result'
+            }],
+            'workspace_name': workspace_name
+        })
+        
+        # Return the result according to KIDL spec and UI expectations
+        output = {
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref'],
+            'embedding_result': embedding.tolist(),
+            'embedding_result_ref': embedding_ref,
+            'summary': summary,
+            'input_parameters': params,
+            'start_time': start_time,
+            'embedding_norm': embedding_norm,
+            'sequence_length': sequence_length
+        }
+        
+        return output
+        #END generate_protein_embedding
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method generate_protein_embedding return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+
+    def assign_family_fast(self, ctx, params):
+        """
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "AssignFamilyFastResults" (Quickly assign
+           a protein embedding to a family by similarity to the medoid.) ->
+           structure: parameter "family_id" of String, parameter "confidence"
+           of Double, parameter "eigenprotein_id" of String, parameter
+           "input_parameters" of mapping from String to unspecified object,
+           parameter "start_time" of Double
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN assign_family_fast
+        import time
+        import numpy as np
+        import uuid
+        start_time = time.time()
+        embedding_ref = params.get('embedding_ref')
+        workspace_name = params.get('workspace_name')
+        
+        # Validate input parameters
+        if not embedding_ref:
+            raise ValueError("Parameter 'embedding_ref' must be provided.")
+        
+        # Get embedding from workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        try:
+            embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
+            embedding = embedding_obj['data']['embedding']
+        except Exception as e:
+            raise ValueError(f"Failed to retrieve embedding from workspace: {str(e)}")
+        
+        if not embedding or not isinstance(embedding, list) or not all(isinstance(x, (int, float)) for x in embedding):
+            raise ValueError("Embedding must be a non-empty list of numbers.")
+        
+        embedding_np = np.array(embedding, dtype=np.float32)
+        result = self.family_assigner.assign_family(embedding_np)
+        
+        # Save family assignment as workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        assignment_obj_name = f"family_assignment_{uuid.uuid4().hex[:8]}"
+        assignment_obj_type = "KBaseProtein.ProteinFamilyAssignmentResult"
+        assignment_obj_data = {
+            'input_id': str(embedding[:10]) + "..." if len(embedding) > 10 else str(embedding),
+            'input_type': 'embedding',
+            'embedding_ref': embedding_ref,  # Reference the input embedding
+            'assigned_family_id': result['family_id'],
+            'similarity_score': float(result['confidence']),
+            'metadata': {
+                'eigenprotein_id': result['eigenprotein_id'],
+                'confidence': float(result['confidence']),
+                'created_at': start_time
+            }
+        }
+        
+        try:
+            save_ret = ws.save_objects({
+                'workspace': workspace_name,
+                'objects': [{
+                    'type': assignment_obj_type,
+                    'data': assignment_obj_data,
+                    'name': assignment_obj_name
+                }]
+            })
+            assignment_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+        except Exception as e:
+            raise ValueError(f"Failed to save family assignment object: {str(e)}")
+        
+        # Create report
+        report = KBaseReport(self.callback_url)
+        report_text = f"""
+        Protein Family Assignment Results
+        
+        Family ID: {result['family_id']}
+        Confidence: {result['confidence']:.4f}
+        Eigenprotein ID: {result['eigenprotein_id']}
+        
+        The protein has been assigned to family {result['family_id']} with confidence {result['confidence']:.4f}.
+        """
+        
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [{
+                'ref': assignment_ref,
+                'description': 'Protein family assignment result'
+            }],
+            'workspace_name': workspace_name
+        })
+        
+        # Return the result according to KIDL spec and UI expectations
+        output = {
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref'],
+            'family_id': result['family_id'],
+            'confidence': float(result['confidence']),
+            'eigenprotein_id': result['eigenprotein_id'],
+            'family_assignment_ref': assignment_ref,
+            'input_parameters': params,
+            'start_time': start_time
+        }
+        
+        return output
+        #END assign_family_fast
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method assign_family_fast return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+
+    def find_top_matches_from_embedding(self, ctx, params):
+        """
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "FindTopMatchesFromEmbeddingResults" (Find
+           top matches for a given protein embedding.) -> structure:
+           parameter "matches" of list of mapping from String to unspecified
+           object, parameter "summary" of String, parameter
+           "input_parameters" of mapping from String to unspecified object,
+           parameter "start_time" of Double, parameter "family_id" of String,
+           parameter "top_n" of Long, parameter "similarity_stats" of mapping
+           from String to Double
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN find_top_matches_from_embedding
+        import time
+        import numpy as np
+        import uuid
+        start_time = time.time()
+        embedding_ref = params.get('embedding_ref')
+        family_id = params.get('family_id')
+        top_n = params.get('top_n', 10)
+        
+        # Validate input parameters
+        if not embedding_ref:
+            raise ValueError("Parameter 'embedding_ref' must be provided.")
+        
+        # Get embedding from workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        try:
+            embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
+            embedding = embedding_obj['data']['embedding']
+        except Exception as e:
+            raise ValueError(f"Failed to retrieve embedding from workspace: {str(e)}")
+        
+        if not embedding or not isinstance(embedding, list) or not all(isinstance(x, (int, float)) for x in embedding):
+            raise ValueError("Embedding must be a non-empty list of numbers.")
+        
+        if not family_id:
+            raise ValueError("Parameter 'family_id' must be provided for similarity search.")
+        
+        if not isinstance(top_n, int) or not (1 <= top_n <= 1000):
+            raise ValueError("Parameter 'top_n' must be an integer between 1 and 1000.")
+        
+        index = HierarchicalIndex()
+        embedding_np = np.array(embedding, dtype=np.uint8)
+        similarities, protein_ids = index.search_family(family_id, embedding_np, top_k=top_n)
+        
+        matches = [
+            {'protein_id': pid, 'similarity': float(sim)}
+            for pid, sim in zip(protein_ids, similarities)
+        ]
+        summary = f"Found {len(matches)} top matches in family {family_id}."
+        
+        # Save similarity search results as workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        search_obj_name = f"similarity_search_{uuid.uuid4().hex[:8]}"
+        search_obj_type = "KBaseProtein.SummarizeVisualizeResult"
+        search_obj_data = {
+            'input_id': str(embedding[:10]) + "..." if len(embedding) > 10 else str(embedding),
+            'input_type': 'embedding',
+            'top_matches_result_ref': None,  # Self-reference
+            'summary_html': report_text,
+            'metadata': {
+                'family_id': family_id,
+                'top_n': top_n,
+                'matches_count': len(matches),
+                'embedding_ref': embedding_ref,  # Reference the input embedding
+                'similarity_stats': {
+                    'max': float(np.max(similarities)) if len(similarities) else None,
+                    'min': float(np.min(similarities)) if len(similarities) else None,
+                    'mean': float(np.mean(similarities)) if len(similarities) else None
+                },
+                'created_at': start_time
+            }
+        }
+        
+        try:
+            save_ret = ws.save_objects({
+                'workspace': params.get('workspace_name'),
+                'objects': [{
+                    'type': search_obj_type,
+                    'data': search_obj_data,
+                    'name': search_obj_name
+                }]
+            })
+            search_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+        except Exception as e:
+            raise ValueError(f"Failed to save similarity search results: {str(e)}")
+        
+        # Create report
+        report = KBaseReport(self.callback_url)
+        report_text = f"""
+        Protein Similarity Search Results
+        
+        Family ID: {family_id}
+        Top N: {top_n}
+        Matches Found: {len(matches)}
+        
+        Similarity Statistics:
+        - Maximum: {search_obj_data['similarity_stats']['max']:.4f}
+        - Minimum: {search_obj_data['similarity_stats']['min']:.4f}
+        - Mean: {search_obj_data['similarity_stats']['mean']:.4f}
+        
+        Top matches have been saved as a workspace object for further analysis.
+        """
+        
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [{
+                'ref': search_ref,
+                'description': 'Protein similarity search results'
+            }],
+            'workspace_name': params.get('workspace_name')
+        })
+        
+        # Return the result according to KIDL spec and UI expectations
+        output = {
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref'],
+            'top_matches_result': {
+                'matches': matches,
+                'family_id': family_id,
+                'top_n': top_n,
+                'similarity_stats': search_obj_data['metadata']['similarity_stats']
+            },
+            'top_matches_result_ref': search_ref,
+            'matches': matches,
+            'summary': summary,
+            'input_parameters': params,
+            'start_time': start_time,
+            'family_id': family_id,
+            'top_n': top_n,
+            'similarity_stats': {
+                'max': float(np.max(similarities)) if len(similarities) else None,
+                'min': float(np.min(similarities)) if len(similarities) else None,
+                'mean': float(np.mean(similarities)) if len(similarities) else None
+            }
+        }
+        
+        return output
+        #END find_top_matches_from_embedding
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method find_top_matches_from_embedding return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+
+    def summarize_and_visualize_results(self, ctx, params):
+        """
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "SummarizeAndVisualizeResultsResults"
+           (Summarize and visualize protein network analysis results.) ->
+           structure: parameter "report_name" of String, parameter
+           "report_ref" of String, parameter "input_parameters" of mapping
+           from String to unspecified object, parameter "start_time" of
+           Double, parameter "output_dir" of String, parameter "summary" of
+           String
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN summarize_and_visualize_results
+        import time
+        import os
+        start_time = time.time()
+        search_results = params.get('search_results')
+        output_dir = params.get('output_dir', self.shared_folder)
+        
+        # Validate input parameters
+        if search_results is None:
+            raise ValueError("Parameter 'search_results' is required.")
+        
+        if output_dir and not isinstance(output_dir, str):
+            raise ValueError("Parameter 'output_dir' must be a valid path string.")
+        
+        summary = f"Results summarized and visualized in {output_dir}."
+        report = KBaseReport(self.callback_url)
+        report_info = report.create_extended_report({
+            'message': summary,
+            'objects_created': [],
+            'workspace_name': params['workspace_name']
+        })
+        
+        # Return the result according to KIDL spec
+        output = {
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref'],
+            'input_parameters': params,
+            'start_time': start_time,
+            'output_dir': output_dir,
+            'summary': summary
+        }
+        
+        return output
+        #END summarize_and_visualize_results
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method summarize_and_visualize_results return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+    def status(self, ctx):
+        #BEGIN_STATUS
+        returnVal = {'state': "OK",
+                     'message': "",
+                     'version': self.VERSION,
+                     'git_url': self.GIT_URL,
+                     'git_commit_hash': self.GIT_COMMIT_HASH}
+        #END_STATUS
+        return [returnVal]

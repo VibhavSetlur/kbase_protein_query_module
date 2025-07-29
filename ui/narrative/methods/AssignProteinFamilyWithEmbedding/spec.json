@@ -18,7 +18,7 @@
             "default_values": [""],
             "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": ["KBaseProtein.ProteinEmbeddingResult"],
+                "valid_ws_types": ["kbase_protein_query_module.ProteinEmbeddingResult"],
                 "example": "Select a previously generated embedding."
             }
         }
@@ -39,10 +39,11 @@
                 }
             ],
             "output_mapping": [
-                { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
-                { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
-                { "service_method_output_path": [0, "assignment_result"], "target_property": "assignment_result" },
-                { "service_method_output_path": [0, "assignment_result_ref"], "target_property": "assignment_result_ref" }
+                { "service_method_output_path": [0, "family_id"], "target_property": "family_id" },
+                { "service_method_output_path": [0, "confidence"], "target_property": "confidence" },
+                { "service_method_output_path": [0, "eigenprotein_id"], "target_property": "eigenprotein_id" },
+                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
+                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" }
             ]
         }
     },
