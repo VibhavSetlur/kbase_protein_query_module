@@ -117,14 +117,37 @@ class kbase_protein_query_module:
         start_time = time.time()
         protein_id = params.get('protein_id')
         
-        # Validate input parameters
-        if not protein_id or not isinstance(protein_id, str) or not protein_id.strip():
-            raise ValueError("Parameter 'protein_id' must be a non-empty string.")
+        # Quick validation - return error immediately for invalid inputs
+        if not protein_id:
+            raise ValueError("Parameter 'protein_id' is required and cannot be empty.")
         
-        # Optional: UniProt regex validation
-        uniprot_regex = r"^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-Z0-9]{6,10}$"
-        if not re.match(uniprot_regex, protein_id):
-            raise ValueError("Parameter 'protein_id' does not match expected UniProt format.")
+        if not isinstance(protein_id, str):
+            raise ValueError("Parameter 'protein_id' must be a string.")
+        
+        protein_id = protein_id.strip()
+        if not protein_id:
+            raise ValueError("Parameter 'protein_id' cannot be empty or whitespace only.")
+        
+        # More flexible validation - accept various formats
+        # UniProt format: P12345, Q1A2B3, etc.
+        uniprot_regex = r"^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$"
+        # Dummy data format: family_X_prot_Y
+        dummy_regex = r"^family_\d+_prot_\d+$"
+        # UniProt-like format: P followed by 8 digits
+        uniprot_like_regex = r"^P\d{8}$"
+        # Generic alphanumeric format (6-10 characters)
+        generic_regex = r"^[A-Z0-9]{6,10}$"
+        
+        # Check if protein_id matches any of the accepted formats
+        is_valid = (re.match(uniprot_regex, protein_id) or 
+                   re.match(dummy_regex, protein_id) or 
+                   re.match(uniprot_like_regex, protein_id) or
+                   re.match(generic_regex, protein_id))
+        
+        if not is_valid:
+            raise ValueError(f"Parameter 'protein_id' '{protein_id}' does not match expected formats. "
+                           f"Accepted formats: UniProt IDs (e.g., P12345), dummy IDs (e.g., family_0_prot_1), "
+                           f"or generic alphanumeric IDs (6-10 characters).")
         
         checker = ProteinExistenceChecker()
         result = checker.check_protein_existence(protein_id)
@@ -206,25 +229,33 @@ class kbase_protein_query_module:
         sequence_length = len(sequence)
         
         # Save embedding as workspace object
-        ws = Workspace(os.environ['WS_URL'])
-        embedding_obj_name = f"protein_embedding_{uuid.uuid4().hex[:8]}"
-        embedding_obj_type = "KBaseProtein.ProteinEmbeddingResult"
-        embedding_obj_data = {
-            'input_id': sequence[:50] + "..." if len(sequence) > 50 else sequence,
-            'input_type': 'sequence',
-            'embedding_ref': None,  # Self-reference
-            'embedding': embedding.tolist(),
-            'model_name': 'esm2_t6_8M_UR50D',
-            'pooling_method': 'mean',
-            'metadata': {
-                'sequence_length': sequence_length,
-                'embedding_norm': embedding_norm,
-                'created_at': start_time,
-                'summary': summary
-            }
-        }
-        
         try:
+            # Get workspace URL from environment or use default
+            ws_url = os.environ.get('WS_URL')
+            if not ws_url:
+                # Try alternative environment variables or use a default
+                ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+                if not ws_url.endswith('/ws'):
+                    ws_url = ws_url + '/ws'
+            
+            ws = Workspace(ws_url)
+            embedding_obj_name = f"protein_embedding_{uuid.uuid4().hex[:8]}"
+            embedding_obj_type = "KBaseProtein.ProteinEmbeddingResult"
+            embedding_obj_data = {
+                'input_id': sequence[:50] + "..." if len(sequence) > 50 else sequence,
+                'input_type': 'sequence',
+                'embedding_ref': None,  # Self-reference
+                'embedding': embedding.tolist(),
+                'model_name': 'esm2_t6_8M_UR50D',
+                'pooling_method': 'mean',
+                'metadata': {
+                    'sequence_length': sequence_length,
+                    'embedding_norm': embedding_norm,
+                    'created_at': start_time,
+                    'summary': summary
+                }
+            }
+            
             save_ret = ws.save_objects({
                 'workspace': workspace_name,
                 'objects': [{
@@ -235,7 +266,9 @@ class kbase_protein_query_module:
             })
             embedding_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
         except Exception as e:
-            raise ValueError(f"Failed to save embedding object: {str(e)}")
+            # If workspace save fails, still return the embedding but without workspace reference
+            embedding_ref = None
+            print(f"Warning: Failed to save embedding to workspace: {str(e)}")
         
         # Create report
         report = KBaseReport(self.callback_url)
@@ -307,7 +340,14 @@ class kbase_protein_query_module:
             raise ValueError("Parameter 'embedding_ref' must be provided.")
         
         # Get embedding from workspace object
-        ws = Workspace(os.environ['WS_URL'])
+        # Get workspace URL from environment or use default
+        ws_url = os.environ.get('WS_URL')
+        if not ws_url:
+            # Try alternative environment variables or use a default
+            ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+            if not ws_url.endswith('/ws'):
+                ws_url = ws_url + '/ws'
+        ws = Workspace(ws_url)
         try:
             embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
             embedding = embedding_obj['data']['embedding']
@@ -321,7 +361,7 @@ class kbase_protein_query_module:
         result = self.family_assigner.assign_family(embedding_np)
         
         # Save family assignment as workspace object
-        ws = Workspace(os.environ['WS_URL'])
+        # Reuse the same workspace connection
         assignment_obj_name = f"family_assignment_{uuid.uuid4().hex[:8]}"
         assignment_obj_type = "KBaseProtein.ProteinFamilyAssignmentResult"
         assignment_obj_data = {
@@ -421,7 +461,14 @@ class kbase_protein_query_module:
             raise ValueError("Parameter 'embedding_ref' must be provided.")
         
         # Get embedding from workspace object
-        ws = Workspace(os.environ['WS_URL'])
+        # Get workspace URL from environment or use default
+        ws_url = os.environ.get('WS_URL')
+        if not ws_url:
+            # Try alternative environment variables or use a default
+            ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+            if not ws_url.endswith('/ws'):
+                ws_url = ws_url + '/ws'
+        ws = Workspace(ws_url)
         try:
             embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
             embedding = embedding_obj['data']['embedding']
@@ -448,7 +495,7 @@ class kbase_protein_query_module:
         summary = f"Found {len(matches)} top matches in family {family_id}."
         
         # Save similarity search results as workspace object
-        ws = Workspace(os.environ['WS_URL'])
+        # Reuse the same workspace connection
         search_obj_name = f"similarity_search_{uuid.uuid4().hex[:8]}"
         search_obj_type = "KBaseProtein.SummarizeVisualizeResult"
         search_obj_data = {

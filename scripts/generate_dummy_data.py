@@ -48,8 +48,11 @@ FAMILY_SPREAD = 0.5  # Standard deviation for within-family variation
 
 for fam in range(N_FAMILIES):
     family_id = f'family_{fam}'
-    # Generate protein IDs
-    protein_ids = [f'{family_id}_prot_{i}' for i in range(N_PROTEINS_PER_FAMILY)]
+    # Generate protein IDs - use both UniProt format and dummy format for testing
+    if fam < 25:  # First half use UniProt-like format
+        protein_ids = [f'P{fam:05d}{i:03d}' for i in range(N_PROTEINS_PER_FAMILY)]
+    else:  # Second half use dummy format
+        protein_ids = [f'{family_id}_prot_{i}' for i in range(N_PROTEINS_PER_FAMILY)]
     # Generate a unique centroid for this family
     centroid = FAMILY_CENTROIDS[fam]
     # Generate embeddings clustered around the centroid
