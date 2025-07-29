@@ -114,8 +114,10 @@ class kbase_protein_query_module:
         #BEGIN check_protein_existence
         import time
         import re
+        import uuid
         start_time = time.time()
         protein_id = params.get('protein_id')
+        workspace_name = params.get('workspace_name')
         
         # Quick validation - return error immediately for invalid inputs
         if not protein_id:
@@ -152,6 +154,43 @@ class kbase_protein_query_module:
         checker = ProteinExistenceChecker()
         result = checker.check_protein_existence(protein_id)
         
+        # Save result to workspace for user access
+        existence_result_ref = None
+        try:
+            # Get workspace URL from environment or use default
+            ws_url = os.environ.get('WS_URL')
+            if not ws_url:
+                # Try alternative environment variables or use a default
+                ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+                if not ws_url.endswith('/ws'):
+                    ws_url = ws_url + '/ws'
+            
+            ws = Workspace(ws_url)
+            existence_obj_name = f"protein_existence_{uuid.uuid4().hex[:8]}"
+            existence_obj_type = "KBaseProtein.ProteinExistenceResult"
+            existence_obj_data = {
+                'protein_id': protein_id,
+                'exists': result['exists'],
+                'family_id': result['family_id'],
+                'metadata': result['metadata'],
+                'search_timestamp': start_time,
+                'summary': f"Protein {protein_id} {'found' if result['exists'] else 'not found'} in database"
+            }
+            
+            save_ret = ws.save_objects({
+                'workspace': workspace_name,
+                'objects': [{
+                    'type': existence_obj_type,
+                    'data': existence_obj_data,
+                    'name': existence_obj_name
+                }]
+            })
+            existence_result_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+        except Exception as e:
+            # If workspace save fails, still return the result but without workspace reference
+            existence_result_ref = None
+            print(f"Warning: Failed to save existence result to workspace: {str(e)}")
+        
         # Create report
         report = KBaseReport(self.callback_url)
         text = f"""
@@ -166,19 +205,25 @@ class kbase_protein_query_module:
         else:
             text += "Protein not found in any family.\n"
         
-        report_info = report.create_extended_report({
+        # Only include objects_created if existence_result_ref is not None
+        report_params = {
             'message': text,
-            'objects_created': [],
-            'workspace_name': params['workspace_name']
-        })
+            'workspace_name': workspace_name
+        }
+        
+        if existence_result_ref is not None:
+            report_params['objects_created'] = [{
+                'ref': existence_result_ref,
+                'description': 'Protein existence check result'
+            }]
+        
+        report_info = report.create_extended_report(report_params)
         
         # Return the result according to KIDL spec and UI expectations
         output = {
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
-            'existence_result': result,
-            'existence_result_ref': None,  # No workspace object saved for existence check
-            'exists': result['exists'],
+            'exists': 1 if result['exists'] else 0,  # Convert boolean to Long as per KIDL spec
             'family_id': result['family_id'],
             'metadata': result['metadata'],
             'input_parameters': params,
@@ -229,6 +274,7 @@ class kbase_protein_query_module:
         sequence_length = len(sequence)
         
         # Save embedding as workspace object
+        embedding_ref = None
         try:
             # Get workspace URL from environment or use default
             ws_url = os.environ.get('WS_URL')
@@ -283,20 +329,25 @@ class kbase_protein_query_module:
         The embedding has been saved as a workspace object and can be used for further analysis.
         """
         
-        report_info = report.create_extended_report({
+        # Only include objects_created if embedding_ref is not None
+        report_params = {
             'message': report_text,
-            'objects_created': [{
+            'workspace_name': workspace_name
+        }
+        
+        if embedding_ref is not None:
+            report_params['objects_created'] = [{
                 'ref': embedding_ref,
                 'description': 'Protein embedding result'
-            }],
-            'workspace_name': workspace_name
-        })
+            }]
+        
+        report_info = report.create_extended_report(report_params)
         
         # Return the result according to KIDL spec and UI expectations
         output = {
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
-            'embedding_result': embedding.tolist(),
+            'embedding': embedding.tolist(),  # Match KIDL spec field name
             'embedding_result_ref': embedding_ref,
             'summary': summary,
             'input_parameters': params,
@@ -362,6 +413,7 @@ class kbase_protein_query_module:
         
         # Save family assignment as workspace object
         # Reuse the same workspace connection
+        assignment_ref = None
         assignment_obj_name = f"family_assignment_{uuid.uuid4().hex[:8]}"
         assignment_obj_type = "KBaseProtein.ProteinFamilyAssignmentResult"
         assignment_obj_data = {
@@ -388,7 +440,9 @@ class kbase_protein_query_module:
             })
             assignment_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
         except Exception as e:
-            raise ValueError(f"Failed to save family assignment object: {str(e)}")
+            # If workspace save fails, still return the result but without workspace reference
+            assignment_ref = None
+            print(f"Warning: Failed to save family assignment to workspace: {str(e)}")
         
         # Create report
         report = KBaseReport(self.callback_url)
@@ -402,14 +456,19 @@ class kbase_protein_query_module:
         The protein has been assigned to family {result['family_id']} with confidence {result['confidence']:.4f}.
         """
         
-        report_info = report.create_extended_report({
+        # Only include objects_created if assignment_ref is not None
+        report_params = {
             'message': report_text,
-            'objects_created': [{
+            'workspace_name': workspace_name
+        }
+        
+        if assignment_ref is not None:
+            report_params['objects_created'] = [{
                 'ref': assignment_ref,
                 'description': 'Protein family assignment result'
-            }],
-            'workspace_name': workspace_name
-        })
+            }]
+        
+        report_info = report.create_extended_report(report_params)
         
         # Return the result according to KIDL spec and UI expectations
         output = {
@@ -418,7 +477,6 @@ class kbase_protein_query_module:
             'family_id': result['family_id'],
             'confidence': float(result['confidence']),
             'eigenprotein_id': result['eigenprotein_id'],
-            'family_assignment_ref': assignment_ref,
             'input_parameters': params,
             'start_time': start_time
         }
@@ -496,6 +554,7 @@ class kbase_protein_query_module:
         
         # Save similarity search results as workspace object
         # Reuse the same workspace connection
+        search_ref = None
         search_obj_name = f"similarity_search_{uuid.uuid4().hex[:8]}"
         search_obj_type = "KBaseProtein.SummarizeVisualizeResult"
         search_obj_data = {
@@ -528,7 +587,9 @@ class kbase_protein_query_module:
             })
             search_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
         except Exception as e:
-            raise ValueError(f"Failed to save similarity search results: {str(e)}")
+            # If workspace save fails, still return the result but without workspace reference
+            search_ref = None
+            print(f"Warning: Failed to save similarity search results to workspace: {str(e)}")
         
         # Create report
         report = KBaseReport(self.callback_url)
@@ -547,32 +608,30 @@ class kbase_protein_query_module:
         Top matches have been saved as a workspace object for further analysis.
         """
         
-        report_info = report.create_extended_report({
+        # Only include objects_created if search_ref is not None
+        report_params = {
             'message': report_text,
-            'objects_created': [{
+            'workspace_name': params.get('workspace_name')
+        }
+        
+        if search_ref is not None:
+            report_params['objects_created'] = [{
                 'ref': search_ref,
                 'description': 'Protein similarity search results'
-            }],
-            'workspace_name': params.get('workspace_name')
-        })
+            }]
+        
+        report_info = report.create_extended_report(report_params)
         
         # Return the result according to KIDL spec and UI expectations
         output = {
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
-            'top_matches_result': {
-                'matches': matches,
-                'family_id': family_id,
-                'top_n': top_n,
-                'similarity_stats': search_obj_data['metadata']['similarity_stats']
-            },
-            'top_matches_result_ref': search_ref,
             'matches': matches,
             'summary': summary,
             'input_parameters': params,
             'start_time': start_time,
             'family_id': family_id,
-            'top_n': top_n,
+            'top_n': int(top_n),  # Ensure it's an integer as per KIDL spec
             'similarity_stats': {
                 'max': float(np.max(similarities)) if len(similarities) else None,
                 'min': float(np.min(similarities)) if len(similarities) else None,
@@ -607,12 +666,12 @@ class kbase_protein_query_module:
         import time
         import os
         start_time = time.time()
-        search_results = params.get('search_results')
+        top_matches_result_ref = params.get('top_matches_result_ref')  # Match UI spec parameter name
         output_dir = params.get('output_dir', self.shared_folder)
         
         # Validate input parameters
-        if search_results is None:
-            raise ValueError("Parameter 'search_results' is required.")
+        if not top_matches_result_ref:
+            raise ValueError("Parameter 'top_matches_result_ref' is required.")
         
         if output_dir and not isinstance(output_dir, str):
             raise ValueError("Parameter 'output_dir' must be a valid path string.")
