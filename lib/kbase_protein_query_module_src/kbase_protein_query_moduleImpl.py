@@ -59,47 +59,41 @@ class kbase_protein_query_module:
         """
         Generate a protein embedding from an amino acid sequence.
         :param params: dict with 'sequence' (required) and 'workspace_name' (optional)
-        :returns: dict with 'report_name', 'report_ref', 'embedding_result', 'embedding_result_ref'
+        :returns: GenerateProteinEmbeddingResults structure as defined in KIDL spec
         """
         #BEGIN generate_protein_embedding
         import time
         import uuid
         start_time = time.time()
-        validation_status = "success"
-        error = None
         sequence = params.get('sequence')
         workspace_name = params.get('workspace_name')
+        
+        # Validate input parameters
         if not sequence or not isinstance(sequence, str) or not sequence.strip():
-            validation_status = "error"
-            error = "Parameter 'sequence' must be a non-empty string."
-            summary = f"Validation failed: {error}"
-            return [{
-                'report_name': None,
-                'report_ref': None,
-                'embedding_result': None,
-                'embedding_result_ref': None,
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'sequence' must be a non-empty string.")
+        
+        # Generate embedding
         generator = ProteinEmbeddingGenerator()
         embedding = generator.generate_embedding(sequence)
         summary = f"Generated embedding for protein. Shape: {embedding.shape}"
-        # Save embedding as a workspace object
+        
+        # Calculate embedding norm
+        embedding_norm = float((embedding**2).sum()**0.5)
+        sequence_length = len(sequence)
+        
+        # Save embedding as workspace object
         ws = Workspace(os.environ['WS_URL'])
-        embedding_obj_name = f"embedding_result_{uuid.uuid4().hex[:8]}"
-        embedding_obj_type = "KBaseProtein.ProteinEmbeddingResult"
+        embedding_obj_name = f"protein_embedding_{uuid.uuid4().hex[:8]}"
+        embedding_obj_type = "KBaseProtein.ProteinEmbedding"
         embedding_obj_data = {
             'embedding': embedding.tolist(),
             'sequence': sequence,
             'summary': summary,
-            'input_parameters': params,
-            'embedding_norm': float((embedding**2).sum()**0.5),
-            'sequence_length': len(sequence),
+            'embedding_norm': embedding_norm,
+            'sequence_length': sequence_length,
             'created_at': start_time
         }
+        
         try:
             save_ret = ws.save_objects({
                 'workspace': workspace_name,
@@ -109,169 +103,169 @@ class kbase_protein_query_module:
                     'name': embedding_obj_name
                 }]
             })
-            embedding_result_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+            embedding_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
         except Exception as e:
-            validation_status = "error"
-            error = f"Failed to save embedding object: {str(e)}"
-            return [{
-                'report_name': None,
-                'report_ref': None,
-                'embedding_result': None,
-                'embedding_result_ref': None,
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': error
-            }]
-        # Create a KBase report
+            raise ValueError(f"Failed to save embedding object: {str(e)}")
+        
+        # Create report
         report = KBaseReport(self.callback_url)
-        report_text = summary
-        try:
-            report_info = report.create({
-                'report': {
-                    'objects_created': [{
-                        'ref': embedding_result_ref,
-                        'description': 'Protein embedding result'
-                    }],
-                    'text_message': report_text
-                },
-                'workspace_name': workspace_name
-            })
-            report_name = report_info['name']
-            report_ref = report_info['ref']
-        except Exception as e:
-            validation_status = "error"
-            error = f"Failed to create report: {str(e)}"
-            return [{
-                'report_name': None,
-                'report_ref': None,
-                'embedding_result': embedding_obj_data,
-                'embedding_result_ref': embedding_result_ref,
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': error
-            }]
+        report_text = f"""
+        Protein Embedding Generation Results
+        
+        Summary: {summary}
+        Sequence Length: {sequence_length}
+        Embedding Norm: {embedding_norm:.4f}
+        Embedding Shape: {embedding.shape}
+        
+        The embedding has been saved as a workspace object and can be used for further analysis.
+        """
+        
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [{
+                'ref': embedding_ref,
+                'description': 'Protein embedding result'
+            }],
+            'workspace_name': workspace_name
+        })
+        
+        # Return the result according to KIDL spec
         output = {
-            'report_name': report_name,
-            'report_ref': report_ref,
-            'embedding_result': embedding_obj_data,
-            'embedding_result_ref': embedding_result_ref,
-            'status': validation_status,
-            'error': error,
+            'embedding': embedding.tolist(),
+            'summary': summary,
             'input_parameters': params,
             'start_time': start_time,
-            'summary': summary
+            'embedding_norm': embedding_norm,
+            'sequence_length': sequence_length
         }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method generate_protein_embedding must return a dict or list of dicts as required by KBase.')
-        return [output]
+        
+        return output
         #END generate_protein_embedding
 
     def assign_family_fast(self, ctx, params):
         """
         Quickly assign a protein embedding to a family by similarity to the medoid (binary Hamming distance only).
         :param params: dict with 'embedding' (list of uint8), and 'workspace_name'
-        :returns: dict with 'family_id', 'confidence', and 'eigenprotein_id'
+        :returns: AssignFamilyFastResults structure as defined in KIDL spec
         """
         #BEGIN assign_family_fast
         import time
         import numpy as np
+        import uuid
         start_time = time.time()
-        validation_status = "success"
-        error = None
         embedding = params.get('embedding')
+        workspace_name = params.get('workspace_name')
+        
+        # Validate input parameters
         if embedding is None or not isinstance(embedding, list) or not embedding or not all(isinstance(x, (int, np.integer)) for x in embedding):
-            validation_status = "error"
-            error = "Parameter 'embedding' must be a non-empty list of uint8 integers."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'embedding' must be a non-empty list of uint8 integers.")
+        
         embedding_np = np.array(embedding, dtype=np.uint8)
+        result = self.family_assigner.assign_family(embedding_np)
+        
+        # Save family assignment as workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        assignment_obj_name = f"family_assignment_{uuid.uuid4().hex[:8]}"
+        assignment_obj_type = "KBaseProtein.ProteinFamilyAssignment"
+        assignment_obj_data = {
+            'family_id': result['family_id'],
+            'confidence': float(result['confidence']),
+            'eigenprotein_id': result['eigenprotein_id'],
+            'embedding': embedding,
+            'created_at': start_time
+        }
+        
         try:
-            result = self.family_assigner.assign_family(embedding_np)
+            save_ret = ws.save_objects({
+                'workspace': workspace_name,
+                'objects': [{
+                    'type': assignment_obj_type,
+                    'data': assignment_obj_data,
+                    'name': assignment_obj_name
+                }]
+            })
+            assignment_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
         except Exception as e:
-            validation_status = "error"
-            error = str(e)
-            summary = f"Assignment failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError(f"Failed to save family assignment object: {str(e)}")
+        
+        # Create report
+        report = KBaseReport(self.callback_url)
+        report_text = f"""
+        Protein Family Assignment Results
+        
+        Family ID: {result['family_id']}
+        Confidence: {result['confidence']:.4f}
+        Eigenprotein ID: {result['eigenprotein_id']}
+        
+        The protein has been assigned to family {result['family_id']} with confidence {result['confidence']:.4f}.
+        """
+        
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [{
+                'ref': assignment_ref,
+                'description': 'Protein family assignment result'
+            }],
+            'workspace_name': workspace_name
+        })
+        
+        # Return the result according to KIDL spec
         output = {
             'family_id': result['family_id'],
             'confidence': float(result['confidence']),
             'eigenprotein_id': result['eigenprotein_id'],
             'input_parameters': params,
-            'start_time': start_time,
-            'validation_status': validation_status,
-            'error': error,
-            'summary': f"Assigned to family {result['family_id']} with confidence {result['confidence']:.3f}."
+            'start_time': start_time
         }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method assign_family_fast must return a dict or list of dicts as required by KBase.')
-        return [output]
+        
+        return output
         #END assign_family_fast
 
     def check_protein_existence(self, ctx, params):
         """
         Check if a protein exists in the storage system.
         :param params: dict with 'protein_id' and 'workspace_name'
-        :returns: dict with 'report_name', 'report_ref', and existence info
+        :returns: CheckProteinExistenceResults structure as defined in KIDL spec
         """
         #BEGIN check_protein_existence
         import time
         import re
         start_time = time.time()
-        validation_status = "success"
-        error = None
         protein_id = params.get('protein_id')
+        
+        # Validate input parameters
         if not protein_id or not isinstance(protein_id, str) or not protein_id.strip():
-            validation_status = "error"
-            error = "Parameter 'protein_id' must be a non-empty string."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'protein_id' must be a non-empty string.")
+        
         # Optional: UniProt regex validation
         uniprot_regex = r"^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-Z0-9]{6,10}$"
         if not re.match(uniprot_regex, protein_id):
-            validation_status = "error"
-            error = "Parameter 'protein_id' does not match expected UniProt format."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'protein_id' does not match expected UniProt format.")
+        
         checker = ProteinExistenceChecker()
         result = checker.check_protein_existence(protein_id)
+        
+        # Create report
         report = KBaseReport(self.callback_url)
-        text = f"Protein {protein_id} existence: {result['exists']}\n"
+        text = f"""
+        Protein Existence Check Results
+        
+        Protein ID: {protein_id}
+        Exists: {result['exists']}
+        """
         if result['exists']:
-            text += f"Family: {result['family_id']}\nMetadata: {result['metadata']}\n"
+            text += f"Family ID: {result['family_id']}\n"
+            text += f"Metadata: {result['metadata']}\n"
         else:
             text += "Protein not found in any family.\n"
-        report_info = report.create({
-            'report': {'objects_created': [], 'text_message': text},
+        
+        report_info = report.create_extended_report({
+            'message': text,
+            'objects_created': [],
             'workspace_name': params['workspace_name']
         })
+        
+        # Return the result according to KIDL spec
         output = {
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
@@ -280,83 +274,102 @@ class kbase_protein_query_module:
             'metadata': result['metadata'],
             'input_parameters': params,
             'start_time': start_time,
-            'summary': text,
-            'validation_status': validation_status,
-            'error': error
+            'summary': text
         }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method check_protein_existence must return a dict or list of dicts as required by KBase.')
-        return [output]
+        
+        return output
         #END check_protein_existence
 
     def find_top_matches_from_embedding(self, ctx, params):
         """
         Find top matches for a given protein embedding (binary FAISS only).
         :param params: dict with 'embedding' (list of uint8), 'top_n', and 'workspace_name'
-        :returns: dict with 'matches' and 'summary'
+        :returns: FindTopMatchesFromEmbeddingResults structure as defined in KIDL spec
         """
         #BEGIN find_top_matches_from_embedding
         import time
         import numpy as np
         start_time = time.time()
-        validation_status = "success"
-        error = None
         embedding = params.get('embedding')
         family_id = params.get('family_id')
         top_n = params.get('top_n', 10)
+        
+        # Validate input parameters
         if embedding is None or not isinstance(embedding, list) or not embedding or not all(isinstance(x, (int, np.integer)) for x in embedding):
-            validation_status = "error"
-            error = "Parameter 'embedding' must be a non-empty list of uint8 integers."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'embedding' must be a non-empty list of uint8 integers.")
+        
         if not family_id:
-            validation_status = "error"
-            error = "Parameter 'family_id' must be provided for similarity search."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'family_id' must be provided for similarity search.")
+        
         if not isinstance(top_n, int) or not (1 <= top_n <= 1000):
-            validation_status = "error"
-            error = "Parameter 'top_n' must be an integer between 1 and 1000."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'top_n' must be an integer between 1 and 1000.")
+        
         index = HierarchicalIndex()
         embedding_np = np.array(embedding, dtype=np.uint8)
-        try:
-            similarities, protein_ids = index.search_family(family_id, embedding_np, top_k=top_n)
-        except Exception as e:
-            validation_status = "error"
-            error = str(e)
-            summary = f"Similarity search failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+        similarities, protein_ids = index.search_family(family_id, embedding_np, top_k=top_n)
+        
         matches = [
             {'protein_id': pid, 'similarity': float(sim)}
             for pid, sim in zip(protein_ids, similarities)
         ]
         summary = f"Found {len(matches)} top matches in family {family_id}."
+        
+        # Save similarity search results as workspace object
+        ws = Workspace(os.environ['WS_URL'])
+        search_obj_name = f"similarity_search_{uuid.uuid4().hex[:8]}"
+        search_obj_type = "KBaseProtein.SimilaritySearchResults"
+        search_obj_data = {
+            'matches': matches,
+            'family_id': family_id,
+            'top_n': top_n,
+            'similarity_stats': {
+                'max': float(np.max(similarities)) if len(similarities) else None,
+                'min': float(np.min(similarities)) if len(similarities) else None,
+                'mean': float(np.mean(similarities)) if len(similarities) else None
+            },
+            'created_at': start_time
+        }
+        
+        try:
+            save_ret = ws.save_objects({
+                'workspace': params.get('workspace_name'),
+                'objects': [{
+                    'type': search_obj_type,
+                    'data': search_obj_data,
+                    'name': search_obj_name
+                }]
+            })
+            search_ref = f"{save_ret[0][6]}/{save_ret[0][0]}/{save_ret[0][4]}"
+        except Exception as e:
+            raise ValueError(f"Failed to save similarity search results: {str(e)}")
+        
+        # Create report
+        report = KBaseReport(self.callback_url)
+        report_text = f"""
+        Protein Similarity Search Results
+        
+        Family ID: {family_id}
+        Top N: {top_n}
+        Matches Found: {len(matches)}
+        
+        Similarity Statistics:
+        - Maximum: {search_obj_data['similarity_stats']['max']:.4f}
+        - Minimum: {search_obj_data['similarity_stats']['min']:.4f}
+        - Mean: {search_obj_data['similarity_stats']['mean']:.4f}
+        
+        Top matches have been saved as a workspace object for further analysis.
+        """
+        
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [{
+                'ref': search_ref,
+                'description': 'Protein similarity search results'
+            }],
+            'workspace_name': params.get('workspace_name')
+        })
+        
+        # Return the result according to KIDL spec
         output = {
             'matches': matches,
             'summary': summary,
@@ -368,178 +381,54 @@ class kbase_protein_query_module:
                 'max': float(np.max(similarities)) if len(similarities) else None,
                 'min': float(np.min(similarities)) if len(similarities) else None,
                 'mean': float(np.mean(similarities)) if len(similarities) else None
-            },
-            'validation_status': validation_status,
-            'error': error
+            }
         }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method find_top_matches_from_embedding must return a dict or list of dicts as required by KBase.')
-        return [output]
+        
+        return output
         #END find_top_matches_from_embedding
 
     def summarize_and_visualize_results(self, ctx, params):
         """
         Summarize and visualize protein network analysis results.
         :param params: dict with 'search_results', 'output_dir', and 'workspace_name'
-        :returns: dict with 'report_name' and 'report_ref'
+        :returns: SummarizeAndVisualizeResultsResults structure as defined in KIDL spec
         """
         #BEGIN summarize_and_visualize_results
         import time
         import os
         start_time = time.time()
-        validation_status = "success"
-        error = None
         search_results = params.get('search_results')
         output_dir = params.get('output_dir', self.shared_folder)
+        
+        # Validate input parameters
         if search_results is None:
-            validation_status = "error"
-            error = "Parameter 'search_results' is required."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'search_results' is required.")
+        
         if output_dir and not isinstance(output_dir, str):
-            validation_status = "error"
-            error = "Parameter 'output_dir' must be a valid path string."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Parameter 'output_dir' must be a valid path string.")
+        
         summary = f"Results summarized and visualized in {output_dir}."
         report = KBaseReport(self.callback_url)
-        report_info = report.create({
-            'report': {'objects_created': [], 'text_message': summary},
+        report_info = report.create_extended_report({
+            'message': summary,
+            'objects_created': [],
             'workspace_name': params['workspace_name']
         })
+        
+        # Return the result according to KIDL spec
         output = {
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
             'input_parameters': params,
             'start_time': start_time,
             'output_dir': output_dir,
-            'summary': summary,
-            'validation_status': validation_status,
-            'error': error
+            'summary': summary
         }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method summarize_and_visualize_results must return a dict or list of dicts as required by KBase.')
-        return [output]
+        
+        return output
         #END summarize_and_visualize_results
 
-    def run_complete_workflow(self, ctx, params):
-        """
-        Run the complete protein network analysis workflow.
-        :param params: dict with 'query_sequence', 'query_protein_id', 'k_similar', 'network_method', 'save_results', 'workspace_name'
-        :returns: dict with 'report_name', 'report_ref', and workflow summary/results
-        """
-        #BEGIN run_complete_workflow
-        import time
-        import os
-        start_time = time.time()
-        validation_status = "success"
-        error = None
-        query_sequence = params.get('query_sequence')
-        workspace_name = params.get('workspace_name')
-        if not query_sequence or not isinstance(query_sequence, str) or not query_sequence.strip():
-            validation_status = "error"
-            error = "Parameter 'query_sequence' must be a non-empty string."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
-        # Validate optional params
-        k_similar = params.get('k_similar', 50)
-        if not isinstance(k_similar, int) or not (1 <= k_similar <= 1000):
-            validation_status = "error"
-            error = "Parameter 'k_similar' must be an integer between 1 and 1000."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
-        network_method = params.get('network_method', 'mutual_knn')
-        save_results = params.get('save_results', True)
-        query_protein_id = params.get('query_protein_id', 'QUERY_PROTEIN')
-        workflow = ProteinNetworkWorkflow()
-        try:
-            results = workflow.run_optimized_workflow(
-                query_sequence=query_sequence,
-                query_protein_id=query_protein_id,
-                k_similar=k_similar,
-                network_method=network_method,
-                save_results=save_results
-            )
-        except Exception as e:
-            validation_status = "error"
-            error = f"Workflow execution failed: {str(e)}"
-            summary = f"Workflow failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
-        summary = f"Workflow completed.\nStatus: {results.get('status')}\n"
-        if 'error' in results:
-            validation_status = "error"
-            error = results['error']
-            summary += f"Error: {results['error']}\n"
-        else:
-            summary += f"Query protein: {query_protein_id}\n"
-            summary += f"Family: {results.get('family_id')}\n"
-            summary += f"Similar proteins found: {len(results.get('similar_proteins', []))}\n"
-            summary += f"Network nodes: {results.get('network_properties', {}).get('num_nodes', 'N/A')}\n"
-            summary += f"Network edges: {results.get('network_properties', {}).get('num_edges', 'N/A')}\n"
-            summary += f"Timing (s): {results.get('timing', {})}\n"
-            summary += f"Performance: {results.get('performance_metrics', {})}\n"
-        html_file = os.path.join(self.shared_folder, f"protein_network_report_{int(time.time())}.html")
-        self._generate_detailed_html_report(results, html_file)
-        report = KBaseReport(self.callback_url)
-        report_info = report.create_extended_report({
-            'message': summary,
-            'objects_created': [],
-            'warnings': [],
-            'workspace_name': workspace_name,
-            'file_links': [],
-            'html_links': [html_file],
-            'direct_html_link_index': 0,
-            'html_window_height': 600
-        })
-        output = {
-            'report_name': report_info['name'],
-            'report_ref': report_info['ref'],
-            'workflow_status': results.get('status'),
-            'family_id': results.get('family_id'),
-            'network_properties': results.get('network_properties'),
-            'similar_proteins': results.get('similar_proteins', []),
-            'input_parameters': params,
-            'start_time': start_time,
-            'timing': results.get('timing', {}),
-            'performance_metrics': results.get('performance_metrics', {}),
-            'summary': summary,
-            'validation_status': validation_status,
-            'error': error
-        }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method run_complete_workflow must return a dict or list of dicts as required by KBase.')
-        return [output]
-        #END run_complete_workflow
+
 
     def status(self, ctx):
         #BEGIN_STATUS
@@ -555,44 +444,33 @@ class kbase_protein_query_module:
         """
         This example function accepts any number of parameters and returns results in a KBaseReport
         :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "ReportResults" -> structure: parameter
-           "report_name" of String, parameter "report_ref" of String
+        :returns: ReportResults structure as defined in KIDL spec
         """
         # ctx is the context object
         # return variables are: output
         #BEGIN run_kbase_protein_query_module
         import time
         start_time = time.time()
-        validation_status = "success"
-        error = None
+        
+        # Validate input parameters
         if not isinstance(params, dict):
-            validation_status = "error"
-            error = "Input parameters must be a dictionary."
-            summary = f"Validation failed: {error}"
-            return [{
-                'status': validation_status,
-                'error': error,
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': summary
-            }]
+            raise ValueError("Input parameters must be a dictionary.")
+        
         report = KBaseReport(self.callback_url)
         report_text = f"KBase Protein Network Analysis Toolkit\n\nParameters:\n{params}\n\nAnalysis started."
-        report_info = report.create({'report': {'objects_created':[],
-                                                'text_message': report_text},
-                                                'workspace_name': params.get('workspace_name', 'UNKNOWN')})
+        report_info = report.create_extended_report({
+            'message': report_text,
+            'objects_created': [],
+            'workspace_name': params.get('workspace_name', 'UNKNOWN')
+        })
+        
+        # Return the result according to KIDL spec
         output = {
             'report_name': report_info['name'],
-            'report_ref': report_info['ref'],
-            'input_parameters': params,
-            'start_time': start_time,
-            'summary': 'Analysis initialized. See report for details.',
-            'validation_status': validation_status,
-            'error': error
+            'report_ref': report_info['ref']
         }
-        if not (isinstance(output, dict) or (isinstance(output, list) and all(isinstance(x, dict) for x in output))):
-            raise ValueError('Method run_kbase_protein_query_module must return a dict or list of dicts as required by KBase.')
-        return [output]
+        
+        return output
         #END run_kbase_protein_query_module
 
     def _generate_detailed_html_report(self, results, output_html_path):
