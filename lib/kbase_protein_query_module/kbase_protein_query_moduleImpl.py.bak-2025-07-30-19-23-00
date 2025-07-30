@@ -31,7 +31,7 @@ class kbase_protein_query_module:
     ######################################### noqa
     VERSION = "0.0.1"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "40111353b65678814ad1c89a992ab40cde81977e"
+    GIT_COMMIT_HASH = "1f4f7e036a9fed98a3464a653dce26c7880ffad5"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -263,12 +263,10 @@ class kbase_protein_query_module:
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "GenerateProteinEmbeddingResults"
            (Generate a protein embedding from a sequence.) -> structure:
-           parameter "report_name" of String, parameter "report_ref" of
-           String, parameter "embedding_result_ref" of String, parameter
-           "summary" of String, parameter "input_parameters" of mapping from
-           String to unspecified object, parameter "start_time" of Double,
-           parameter "embedding_norm" of Double, parameter "sequence_length"
-           of Long, parameter "embedding_dim" of Long
+           parameter "embedding" of list of Double, parameter "summary" of
+           String, parameter "input_parameters" of mapping from String to
+           unspecified object, parameter "start_time" of Double, parameter
+           "embedding_norm" of Double, parameter "sequence_length" of Long
         """
         # ctx is the context object
         # return variables are: output

@@ -125,8 +125,16 @@ class ProteinEmbeddingGenerator:
             self.model = self.model.to(self.device)
             self.model.eval()
             
-            # Get embedding dimension
+            # Get embedding dimension - ensure it's correct for the local model
             self.embedding_dim = self.model.config.hidden_size
+            
+            # Validate embedding dimension for local model
+            if self.model_name == "esm2_t6_8M_UR50D" and self.embedding_dim != 320:
+                logger.warning(f"Expected embedding dimension 320 for {self.model_name}, got {self.embedding_dim}")
+                # Force the correct dimension for local model
+                if hasattr(self.model.config, 'hidden_size'):
+                    self.model.config.hidden_size = 320
+                    self.embedding_dim = 320
             
             logger.info(f"Model loaded successfully on {self.device} with dtype {model_dtype}")
             logger.info(f"Embedding dimension: {self.embedding_dim}")

@@ -40,12 +40,15 @@ module kbase_protein_query_module {
         Generate a protein embedding from a sequence.
     */
     typedef structure {
-        list<float> embedding;
+        string report_name;
+        string report_ref;
+        string embedding_result_ref;
         string summary;
         mapping<string, UnspecifiedObject> input_parameters;
         float start_time;
         float embedding_norm;
         int sequence_length;
+        int embedding_dim;
     } GenerateProteinEmbeddingResults;
     funcdef generate_protein_embedding(mapping<string, UnspecifiedObject> params) returns (GenerateProteinEmbeddingResults output) authentication required;
 

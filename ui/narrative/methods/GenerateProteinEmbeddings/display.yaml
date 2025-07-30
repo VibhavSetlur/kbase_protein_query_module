@@ -29,10 +29,10 @@ parameters :
         long-hint  : Provide either a UniProt ID or a raw sequence.
 
 description : |
-    <p>Generate a high-dimensional embedding for a protein using its sequence or UniProt ID. Use the embedding for similarity search or network analysis.</p>
+    <p>Generate a high-dimensional embedding for a protein using its amino acid sequence. The embedding is saved as a workspace object for use in downstream analysis.</p>
     <ul>
-    <li><b>Input:</b> UniProt ID or sequence</li>
-    <li><b>Output:</b> Embedding vector and summary</li>
+    <li><b>Input:</b> Amino acid sequence</li>
+    <li><b>Output:</b> Saved embedding object and summary statistics</li>
     </ul>
     <p>Click <b>Generate Embedding</b> to run.</p>
 
