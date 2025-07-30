@@ -115,15 +115,10 @@ class JSONRPCServiceCustom(JSONRPCService):
             # Exception was raised inside the method.
             newerr = JSONServerError()
             newerr.trace = traceback.format_exc()
-            # Handle exceptions that don't have a message attribute
-            if hasattr(e, 'message') and isinstance(e.message, str):
-                newerr.data = repr(e.message)
-            elif hasattr(e, 'args') and len(e.args) == 1:
+            if len(e.args) == 1:
                 newerr.data = repr(e.args[0])
-            elif hasattr(e, 'args'):
-                newerr.data = repr(e.args)
             else:
-                newerr.data = repr(str(e))
+                newerr.data = repr(e.args)
             raise newerr
         return result
 
@@ -449,7 +444,7 @@ class Application(object):
                     status = '200 OK'
                 except JSONRPCError as jre:
                     err = {'error': {'code': jre.code,
-                                     'name': 'JSONRPCError',
+                                     'name': jre.message,
                                      'message': jre.data
                                      }
                            }
@@ -604,7 +599,7 @@ def process_async_cli(input_file_path, output_file_path, token):
         resp = {'id': req['id'],
                 'version': req['version'],
                 'error': {'code': jre.code,
-                          'name': 'JSONRPCError',
+                          'name': jre.message,
                           'message': jre.data,
                           'error': trace}
                 }

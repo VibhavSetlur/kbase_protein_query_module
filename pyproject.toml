@@ -12,7 +12,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "torch>=1.10.2",
+    "torch>=1.13.0",
     "transformers>=4.31.0",
     "sentence-transformers>=2.2.0",
     "numpy>=1.21.0",

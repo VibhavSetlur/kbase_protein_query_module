@@ -1,0 +1,5 @@
+
+description: Always use conda environments for running programs, never use global environment. Search conda env list before finding one needed. Don't install packages in global environment. For this project, use the kbasd-test conda environment.
+globs: ["**/*"]
+alwaysApply: true
+---

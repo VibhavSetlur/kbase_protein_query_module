@@ -1,0 +1,5 @@
+
+description: Execute tasks directly without asking for confirmation. Focus on getting things working rather than perfect documentation. Prefer action over planning. When you see a problem, fix it immediately rather than documenting it.
+globs: ["**/*"]
+alwaysApply: true
+---

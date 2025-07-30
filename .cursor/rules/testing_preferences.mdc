@@ -1,0 +1,5 @@
+
+description: Always run tests after making changes, especially for the protein query module. Use conda environment kbasd-test. Focus on fixing test failures immediately rather than creating documentation about them. Prefer running tests directly over creating test plans.
+globs: ["**/*.py", "test/**/*", "**/test_*.py"]
+alwaysApply: true
+---

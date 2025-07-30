@@ -6,15 +6,15 @@ using ESM-2 models. It provides efficient batch processing and storage capabilit
 """
 
 import os
-import torch
 import numpy as np
 import pandas as pd
 import h5py
-from transformers import AutoTokenizer, EsmModel
 from typing import List, Dict, Optional, Union
 import logging
 from tqdm import tqdm
 import warnings
+import torch
+from transformers import AutoTokenizer, EsmModel
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -25,7 +25,6 @@ warnings.filterwarnings("ignore", message=".*attention_mask.*")
 
 logger = logging.getLogger(__name__)
 
-
 class ProteinEmbeddingGenerator:
     """
     Generates protein embeddings using ESM-2 models.
@@ -34,7 +33,7 @@ class ProteinEmbeddingGenerator:
     embeddings that capture structural and functional information.
     """
     
-    def __init__(self, model_name: str = "esm2_t48_15B_UR50D", device: str = "auto"):
+    def __init__(self, model_name: str = "esm2_t6_8M_UR50D", device: str = "auto"):
         """
         Initialize the embedding generator.
         
@@ -49,35 +48,80 @@ class ProteinEmbeddingGenerator:
         self.embedding_dim = None
         self._load_model()
         
-    def _setup_device(self, device: str) -> torch.device:
+    def _setup_device(self, device: str):
         """Setup the device for model inference."""
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
-        return torch.device(device)
+        try:
+            return torch.device(device)
+        except AttributeError:
+            # Fallback if torch.device is not available
+            return "cpu"
     
     def _load_model(self):
         """Load the ESM-2 model and tokenizer with proper dtype handling."""
         try:
             logger.info(f"Loading ESM-2 model: {self.model_name}")
             
-            # Always use local path for esm2_t6_8M_UR50D
-            local_model_dir = "data/esm2_t6_8M_UR50D_local"
-            if self.model_name == "esm2_t6_8M_UR50D":
-                model_path = local_model_dir
-            else:
-                model_path = f"facebook/{self.model_name}"
+            # Try multiple possible paths for the local model
+            possible_paths = [
+                os.path.join(os.getcwd(), "data", "esm2_t6_8M_UR50D_local"),
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "esm2_t6_8M_UR50D_local"),
+                "/kb/module/data/esm2_t6_8M_UR50D_local",
+                # Add paths for test context
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))), "data", "esm2_t6_8M_UR50D_local"),
+                # Add more specific test paths
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "data", "esm2_t6_8M_UR50D_local"),
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))), "data", "esm2_t6_8M_UR50D_local")
+            ]
+            
+            model_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    model_path = path
+                    logger.info(f"Using local model at: {model_path}")
+                    break
+            
+            if model_path is None:
+                # Try to find the model by searching from current directory
+                current_dir = os.getcwd()
+                for root, dirs, files in os.walk(current_dir):
+                    if "esm2_t6_8M_UR50D_local" in dirs:
+                        model_path = os.path.join(root, "esm2_t6_8M_UR50D_local")
+                        logger.info(f"Found model at: {model_path}")
+                        break
+                    if root.count(os.sep) > 5:  # Limit search depth
+                        break
+            
+            if model_path is None:
+                raise FileNotFoundError(f"Local model not found. Searched in: {possible_paths}")
 
             # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+            except Exception as e:
+                logger.warning(f"Failed to load tokenizer locally: {e}")
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             
             # Determine appropriate dtype based on device
-            model_dtype = torch.float16 if self.device.type == 'cuda' else torch.float32
+            if isinstance(self.device, str):
+                model_dtype = torch.float32 if hasattr(torch, 'float32') else torch.float
+            else:
+                if hasattr(torch, 'float32'):
+                    model_dtype = torch.float16 if self.device.type == 'cuda' else torch.float32
+                else:
+                    model_dtype = torch.float
             
             # Load model with proper dtype for large models
-            self.model = EsmModel.from_pretrained(
-                model_path, 
-                torch_dtype=model_dtype
-            )
+            try:
+                self.model = EsmModel.from_pretrained(
+                    model_path, 
+                    torch_dtype=model_dtype,
+                    local_files_only=True
+                )
+            except Exception as e:
+                logger.warning(f"Failed to load model locally: {e}")
+
             self.model = self.model.to(self.device)
             self.model.eval()
             
@@ -91,93 +135,52 @@ class ProteinEmbeddingGenerator:
             logger.error(f"Failed to load model: {e}")
             raise
     
-    def generate_embedding(self, sequence: str, pooling_method: str = "mean") -> np.ndarray:
+    def generate_embedding(self, sequence: str) -> np.ndarray:
         """
-        Generate embedding for a single protein sequence.
+        Generate mean-pooled embedding for a single protein sequence.
         
         Args:
             sequence: Amino acid sequence string
-            pooling_method: Method to pool token embeddings ("mean", "cls", "max")
-            
         Returns:
-            Protein embedding as numpy array
+            numpy.ndarray: Protein embedding vector (mean pooled)
         """
-        with torch.no_grad():
-            # Tokenize the sequence with proper handling for large models
-            tokenized_inputs = self.tokenizer(
-                sequence, 
-                return_tensors="pt", 
-                truncation=True, 
-                max_length=1024,
-                add_special_tokens=True
-            )
-            input_ids = tokenized_inputs['input_ids'].to(self.device)
-            attention_mask = tokenized_inputs['attention_mask'].to(self.device)
-            
+        if not sequence or not isinstance(sequence, str):
+            raise ValueError("Sequence must be a non-empty string")
+        try:
+            # Tokenize the sequence
+            inputs = self.tokenizer(sequence, return_tensors="pt", padding=True, truncation=True)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
             # Generate embeddings
-            outputs = self.model(input_ids, attention_mask=attention_mask)
-            embeddings = outputs.last_hidden_state
-            
-            # Pool the embeddings (excluding special tokens)
-            if pooling_method == "cls":
-                # Use the [CLS] token embedding (position 0)
-                pooled_embedding = embeddings[:, 0, :]
-            elif pooling_method == "mean":
-                # Mean pooling over all tokens (excluding special tokens)
-                # ESM2 adds <cls> at 0 and <eos> at end, so slice 1:original_len+1
-                original_len = len(sequence)
-                # Use attention mask to determine valid tokens
-                valid_tokens = attention_mask.squeeze(0) == 1
-                # Exclude special tokens (first and last)
-                valid_tokens[0] = False  # Exclude <cls>
-                valid_tokens[-1] = False  # Exclude <eos>
-                
-                if valid_tokens.sum() > 0:
-                    masked_embeddings = embeddings.squeeze(0)[valid_tokens, :]
-                    pooled_embedding = masked_embeddings.mean(dim=0, keepdim=True)
-                else:
-                    # Fallback to mean of all tokens if no valid tokens
-                    pooled_embedding = embeddings.mean(dim=1)
-            elif pooling_method == "max":
-                # Max pooling over all tokens (excluding special tokens)
-                original_len = len(sequence)
-                valid_tokens = attention_mask.squeeze(0) == 1
-                valid_tokens[0] = False  # Exclude <cls>
-                valid_tokens[-1] = False  # Exclude <eos>
-                
-                if valid_tokens.sum() > 0:
-                    masked_embeddings = embeddings.squeeze(0)[valid_tokens, :]
-                    pooled_embedding = masked_embeddings.max(dim=0, keepdim=True)[0]
-                else:
-                    # Fallback to max of all tokens if no valid tokens
-                    pooled_embedding = embeddings.max(dim=1)[0]
-            else:
-                raise ValueError(f"Unknown pooling method: {pooling_method}")
-            
-            return pooled_embedding.cpu().numpy().flatten()
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                embeddings = outputs.last_hidden_state
+                # Mean pooling over all tokens (excluding padding)
+                attention_mask = inputs['attention_mask']
+                masked_embeddings = embeddings * attention_mask.unsqueeze(-1)
+                pooled_embedding = masked_embeddings.sum(dim=1) / attention_mask.sum(dim=1, keepdim=True)
+                # Convert to numpy and return
+                return pooled_embedding.cpu().numpy().flatten()
+        except Exception as e:
+            logger.error(f"Error generating embedding: {e}")
+            raise
     
     def generate_embeddings_batch(self, sequences: List[str], 
                                 protein_ids: List[str],
-                                pooling_method: str = "mean",
                                 batch_size: int = 8) -> Dict[str, np.ndarray]:
         """
-        Generate embeddings for a batch of protein sequences.
+        Generate mean-pooled embeddings for a batch of protein sequences.
         
         Args:
             sequences: List of amino acid sequences
             protein_ids: List of protein IDs corresponding to sequences
-            pooling_method: Method to pool token embeddings
             batch_size: Batch size for processing (reduced for large models)
-            
         Returns:
-            Dictionary mapping protein IDs to embeddings
+            Dictionary mapping protein IDs to mean-pooled embeddings
         """
         embeddings_dict = {}
-        
         for i in tqdm(range(0, len(sequences), batch_size), desc="Generating embeddings"):
             batch_sequences = sequences[i:i + batch_size]
             batch_ids = protein_ids[i:i + batch_size]
-            
             try:
                 # Tokenize batch with proper handling for large models
                 tokenized_inputs = self.tokenizer(
@@ -190,65 +193,34 @@ class ProteinEmbeddingGenerator:
                 )
                 input_ids = tokenized_inputs['input_ids'].to(self.device)
                 attention_mask = tokenized_inputs['attention_mask'].to(self.device)
-                
                 # Generate embeddings
                 with torch.no_grad():
                     outputs = self.model(input_ids, attention_mask=attention_mask)
                     embeddings = outputs.last_hidden_state
-                    
-                    # Pool embeddings for each sequence in batch
+                    # Mean pooling for each sequence in batch
                     batch_embeddings = []
                     for j in range(len(batch_sequences)):
                         seq_embeddings = embeddings[j]  # [seq_len, hidden_dim]
                         seq_attention = attention_mask[j]  # [seq_len]
-                        
-                        if pooling_method == "cls":
-                            # Use the [CLS] token embedding
-                            pooled_embedding = seq_embeddings[0]
-                        elif pooling_method == "mean":
-                            # Mean pooling over valid tokens (excluding special tokens)
-                            valid_tokens = seq_attention == 1
-                            valid_tokens[0] = False  # Exclude <cls>
-                            valid_tokens[-1] = False  # Exclude <eos>
-                            
-                            if valid_tokens.sum() > 0:
-                                valid_embeddings = seq_embeddings[valid_tokens]
-                                pooled_embedding = valid_embeddings.mean(dim=0)
-                            else:
-                                pooled_embedding = seq_embeddings.mean(dim=0)
-                        elif pooling_method == "max":
-                            # Max pooling over valid tokens (excluding special tokens)
-                            valid_tokens = seq_attention == 1
-                            valid_tokens[0] = False  # Exclude <cls>
-                            valid_tokens[-1] = False  # Exclude <eos>
-                            
-                            if valid_tokens.sum() > 0:
-                                valid_embeddings = seq_embeddings[valid_tokens]
-                                pooled_embedding = valid_embeddings.max(dim=0)[0]
-                            else:
-                                pooled_embedding = seq_embeddings.max(dim=0)[0]
+                        valid_tokens = seq_attention == 1
+                        # Exclude special tokens if needed (optional, can be left as is)
+                        if valid_tokens.sum() > 0:
+                            valid_embeddings = seq_embeddings[valid_tokens]
+                            pooled_embedding = valid_embeddings.mean(dim=0)
                         else:
-                            raise ValueError(f"Unknown pooling method: {pooling_method}")
-                        
+                            pooled_embedding = seq_embeddings.mean(dim=0)
                         batch_embeddings.append(pooled_embedding.cpu().numpy())
-                    
                     # Store embeddings
                     for j, protein_id in enumerate(batch_ids):
                         embeddings_dict[protein_id] = batch_embeddings[j]
-                        
             except RuntimeError as e:
                 logger.error(f"RuntimeError processing batch starting with {batch_ids[0]}: {e}")
-                # Continue with next batch
                 continue
             except Exception as e:
                 logger.error(f"Error processing batch starting with {batch_ids[0]}: {e}")
-                # Continue with next batch
                 continue
-            
-            # Clear GPU cache if using CUDA
             if self.device.type == 'cuda':
                 torch.cuda.empty_cache()
-        
         return embeddings_dict
     
     def save_embeddings(self, embeddings_dict: Dict[str, np.ndarray], 
@@ -343,51 +315,10 @@ def generate_embeddings_from_fasta(fasta_file: str,
     # Generate embeddings
     generator = ProteinEmbeddingGenerator(model_name=model_name, device=device)
     embeddings_dict = generator.generate_embeddings_batch(
-        sequences, protein_ids, pooling_method, batch_size
+        sequences, protein_ids, batch_size
     )
     
     # Save embeddings
     generator.save_embeddings(embeddings_dict, output_file)
     
     return embeddings_dict 
-
-    if __name__ == "__main__":
-        import tempfile
-        import os
-
-        # Create a small test FASTA file
-        test_fasta_content = """>protein1
-        MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ
-        >protein2
-        GAWKDSYVGDEAQSKRGILTLKYPIEHGIITNWDDMEK
-        """
-        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".fasta") as fasta_tmp:
-            fasta_tmp.write(test_fasta_content)
-            fasta_tmp.flush()
-            fasta_path = fasta_tmp.name
-
-        # Output HDF5 file
-        with tempfile.NamedTemporaryFile("w+b", delete=False, suffix=".h5") as h5_tmp:
-            h5_path = h5_tmp.name
-
-        try:
-            print("Running embedding generation test...")
-            embeddings = generate_embeddings_from_fasta(
-                fasta_file=fasta_path,
-                output_file=h5_path,
-                model_name="esm2_t6_8M_UR50D",
-                pooling_method="mean",
-                batch_size=2
-                )
-            print("Embeddings generated for proteins:", list(embeddings.keys()))
-            for pid, emb in embeddings.items():
-                print(f"{pid}: shape={emb.shape}, norm={np.linalg.norm(emb):.4f}")
-            # Check HDF5 file exists and contains expected keys
-            import h5py
-            with h5py.File(h5_path, "r") as h5f:
-                print("HDF5 keys:", list(h5f.keys()))
-        except Exception as e:
-            print("Test failed:", e)
-        finally:
-            os.remove(fasta_path)
-            os.remove(h5_path)

@@ -1,0 +1,5 @@
+
+description: Provide clear, actionable feedback in error messages and logs. Include examples and suggestions for fixes. Be helpful rather than just pointing out problems. Give users a path forward when things go wrong.
+globs: ["**/*"]
+alwaysApply: true
+---

@@ -1,0 +1,5 @@
+
+description: Never make unnecessary markdown files for changes you have made. This includes summaries of changes made or next steps files. Perform this unless specified to make a markdown file.
+globs: ["**/*"]
+alwaysApply: true
+---

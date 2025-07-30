@@ -2,420 +2,195 @@
 
 This directory contains comprehensive testing infrastructure for the KBase Protein Query Module, including unit tests, integration tests, and test data.
 
-## Directory Structure
+## Testing Overview
 
-```
-test/
-├── unit_tests_query/                           # Unit tests for individual modules
-│   ├── test_assign_protein_family_query.py     # Family assignment tests
-│   ├── test_check_existence.py                 # Existence checking tests
-│   ├── test_embedding_generator.py             # Embedding generation tests
-│   ├── test_network_builder.py                 # Network building tests
-│   ├── test_similarity_index.py                # Similarity search tests
-│   ├── test_storage.py                         # Storage functionality tests
-│   └── test_workflow_orchestrator.py           # Workflow orchestration tests
-├── kbase_protein_query_module_query_server_test.py # Main integration tests
-├── data/                                       # Test data and fixtures
-│   └── streaming/                              # Streaming test data
-├── README.md                                   # This documentation
-└── run_tests.sh                                # Test execution script
-```
+The testing infrastructure follows KBase SDK standards and includes:
 
-## Testing Strategy
-
-### Test Categories
-
-1. **Unit Tests** (`unit_tests_query/`)
-   - Individual module functionality
-   - Isolated component testing
-   - Mock data and dependencies
-   - Fast execution
-
-2. **Integration Tests** (`kbase_protein_query_module_query_server_test.py`)
-   - End-to-end workflow testing
-   - KBase service integration
-   - Real data processing
-   - Complete app functionality
-
-3. **Performance Tests** (Integrated in unit tests)
-   - Memory usage monitoring
-   - Execution time measurement
-   - Scalability testing
-   - Resource utilization
-
-### Test Coverage
-
-- **Code Coverage**: >90% for all modules
-- **Function Coverage**: All public functions tested
-- **Error Handling**: Comprehensive error case testing
-- **Edge Cases**: Boundary condition testing
-- **Integration**: Full workflow testing
-
-## Running Tests
-
-### Prerequisites
-
-1. **KBase SDK**: Install the [KBase SDK](https://kbase.github.io/kb_sdk_docs/tutorial/2_install.html)
-2. **Dependencies**: Install all requirements from `requirements.txt`
-3. **Test Configuration**: Set up `test_local/test.cfg` with your KBase token
-
-### Test Execution
-
-#### Run All Tests
-```bash
-# Using KBase SDK
-kb-sdk test
-
-# Using make
-make test
-
-# Using pytest directly
-python -m pytest test/
-```
-
-#### Run Specific Test Categories
-```bash
-# Unit tests only
-python -m pytest test/unit_tests_query/
-
-# Integration tests only
-python -m pytest test/kbase_protein_query_module_query_server_test.py
-
-# Specific module tests
-python -m pytest test/unit_tests_query/test_embedding_generator.py
-```
-
-#### Run with Coverage
-```bash
-# Generate coverage report
-python -m pytest test/ --cov=kbase_protein_query_module --cov-report=html
-
-# View coverage report
-open htmlcov/index.html
-```
-
-#### Run with Verbose Output
-```bash
-python -m pytest test/ -v --tb=short
-```
-
-## Test Details
-
-### Unit Tests
-
-#### `test_assign_protein_family_query.py`
-**Purpose**: Test protein family assignment functionality
-
-**Test Cases**:
-- Family centroid loading
-- Embedding assignment to families
-- Confidence score calculation
-- Error handling for invalid inputs
-- Performance with large datasets
-
-**Example**:
-```python
-def test_family_assignment():
-    assigner = AssignProteinFamily()
-    assigner.load_family_centroids(test_centroids_file)
-    result = assigner.assign_family(test_embedding)
-    assert result['family_id'] == expected_family
-    assert result['confidence'] > 0.8
-```
-
-#### `test_check_existence.py`
-**Purpose**: Test protein existence checking
-
-**Test Cases**:
-- Protein existence verification
-- Metadata retrieval
-- Family information extraction
-- Non-existent protein handling
-- Storage system integration
-
-#### `test_embedding_generator.py`
-**Purpose**: Test protein embedding generation
-
-**Test Cases**:
-- ESM-2 model integration
-- Multiple pooling methods
-- Batch processing
-- GPU acceleration
-- Memory efficiency
-- Error handling for invalid sequences
-
-#### `test_network_builder.py`
-**Purpose**: Test network construction and visualization
-
-**Test Cases**:
-- Network construction methods
-- Visualization generation
-- Network analysis
-- Export functionality
-- Interactive plot creation
-
-#### `test_similarity_index.py`
-**Purpose**: Test similarity search functionality
-
-**Test Cases**:
-- FAISS index creation
-- Similarity search accuracy
-- Hierarchical indexing
-- Streaming capabilities
-- Performance optimization
-
-#### `test_storage.py`
-**Purpose**: Test data storage functionality
-
-**Test Cases**:
-- Hierarchical storage
-- Compressed metadata
-- Memory-efficient loading
-- Streaming capabilities
-- Data integrity
-
-#### `test_workflow_orchestrator.py`
-**Purpose**: Test complete workflow orchestration
-
-**Test Cases**:
-- End-to-end workflow execution
-- Performance monitoring
-- Memory optimization
-- Configuration management
-- Error recovery
-
-### Integration Tests
-
-#### `kbase_protein_query_module_query_server_test.py`
-**Purpose**: Test complete KBase app functionality
-
-**Test Cases**:
-- KBase service integration
-- Parameter validation
-- Report generation
-- Workspace interaction
-- Authentication handling
-- Error reporting
-
-**Key Test Functions**:
-```python
-def test_check_protein_existence(self):
-    """Test protein existence checking app"""
-    params = {'protein_id': 'P12345', 'workspace_name': self.wsName}
-    ret = self.serviceImpl.check_protein_existence(self.ctx, params)
-    self.assertIsInstance(ret, dict)
-    self.assertIn('exists', ret)
-
-def test_generate_protein_embedding(self):
-    """Test protein embedding generation app"""
-    params = {'sequence': 'MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ'}
-    ret = self.serviceImpl.generate_protein_embedding(self.ctx, params)
-    self.assertIsInstance(ret, dict)
-    self.assertIn('embedding', ret)
-```
+1. **Unit Tests** (`unit_tests_query/`) - Individual component testing
+2. **Integration Tests** (`kbase_protein_query_module_query_server_test.py`) - Full module testing
+3. **Local Test Runner** (`test_local/`) - Local development testing
+4. **Actual Data Testing** - Tests using real data from the `data/` folder
 
 ## Test Data
 
-### Test Data Structure
-```
-test/data/
-├── streaming/                    # Streaming test data
-│   ├── sample_embeddings.h5     # Sample protein embeddings
-│   ├── sample_metadata.csv      # Sample protein metadata
-│   └── test_families/           # Test family data
-└── fixtures/                    # Test fixtures
-    ├── test_centroids.npz       # Test family centroids
-    ├── test_sequences.fasta      # Test protein sequences
-    └── test_networks/           # Test network data
-```
+The module uses actual test data generated by `scripts/generate_dummy_data.py`:
 
-### Test Data Generation
+- **50 protein families** with 500 proteins each
+- **ESM2 model** (`esm2_t6_8M_UR50D`) for embedding generation
+- **FAISS indexes** for similarity search
+- **Metadata** in Parquet format
+- **Centroids** for family assignment
+
+## Running Tests
+
+### 1. KBase SDK Tests (Recommended)
+
 ```bash
-# Generate test data
-python scripts/generate_dummy_data.py
+# Run KBase SDK tests (proper way)
+make test-kbase
 
-# Generate specific test fixtures
-python -c "
-from lib.kbase_protein_query_module.src.storage import ProteinStorage
-storage = ProteinStorage()
-storage.create_test_data()
-"
+# Or directly
+kb-sdk test
 ```
+
+### 2. Local Tests with Actual Data
+
+```bash
+# Set up test data and run tests
+make test-with-data
+
+# Or step by step
+make setup-test-data
+make test-with-actual-data
+```
+
+### 3. Unit Tests Only
+
+```bash
+# Run unit tests
+cd test/unit_tests_query
+python -m unittest discover
+
+# Run specific test
+python -m unittest test_embedding_generator.TestProteinEmbeddingGenerator
+```
+
+### 4. Integration Tests
+
+```bash
+# Run integration tests
+cd test
+python -m unittest kbase_protein_query_module_query_server_test
+```
+
+## Test Structure
+
+### Unit Tests (`unit_tests_query/`)
+
+- `test_assign_protein_family_query.py` - Family assignment testing
+- `test_check_existence.py` - Protein existence checking
+- `test_embedding_generator.py` - Embedding generation
+- `test_network_builder.py` - Network construction
+- `test_similarity_index.py` - Similarity search
+- `test_storage.py` - Data storage
+- `test_workflow_orchestrator.py` - End-to-end workflow
+
+### Integration Tests
+
+- `kbase_protein_query_module_query_server_test.py` - Full module testing with KBase SDK
+
+### Local Test Runner
+
+- `test_local/test_with_data.py` - Tests using actual data
+- `test_local/test_runner.py` - General test runner
+- `test_local/generate_test_data.py` - Test data generation
+
+## Test Data Format
+
+The test data follows this structure:
+
+```
+data/
+├── esm2_t6_8M_UR50D_local/     # ESM2 model files
+├── families/                     # HDF5 files with embeddings
+│   ├── family_0.h5
+│   ├── family_1.h5
+│   └── ...
+├── metadata/                     # Parquet metadata files
+│   ├── family_0_metadata.parquet
+│   ├── family_1_metadata.parquet
+│   └── ...
+├── indexes/                      # FAISS indexes
+│   ├── families/
+│   │   ├── family_0.faiss
+│   │   ├── family_1.faiss
+│   │   └── ...
+│   └── family_mapping.json
+└── family_centroids_binary.npz  # Family centroids
+```
+
+## Protein ID Formats
+
+The test data includes multiple protein ID formats:
+
+- **UniProt-like**: `P00000001`, `P00000002`, etc.
+- **Dummy format**: `family_0_prot_1`, `family_25_prot_100`, etc.
+- **Generic**: 6-10 character alphanumeric IDs
+
+## Model Requirements
+
+Tests require the ESM2 model (`esm2_t6_8M_UR50D`) to be available in:
+- `data/esm2_t6_8M_UR50D_local/` (relative to project root)
+- `/kb/module/data/esm2_t6_8M_UR50D_local/` (in Docker container)
 
 ## Test Configuration
 
-### Environment Setup
+### Environment Variables
+
 ```bash
-# Set up test environment
+export KB_AUTH_TOKEN=dummy_token
+export SDK_CALLBACK_URL=http://localhost:5000/callback
 export KB_DEPLOYMENT_CONFIG=test_local/test.cfg
-export KB_AUTH_TOKEN=your_kbase_token
-export PYTHONPATH=lib:$PYTHONPATH
 ```
 
 ### Test Configuration File
-```ini
-# test_local/test.cfg
-[kbase_protein_query_module]
-workspace-url = https://appdev.kbase.us/services/ws
-auth-service-url = https://appdev.kbase.us/services/auth/api/legacy/KBase/Sessions/Login
-scratch = /tmp
-```
 
-## Performance Testing
-
-### Memory Usage Testing
-```python
-def test_memory_usage():
-    """Test memory usage with large datasets"""
-    import psutil
-    import gc
-    
-    process = psutil.Process()
-    initial_memory = process.memory_info().rss
-    
-    # Run memory-intensive operation
-    workflow = ProteinNetworkWorkflow()
-    results = workflow.run_optimized_workflow(large_sequence)
-    
-    final_memory = process.memory_info().rss
-    memory_increase = final_memory - initial_memory
-    
-    # Assert memory usage is reasonable
-    assert memory_increase < 2 * 1024 * 1024 * 1024  # 2GB limit
-```
-
-### Execution Time Testing
-```python
-def test_execution_time():
-    """Test execution time for key operations"""
-    import time
-    
-    start_time = time.time()
-    
-    # Run operation
-    generator = ProteinEmbeddingGenerator()
-    embedding = generator.generate_embedding(test_sequence)
-    
-    execution_time = time.time() - start_time
-    
-    # Assert reasonable execution time
-    assert execution_time < 30.0  # 30 seconds limit
-```
-
-## Continuous Integration
-
-### GitHub Actions
-```yaml
-# .github/workflows/test.yml
-name: Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run tests
-        run: python -m pytest test/ --cov=kbase_protein_query_module
-```
-
-### Local CI
-```bash
-# Run full test suite locally
-./scripts/run_ci_tests.sh
-```
+`test_local/test.cfg` contains KBase service endpoints and authentication settings.
 
 ## Troubleshooting
 
-### Common Test Issues
+### Model Not Found
 
-1. **Import Errors**
-   ```bash
-   # Solution: Set PYTHONPATH
-   export PYTHONPATH=lib:$PYTHONPATH
-   ```
+If tests fail with "Local model not found":
 
-2. **Authentication Errors**
-   ```bash
-   # Solution: Check token configuration
-   cat test_local/test.cfg
-   ```
+1. Ensure the ESM2 model is downloaded to `data/esm2_t6_8M_UR50D_local/`
+2. Run `make setup-test-data` to generate test data
+3. Check model file permissions
 
-3. **Memory Issues**
-   ```bash
-   # Solution: Use smaller test datasets
-   export TEST_SMALL_DATASET=true
-   ```
+### Data Not Found
 
-4. **GPU Issues**
-   ```bash
-   # Solution: Force CPU usage
-   export CUDA_VISIBLE_DEVICES=""
-   ```
+If tests fail with "Data directory not found":
 
-### Debug Mode
-```bash
-# Run tests with debug output
-python -m pytest test/ -v -s --log-cli-level=DEBUG
-```
+1. Run `make setup-test-data` to generate test data
+2. Ensure the `data/` directory exists with proper structure
+3. Check file permissions
 
-### Test Isolation
-```bash
-# Run tests in isolation
-python -m pytest test/ --dist=no
-```
+### KBase SDK Issues
 
-## Contributing to Tests
+If `kb-sdk test` fails:
 
-### Adding New Tests
-1. **Follow Naming Convention**: `test_<module_name>.py`
-2. **Use Descriptive Names**: Clear test function names
-3. **Include Documentation**: Docstrings for all test functions
-4. **Test Edge Cases**: Include boundary condition tests
-5. **Mock Dependencies**: Use mocks for external dependencies
+1. Ensure KBase SDK is properly installed
+2. Check network connectivity to KBase services
+3. Verify authentication token in `test_local/test.cfg`
 
-### Test Guidelines
-- **Isolation**: Each test should be independent
-- **Speed**: Tests should run quickly
-- **Reliability**: Tests should be deterministic
-- **Coverage**: Aim for >90% code coverage
-- **Documentation**: Clear test descriptions
+## Coverage
 
-### Example Test Template
-```python
-def test_function_name():
-    """
-    Test description.
-    
-    This test verifies that the function behaves correctly
-    under normal conditions and edge cases.
-    """
-    # Arrange
-    input_data = create_test_data()
-    expected_output = create_expected_output()
-    
-    # Act
-    actual_output = function_under_test(input_data)
-    
-    # Assert
-    assert actual_output == expected_output
-    assert len(actual_output) > 0
-    assert all(isinstance(x, expected_type) for x in actual_output)
-```
+Tests cover:
 
-## Resources
+- ✅ Protein existence checking
+- ✅ Embedding generation
+- ✅ Family assignment
+- ✅ Similarity search
+- ✅ Network construction
+- ✅ Data storage and retrieval
+- ✅ End-to-end workflows
+- ✅ Error handling
+- ✅ Parameter validation
 
-- **[KBase SDK Testing Guide](https://kbase.github.io/kb_sdk_docs/references/troubleshooting.html)**
-- **[pytest Documentation](https://docs.pytest.org/)**
-- **[Coverage.py Documentation](https://coverage.readthedocs.io/)**
-- **[KBase Developer Guidelines](https://kbase.github.io/kb_sdk_docs/references/developer_guidelines.html)**
+## Continuous Integration
 
-## License
+The module includes:
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+- **Travis CI** configuration (`.travis.yml`)
+- **Docker** testing support
+- **Coverage** reporting
+- **Automated** test execution
+
+## Best Practices
+
+1. **Use actual data** when possible for realistic testing
+2. **Mock external dependencies** for unit tests
+3. **Test error conditions** and edge cases
+4. **Follow KBase SDK standards** for integration tests
+5. **Maintain test data** consistency across environments
  

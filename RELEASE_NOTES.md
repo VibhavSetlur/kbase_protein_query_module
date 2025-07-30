@@ -81,7 +81,7 @@ This document tracks all releases of the KBase Protein Query Module, including n
 1. **Import Updates**: If using this module as a dependency, update import paths:
    ```python
    # Old
-   from kbase_protein_query_module_src.module import Class
+   from kbase_protein_query_module.src.module import Class
    
    # New
    from kbase_protein_query_module.src.module import Class

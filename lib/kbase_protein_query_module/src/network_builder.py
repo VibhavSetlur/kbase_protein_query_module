@@ -487,22 +487,6 @@ def visualize_interactive_protein_network(
         else:
             fig.write_html(output_file)
         logger.info(f"Interactive visualization saved to: {output_file}")
-
-    # --- 6. Display the Figure ---
-    logger.info("Interactive protein network created.")
-    logger.info("Features:")
-    logger.info("- Query protein highlighted as red star (larger size)")
-    logger.info("- Proteins connected to query shown in red")
-    logger.info("- Other proteins shown in gray")
-    logger.info("- Kamada-Kawai layout for optimal edge visibility")
-    logger.info("- Natural groupings revealed without forced clustering")
-    logger.info("- Clear edge relationships and protein connections")
-    logger.info("- Click on nodes to highlight their edges")
-    logger.info("- Double-click to reset edge highlighting")
-    logger.info("- Hover over nodes to see detailed protein information")
-    logger.info("- Edges show protein similarities")
-    logger.info("- Interactive zoom, pan, and hover")
-    logger.info("- Legend shows node types")
     
     return fig, G
 
@@ -555,23 +539,52 @@ class DynamicNetworkBuilder:
             NetworkX graph
         """
         logger.info("Building mutual k-NN network using FAISS IVF float32...")
-        if index is None or family_id is None:
-            raise ValueError("Must provide HierarchicalIndex and family_id for FAISS search.")
         G = nx.Graph()
+        
+        # Add all nodes
         for i, pid in enumerate(protein_ids):
             G.add_node(pid)
-        for i, pid in enumerate(protein_ids):
-            query = embeddings[i].astype(np.float32)
-            try:
-                D, I = index.search_family_float(family_id, query, self.k_neighbors+1)
-            except Exception as e:
-                logger.error(f"FAISS search failed for {pid}: {e}")
-                continue
-            for dist, idx in zip(D, I):
-                if idx == i or idx == -1:
+        
+        # Add query protein if provided
+        if query_protein_id is not None:
+            G.add_node(query_protein_id)
+        
+        # If index is available, use FAISS search
+        if index is not None and family_id is not None:
+            for i, pid in enumerate(protein_ids):
+                query = embeddings[i].astype(np.float32)
+                try:
+                    D, I = index.search_family_float(family_id, query, len(protein_ids))
+                    # Debug: Check data types
+                    logger.debug(f"Mutual k-NN FAISS search returned D type: {type(D)}, I type: {type(I)}")
+                    logger.debug(f"First few D values: {D[:3]}, types: {[type(d) for d in D[:3]]}")
+                    
+                    # Ensure D and I are properly typed
+                    if not isinstance(D, np.ndarray):
+                        D = np.array(D, dtype=np.float32)
+                    if not isinstance(I, (list, np.ndarray)):
+                        I = list(I) if hasattr(I, '__iter__') else [I]
+                    
+                    for dist, idx in zip(D, I):
+                        # Ensure idx is an integer for comparison
+                        try:
+                            idx = int(idx) if idx is not None else -1
+                        except (ValueError, TypeError):
+                            idx = -1
+                            
+                        if idx == i or idx == -1 or idx >= len(protein_ids):
+                            continue
+                        neighbor_id = protein_ids[idx]
+                        # Use safe numeric conversion to prevent string vs int errors
+                        weight = self._safe_numeric_conversion(dist, default=0.0)
+                        G.add_edge(pid, neighbor_id, weight=weight)
+                except Exception as e:
+                    logger.error(f"FAISS search failed for {pid}: {e}")
                     continue
-                neighbor_id = protein_ids[idx]
-                G.add_edge(pid, neighbor_id, weight=float(dist))
+        else:
+            # No fallback - FAISS index is required
+            raise RuntimeError(f"FAISS index is required for network building. Index: {index}, Family ID: {family_id}")
+        
         return G
     
     def build_threshold_network(self, embeddings: np.ndarray,
@@ -593,24 +606,53 @@ class DynamicNetworkBuilder:
             NetworkX graph
         """
         logger.info("Building threshold-based network using FAISS IVF float32...")
-        if index is None or family_id is None:
-            raise ValueError("Must provide HierarchicalIndex and family_id for FAISS search.")
         G = nx.Graph()
+        
+        # Add all nodes
         for i, pid in enumerate(protein_ids):
             G.add_node(pid)
-        for i, pid in enumerate(protein_ids):
-            query = embeddings[i].astype(np.float32)
-            try:
-                D, I = index.search_family_float(family_id, query, len(protein_ids))
-            except Exception as e:
-                logger.error(f"FAISS search failed for {pid}: {e}")
-                continue
-            for dist, idx in zip(D, I):
-                if idx == i or idx == -1:
+        
+        # Add query protein if provided
+        if query_protein_id is not None:
+            G.add_node(query_protein_id)
+        
+        # If index is available, use FAISS search
+        if index is not None and family_id is not None:
+            for i, pid in enumerate(protein_ids):
+                query = embeddings[i].astype(np.float32)
+                try:
+                    D, I = index.search_family_float(family_id, query, len(protein_ids))
+                    # Debug: Check data types
+                    logger.debug(f"Threshold FAISS search returned D type: {type(D)}, I type: {type(I)}")
+                    logger.debug(f"First few D values: {D[:3]}, types: {[type(d) for d in D[:3]]}")
+                    
+                    # Ensure D and I are properly typed
+                    if not isinstance(D, np.ndarray):
+                        D = np.array(D, dtype=np.float32)
+                    if not isinstance(I, (list, np.ndarray)):
+                        I = list(I) if hasattr(I, '__iter__') else [I]
+                    
+                    for dist, idx in zip(D, I):
+                        # Ensure idx is an integer for comparison
+                        try:
+                            idx = int(idx) if idx is not None else -1
+                        except (ValueError, TypeError):
+                            idx = -1
+                            
+                        if idx == i or idx == -1 or idx >= len(protein_ids):
+                            continue
+                        # Use safe numeric comparison to prevent string vs int errors
+                        if self._safe_numeric_comparison(dist, self.similarity_threshold, '<='):
+                            neighbor_id = protein_ids[idx]
+                            weight = self._safe_numeric_conversion(dist)
+                            G.add_edge(pid, neighbor_id, weight=weight)
+                except Exception as e:
+                    logger.error(f"FAISS search failed for {pid}: {e}")
                     continue
-                if dist <= self.similarity_threshold:
-                    neighbor_id = protein_ids[idx]
-                    G.add_edge(pid, neighbor_id, weight=float(dist))
+        else:
+            # No fallback - FAISS index is required
+            raise RuntimeError(f"FAISS index is required for threshold network building. Index: {index}, Family ID: {family_id}")
+        
         return G
     
     def build_hybrid_network(self, embeddings: np.ndarray,
@@ -632,25 +674,49 @@ class DynamicNetworkBuilder:
             NetworkX graph
         """
         logger.info("Building hybrid network using FAISS IVF float32...")
-        if index is None or family_id is None:
-            raise ValueError("Must provide HierarchicalIndex and family_id for FAISS search.")
         G = nx.Graph()
+        
+        # Add all nodes
         for i, pid in enumerate(protein_ids):
             G.add_node(pid)
-        for i, pid in enumerate(protein_ids):
-            query = embeddings[i].astype(np.float32)
-            try:
-                D, I = index.search_family_float(family_id, query, self.k_neighbors+1)
-            except Exception as e:
-                logger.error(f"FAISS search failed for {pid}: {e}")
-                continue
-            for dist, idx in zip(D, I):
-                if idx == i or idx == -1:
+        
+        # Add query protein if provided
+        if query_protein_id is not None:
+            G.add_node(query_protein_id)
+        
+        # If index is available, use FAISS search
+        if index is not None and family_id is not None:
+            for i, pid in enumerate(protein_ids):
+                query = embeddings[i].astype(np.float32)
+                try:
+                    D, I = index.search_family_float(family_id, query, len(protein_ids))
+                    
+                    # Ensure D and I are properly typed
+                    if not isinstance(D, np.ndarray):
+                        D = np.array(D, dtype=np.float32)
+                    if not isinstance(I, (list, np.ndarray)):
+                        I = list(I) if hasattr(I, '__iter__') else [I]
+                    
+                    for dist, idx in zip(D, I):
+                        # Ensure idx is an integer for comparison
+                        try:
+                            idx = int(idx) if idx is not None else -1
+                        except (ValueError, TypeError):
+                            idx = -1
+                            
+                        if idx == i or idx == -1 or idx >= len(protein_ids):
+                            continue
+                        # Use safe numeric comparison to prevent string vs int errors
+                        if self._safe_numeric_comparison(dist, self.similarity_threshold, '<='):
+                            neighbor_id = protein_ids[idx]
+                            weight = self._safe_numeric_conversion(dist)
+                            G.add_edge(pid, neighbor_id, weight=weight)
+                except Exception as e:
+                    logger.error(f"FAISS search failed for {pid}: {e}")
                     continue
-                if dist <= self.similarity_threshold or idx < self.k_neighbors:
-                    neighbor_id = protein_ids[idx]
-                    G.add_edge(pid, neighbor_id, weight=float(dist))
-        return G
+        else:
+            # No fallback - FAISS index is required
+            raise RuntimeError(f"FAISS index is required for hybrid network building. Index: {index}, Family ID: {family_id}")
     
     def _expand_network(self, G: nx.Graph, similarity_matrix: np.ndarray, 
                        protein_ids: List[str]):
@@ -690,6 +756,52 @@ class DynamicNetworkBuilder:
                 if len(G.nodes()) <= self.max_network_size:
                     break
                 G.remove_node(node)
+    
+    def _safe_numeric_conversion(self, value, default=float('inf')):
+        """
+        Safely convert a value to float for numeric comparisons.
+        Based on StackAbuse guidance for handling incompatible type comparisons.
+        """
+        try:
+            if isinstance(value, str):
+                # Handle string values more robustly
+                if value.lower() in ['inf', 'infinity', 'nan']:
+                    return float('inf')
+                return float(value)
+            elif isinstance(value, (int, float, np.integer, np.floating)):
+                return float(value)
+            elif hasattr(value, 'item'):  # Handle numpy scalars
+                return float(value.item())
+            elif hasattr(value, '__iter__') and not isinstance(value, str):
+                # Handle array-like objects
+                return float(value[0]) if len(value) > 0 else default
+            else:
+                return default
+        except (ValueError, TypeError, AttributeError, IndexError):
+            return default
+    
+    def _safe_numeric_comparison(self, a, b, operator='<='):
+        """
+        Safely compare two values after converting them to numeric types.
+        """
+        try:
+            a_val = self._safe_numeric_conversion(a)
+            b_val = self._safe_numeric_conversion(b)
+            
+            if operator == '<=':
+                return a_val <= b_val
+            elif operator == '>=':
+                return a_val >= b_val
+            elif operator == '<':
+                return a_val < b_val
+            elif operator == '>':
+                return a_val > b_val
+            elif operator == '==':
+                return a_val == b_val
+            else:
+                return False
+        except Exception:
+            return False
     
     def build_network_from_similar_proteins(self, 
                                           similar_proteins: List[Dict],

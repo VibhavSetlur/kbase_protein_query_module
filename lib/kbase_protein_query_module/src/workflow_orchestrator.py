@@ -60,9 +60,37 @@ class ProteinNetworkWorkflow:
         # Load centroids for assignment
         centroids_path = self.config.get('storage', {}).get('centroids_path', None)
         if centroids_path is None:
-            centroids_path = str(self.storage.base_dir / "family_centroids_binary.npz")
-        if os.path.exists(centroids_path):
+            # Try multiple possible paths for centroids
+            possible_paths = [
+                str(self.storage.base_dir / "family_centroids" / "family_centroids_binary.npz") if self.storage else None,
+                str(self.storage.base_dir / "family_centroids_binary.npz") if self.storage else None,
+                "data/family_centroids/family_centroids_binary.npz",
+                "data/family_centroids_binary.npz",
+                "/kb/module/data/family_centroids/family_centroids_binary.npz",
+                "/kb/module/data/family_centroids_binary.npz"
+            ]
+            centroids_path = None
+            for path in possible_paths:
+                if path and os.path.exists(path):
+                    centroids_path = path
+                    break
+        
+        if centroids_path and os.path.exists(centroids_path):
+            logger.info(f"Loading family centroids from: {centroids_path}")
             self.assign_protein_family.load_family_centroids(centroids_path)
+        else:
+            logger.warning("Family centroids file not found. Family assignment will not be available.")
+            # Try to find centroids by searching
+            import glob
+            search_paths = ["data", "/kb/module/data", "."]
+            for search_path in search_paths:
+                if os.path.exists(search_path):
+                    centroids_files = glob.glob(os.path.join(search_path, "**/*family_centroids*.npz"), recursive=True)
+                    if centroids_files:
+                        centroids_path = centroids_files[0]
+                        logger.info(f"Found centroids file: {centroids_path}")
+                        self.assign_protein_family.load_family_centroids(centroids_path)
+                        break
         
         # Performance monitoring
         self.performance_metrics = {}
@@ -120,6 +148,9 @@ class ProteinNetworkWorkflow:
         
         # Initialize hierarchical index
         index_storage_dir = storage_config.get('index_storage_dir', 'data/indexes')
+        # Also check the families directory where indexes are actually stored
+        families_index_dir = os.path.join(optimized_storage_dir, 'families')
+        
         if os.path.exists(index_storage_dir):
             logger.info(f"Loading hierarchical index from {index_storage_dir}")
             index_config = self.config.get('similarity_search', {})
@@ -129,9 +160,23 @@ class ProteinNetworkWorkflow:
                 quantization=index_config.get('faiss', {}).get('quantization', 'pq'),
                 cache_size=index_config.get('cache_size', 10)
             )
+        elif os.path.exists(families_index_dir):
+            logger.info(f"Loading hierarchical index from {families_index_dir}")
+            index_config = self.config.get('similarity_search', {})
+            self.hierarchical_index = HierarchicalIndex(
+                base_dir=families_index_dir,
+                index_type=index_config.get('index_type', 'faiss'),
+                quantization=index_config.get('faiss', {}).get('quantization', 'pq'),
+                cache_size=index_config.get('cache_size', 10)
+            )
         else:
-            logger.warning(f"Hierarchical index not found at {index_storage_dir}")
+            logger.warning(f"Hierarchical index not found at {index_storage_dir} or {families_index_dir}")
             self.hierarchical_index = None
+        
+        # Create FAISS indexes if they don't exist
+        if self.hierarchical_index is None and self.storage is not None:
+            logger.info("Creating FAISS indexes for available families...")
+            self._create_faiss_indexes()
         
         # Initialize streaming index for memory-efficient processing
         streaming_dir = storage_config.get('streaming_dir', 'data/streaming')
@@ -155,6 +200,46 @@ class ProteinNetworkWorkflow:
         
         logger.info(f"Configured model: {self.model_name}")
         logger.info(f"Expected embedding dimension: {self.embedding_dim}")
+    
+    def _create_faiss_indexes(self):
+        """Create FAISS indexes for all available families."""
+        if not self.storage or not self.available_families:
+            logger.warning("No storage or families available for index creation")
+            return
+        
+        logger.info("Creating FAISS indexes for all families...")
+        created_count = 0
+        
+        for family_id in self.available_families:
+            try:
+                # Check if index already exists
+                index_file = self.storage.base_dir / "indexes" / "families" / f"{family_id}.faiss"
+                if index_file.exists():
+                    logger.debug(f"FAISS index already exists for family {family_id}")
+                    continue
+                
+                # Create the index
+                self.storage.create_family_index_float(family_id)
+                created_count += 1
+                logger.info(f"Created FAISS index for family {family_id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create FAISS index for family {family_id}: {e}")
+                continue
+        
+        logger.info(f"Created {created_count} FAISS indexes")
+        
+        # Reinitialize hierarchical index after creating indexes
+        index_storage_dir = self.storage.base_dir / "indexes"
+        if index_storage_dir.exists():
+            index_config = self.config.get('similarity_search', {})
+            self.hierarchical_index = HierarchicalIndex(
+                base_dir=str(index_storage_dir),
+                index_type=index_config.get('index_type', 'faiss'),
+                quantization=index_config.get('faiss', {}).get('quantization', 'pq'),
+                cache_size=index_config.get('cache_size', 10)
+            )
+            logger.info("Reinitialized hierarchical index with created FAISS indexes")
     
     def _load_legacy_data(self):
         """Load data using legacy storage system for backward compatibility."""
@@ -191,10 +276,7 @@ class ProteinNetworkWorkflow:
             )
         
         # Generate embedding
-        query_embedding = self.embedding_generator.generate_embedding(
-            query_sequence, 
-            pooling_method="mean"
-        )
+        query_embedding = self.embedding_generator.generate_embedding(query_sequence)
         
         logger.info(f"Generated embedding with shape: {query_embedding.shape}")
         return query_embedding
@@ -253,7 +335,8 @@ class ProteinNetworkWorkflow:
         """
         logger.info(f"Performing optimized similarity search for top {k} proteins in family {family_id} using FAISS IVF float32...")
         if self.hierarchical_index is None:
-            raise RuntimeError("FAISS hierarchical index is required for similarity search.")
+            raise RuntimeError("FAISS hierarchical index not available for similarity search.")
+        
         if query_embedding.dtype != np.float32:
             raise ValueError("Query embedding must be np.float32 for float FAISS search.")
         try:
@@ -291,6 +374,10 @@ class ProteinNetworkWorkflow:
             Tuple of (NetworkX graph, network properties)
         """
         logger.info(f"Building optimized network for family {family_id} using FAISS IVF float32...")
+        
+        if self.hierarchical_index is None:
+            raise RuntimeError("FAISS hierarchical index is required for network building.")
+        
         family_embeddings, family_protein_ids = self.storage.load_family_embeddings(family_id)
         from .network_builder import DynamicNetworkBuilder
         builder = DynamicNetworkBuilder(**self.config.get('network', {}))

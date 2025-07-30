@@ -1,0 +1,5 @@
+
+description: Always look for online sources, documentation, and best practices to guide the thought process. Research solutions before implementing. Use official documentation, Stack Overflow, GitHub issues, and academic papers when relevant. Don't guess - find authoritative sources.
+globs: ["**/*"]
+alwaysApply: true
+---

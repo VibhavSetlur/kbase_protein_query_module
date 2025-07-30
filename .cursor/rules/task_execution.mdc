@@ -1,0 +1,5 @@
+
+description: Always run agentic tasks directly - don't ask "would you like to proceed" after finishing a prompt. Execute requested changes immediately without confirmation prompts.
+globs: ["**/*"]
+alwaysApply: true
+---

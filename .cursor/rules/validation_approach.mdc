@@ -1,0 +1,5 @@
+
+description: Be flexible with input validation - accept multiple formats and provide clear guidance on what's accepted. Don't be overly restrictive. Give helpful error messages with examples of valid formats. Prefer inclusive validation over exclusive.
+globs: ["**/*.py", "**/*.js", "**/*.ts"]
+alwaysApply: true
+---

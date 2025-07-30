@@ -18,7 +18,7 @@
             "default_values": [""],
             "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": ["kbase_protein_query_module.ProteinEmbeddingResult"],
+                "valid_ws_types": ["ProteinEmbeddingResult"],
                 "example": "Select a previously generated embedding."
             }
         },

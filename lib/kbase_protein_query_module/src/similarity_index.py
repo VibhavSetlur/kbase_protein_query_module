@@ -18,6 +18,7 @@ import faiss
 import h5py
 from collections import defaultdict
 
+
 logger = logging.getLogger(__name__)
 
 class HierarchicalIndex:
@@ -101,12 +102,34 @@ class HierarchicalIndex:
         num_proteins = len(embeddings)
         if embeddings.dtype != np.uint8:
             raise ValueError("Embeddings must be np.uint8 for binary FAISS indexing.")
+        
+        # Ensure we have enough training points for FAISS clustering
+        # According to FAISS FAQ: minimum 39 training points per centroid
         nlist = min(100, num_proteins // 10) or 1
-        quantizer = faiss.IndexBinaryFlat(dimension)
-        index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
-        index.train(embeddings)
-        index.add(embeddings)
-        index_file = self.base_dir / "families" / f"family_{family_id}.faissbin"
+        min_training_points = nlist * 39
+        
+        if num_proteins < min_training_points:
+            # Adjust nlist to meet training requirements
+            nlist = max(1, num_proteins // 39)
+            if nlist < 1:
+                # If we still don't have enough points, use a flat index instead
+                logger.warning(f"Not enough training points for binary IVF index in family {family_id}. Using flat index.")
+                index = faiss.IndexBinaryFlat(dimension)
+                index.add(embeddings)
+            else:
+                # Use adjusted nlist
+                logger.info(f"Adjusted nlist to {nlist} for binary family {family_id} to meet training requirements")
+                quantizer = faiss.IndexBinaryFlat(dimension)
+                index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
+                index.train(embeddings)
+                index.add(embeddings)
+        else:
+            # We have enough training points, proceed normally
+            quantizer = faiss.IndexBinaryFlat(dimension)
+            index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
+            index.train(embeddings)
+            index.add(embeddings)
+        index_file = self.base_dir / "families" / f"{family_id}.faissbin"
         faiss.write_index_binary(index, str(index_file))
         metadata = {
             'protein_ids': protein_ids,
@@ -114,7 +137,7 @@ class HierarchicalIndex:
             'num_proteins': num_proteins,
             'index_type': 'faiss_binary'
         }
-        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
+        metadata_file = self.base_dir / "metadata" / f"{family_id}_metadata.json"
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
         logger.info(f"Created FAISS IVF binary index for family {family_id}: {num_proteins} proteins, {dimension} bits")
@@ -127,20 +150,44 @@ class HierarchicalIndex:
         if embeddings.dtype != np.float32:
             raise ValueError("Embeddings must be np.float32 for float FAISS indexing.")
         dimension = embeddings.shape[1]
-        nlist = min(nlist, max(1, len(embeddings)//10))
-        quantizer = faiss.IndexFlatL2(dimension)
-        index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
-        index.train(embeddings)
-        index.add(embeddings)
-        index_file = self.base_dir / "families" / f"family_{family_id}.faiss"
+        
+        # Ensure we have enough training points for FAISS clustering
+        # According to FAISS FAQ: minimum 39 training points per centroid
+        min_training_points = nlist * 39
+        if len(embeddings) < min_training_points:
+            # Adjust nlist to meet training requirements
+            nlist = max(1, len(embeddings) // 39)
+            if nlist < 1:
+                # If we still don't have enough points, use a flat index instead
+                logger.warning(f"Not enough training points for IVF index in family {family_id}. Using flat index.")
+                index = faiss.IndexFlatL2(dimension)
+                index.add(embeddings)
+            else:
+                # Use adjusted nlist
+                logger.info(f"Adjusted nlist to {nlist} for family {family_id} to meet training requirements")
+                quantizer = faiss.IndexFlatL2(dimension)
+                index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
+                index.train(embeddings)
+                index.add(embeddings)
+        else:
+            # We have enough training points, proceed normally
+            nlist = min(nlist, max(1, len(embeddings)//10))
+            quantizer = faiss.IndexFlatL2(dimension)
+            index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
+            index.train(embeddings)
+            index.add(embeddings)
+        
+        index_file = self.base_dir / "families" / f"{family_id}.faiss"
         faiss.write_index(index, str(index_file))
         metadata = {
             'protein_ids': protein_ids,
             'dimension': dimension,
             'num_proteins': len(protein_ids),
-            'index_type': 'faiss_float'
+            'index_type': 'faiss_float',
+            'nlist': nlist,
+            'training_points': len(embeddings)
         }
-        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_float_metadata.json"
+        metadata_file = self.base_dir / "metadata" / f"{family_id}_float_metadata.json"
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
         logger.info(f"Created FAISS IVF float index for family {family_id}: {len(protein_ids)} proteins, {dimension} dim")
@@ -156,7 +203,18 @@ class HierarchicalIndex:
         if family_id not in self.family_mapping:
             raise ValueError(f"Family {family_id} not found in index mapping")
         index_file = self.family_mapping[family_id]
-        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
+        # Try different metadata file patterns
+        metadata_file = self.base_dir / "metadata" / f"{family_id}_metadata.json"
+        if not metadata_file.exists():
+            metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
+        if not metadata_file.exists():
+            metadata_file = self.base_dir / "metadata" / f"{family_id}_binary_metadata.json"
+        if not metadata_file.exists():
+            metadata_file = self.base_dir / "metadata" / f"family_{family_id}_binary_metadata.json"
+        
+        if not metadata_file.exists():
+            raise FileNotFoundError(f"Metadata file not found for family {family_id}")
+            
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
         index = faiss.read_index_binary(str(index_file))
@@ -180,21 +238,68 @@ class HierarchicalIndex:
     
     def search_family_float(self, family_id: str, query_embedding: np.ndarray, top_k: int = 50) -> Tuple[np.ndarray, List[str]]:
         import faiss
-        index_file = self.base_dir / "families" / f"family_{family_id}.faiss"
-        metadata_file = self.base_dir / "metadata" / f"family_{family_id}_float_metadata.json"
+        # Fix the filename pattern - look in the correct indexes directory
+        index_file = self.base_dir / "families" / f"{family_id}.faiss"
+        metadata_file = self.base_dir / "metadata" / f"{family_id}_float_metadata.json"
+        
+        # If not found in the main directories, try the indexes subdirectories
+        if not index_file.exists():
+            index_file = self.base_dir / "indexes" / "families" / f"{family_id}.faiss"
+        if not metadata_file.exists():
+            metadata_file = self.base_dir / "indexes" / "metadata" / f"{family_id}_float_metadata.json"
+        
         if not index_file.exists() or not metadata_file.exists():
-            raise FileNotFoundError(f"Float index or metadata missing for family {family_id}")
+            raise FileNotFoundError(f"Float index or metadata missing for family {family_id}. Index: {index_file}, Metadata: {metadata_file}")
+        
+        # Load metadata
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
+        
+        # Load FAISS index
         index = faiss.read_index(str(index_file))
+        
         if query_embedding.dtype != np.float32:
-            raise ValueError("Query embedding must be np.float32 for float FAISS search.")
+            query_embedding = query_embedding.astype(np.float32)
+        
+        # Perform FAISS search
         D, I = index.search(query_embedding.reshape(1, -1), top_k)
-        D = D[0]
-        I = I[0]
-        protein_ids = [metadata['protein_ids'][i] for i in I if i != -1]
-        D = D[:len(protein_ids)]
-        return D, protein_ids
+        
+        # Convert distances to proper numeric values and ensure they are floats
+        distances = []
+        for dist in D[0]:
+            try:
+                if isinstance(dist, str):
+                    # Handle string distances by converting to float
+                    distances.append(float(dist))
+                elif isinstance(dist, (int, float, np.integer, np.floating)):
+                    distances.append(float(dist))
+                elif hasattr(dist, 'item'):  # Handle numpy scalars
+                    distances.append(float(dist.item()))
+                else:
+                    # Fallback for unknown types
+                    distances.append(float('inf'))
+            except (ValueError, TypeError, AttributeError):
+                # If conversion fails, use infinity
+                distances.append(float('inf'))
+        
+        # Ensure we have the right number of distances
+        while len(distances) < top_k:
+            distances.append(float('inf'))
+        
+        # Get protein IDs, handling potential index issues
+        protein_ids = []
+        for idx in I[0]:
+            if idx != -1 and idx < len(metadata['protein_ids']):
+                protein_ids.append(metadata['protein_ids'][idx])
+        
+        # Ensure we return the same number of protein IDs as distances
+        while len(protein_ids) < len(distances):
+            protein_ids.append("UNKNOWN")
+        
+        # Convert to numpy array with explicit dtype to ensure numeric types
+        distances_array = np.array(distances, dtype=np.float32)
+        
+        return distances_array, protein_ids
     
     def search_all_families(self, 
                            query_embedding: np.ndarray,
@@ -239,7 +344,7 @@ class HierarchicalIndex:
         stats = {}
         
         for family_id in self.family_mapping.keys():
-            metadata_file = self.base_dir / "metadata" / f"family_{family_id}_metadata.json"
+            metadata_file = self.base_dir / "metadata" / f"{family_id}_metadata.json"
             
             if metadata_file.exists():
                 with open(metadata_file, 'r') as f:
@@ -374,7 +479,18 @@ class StreamingIndex:
                     
                     # Filter by threshold and add to results
                     for i, similarity in enumerate(similarities):
-                        if similarity >= similarity_threshold:
+                        # Ensure similarity is numeric for comparison
+                        try:
+                            if isinstance(similarity, str):
+                                sim_val = float(similarity)
+                            elif isinstance(similarity, (int, float, np.integer, np.floating)):
+                                sim_val = float(similarity)
+                            else:
+                                sim_val = 0.0
+                        except (ValueError, TypeError):
+                            sim_val = 0.0
+                        # Use safe numeric comparison
+                        if sim_val >= similarity_threshold:
                             protein_idx = batch_start + i
                             protein_id = protein_ids[protein_idx]
                             results.append((protein_id, float(similarity)))

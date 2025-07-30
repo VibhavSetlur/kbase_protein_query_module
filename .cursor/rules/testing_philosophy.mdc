@@ -1,0 +1,5 @@
+
+description: Test comprehensively with diverse data formats and edge cases. Use both realistic and synthetic data for testing. Focus on integration tests that verify the full workflow. Prefer running tests immediately over planning them.
+globs: ["**/*.py", "test/**/*", "**/test_*.py"]
+alwaysApply: true
+---

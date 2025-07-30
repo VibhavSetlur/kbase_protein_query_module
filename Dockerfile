@@ -49,47 +49,9 @@ RUN cd /tmp && \
 # Upgrade pip and install build tools
 RUN pip install --upgrade pip==21.3.1 setuptools==59.5.0 wheel setuptools-rust
 
-# Install required dependencies
-RUN pip install --no-cache-dir \
-
-    # Deep Learning & Transformers
-    torch==1.10.2 \
-    transformers==4.31.0 \
-    sentence-transformers==2.2.0 \
-
-    # Data Science & Analysis
-    numpy==1.21.0 \
-    pandas==1.3.0 \
-    scipy==1.7.3 \
-    scikit-learn==1.0.2 \
-
-
-    # Graphs & Networks
-    networkx==2.6.0 \
-
-    # Embedding Indexes
-    faiss-cpu==1.7.0 \
-    annoy==1.17.0 \
-
-    # Plotting & Visualization
-    matplotlib==3.5.0 \
-    seaborn==0.11.0 \
-    plotly==5.0.0 \
-    kaleido==0.2.1 \
-
-    # Data Storage & Formats
-    h5py==3.6.0 \
-    zarr==2.10.3 \
-    tables==3.7.0 \
-    pyarrow==6.0.0 \
-
-    # Bioinformatics
-    biopython==1.79 \
-
-    # Other
-    joblib==1.1.0 \
-    tqdm==4.62.0 \
-    pyyaml==6.0
+# Install Python dependencies from requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Copy the module code
 COPY ./ /kb/module

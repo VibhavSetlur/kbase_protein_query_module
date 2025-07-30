@@ -31,7 +31,7 @@ class kbase_protein_query_module:
     ######################################### noqa
     VERSION = "0.0.1"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "ffc0b6e9413e90c7388d4cc8221a931da79147c4"
+    GIT_COMMIT_HASH = "1f4f7e036a9fed98a3464a653dce26c7880ffad5"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -84,10 +84,18 @@ class kbase_protein_query_module:
         # Return the result according to KIDL spec
         output = {
             'report_name': report_info['name'],
-            'report_ref': report_info['ref']
+            'report_ref': report_info['ref'],
+            'input_parameters': params,
+            'summary': report_text,
+            'start_time': start_time
         }
         
-        return output
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method run_kbase_protein_query_module return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
         #END run_kbase_protein_query_module
 
         # At some point might do deeper type checking...
@@ -157,17 +165,17 @@ class kbase_protein_query_module:
         # Save result to workspace for user access
         existence_result_ref = None
         try:
-            # Get workspace URL from environment or use default
-            ws_url = os.environ.get('WS_URL')
+            # Get workspace URL from configuration
+            ws_url = self.config.get('workspace-url')
             if not ws_url:
-                # Try alternative environment variables or use a default
-                ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+                # Fallback to environment variable
+                ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
                 if not ws_url.endswith('/ws'):
                     ws_url = ws_url + '/ws'
             
             ws = Workspace(ws_url)
             existence_obj_name = f"protein_existence_{uuid.uuid4().hex[:8]}"
-            existence_obj_type = "KBaseProtein.ProteinExistenceResult"
+            existence_obj_type = "ProteinExistenceResult"
             existence_obj_data = {
                 'protein_id': protein_id,
                 'exists': result['exists'],
@@ -177,8 +185,17 @@ class kbase_protein_query_module:
                 'summary': f"Protein {protein_id} {'found' if result['exists'] else 'not found'} in database"
             }
             
+            # Handle workspace parameter - could be workspace name or ID
+            workspace_param = workspace_name
+            if isinstance(workspace_name, str) and workspace_name.isdigit():
+                # It's a workspace ID
+                workspace_param = int(workspace_name)
+            elif isinstance(workspace_name, str) and ':' in workspace_name:
+                # It's a workspace name with owner
+                workspace_param = workspace_name
+            
             save_ret = ws.save_objects({
-                'workspace': workspace_name,
+                'workspace': workspace_param,
                 'objects': [{
                     'type': existence_obj_type,
                     'data': existence_obj_data,
@@ -276,24 +293,24 @@ class kbase_protein_query_module:
         # Save embedding as workspace object
         embedding_ref = None
         try:
-            # Get workspace URL from environment or use default
-            ws_url = os.environ.get('WS_URL')
+            # Get workspace URL from configuration
+            ws_url = self.config.get('workspace-url')
             if not ws_url:
-                # Try alternative environment variables or use a default
-                ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+                # Fallback to environment variable
+                ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
                 if not ws_url.endswith('/ws'):
                     ws_url = ws_url + '/ws'
             
             ws = Workspace(ws_url)
             embedding_obj_name = f"protein_embedding_{uuid.uuid4().hex[:8]}"
-            embedding_obj_type = "KBaseProtein.ProteinEmbeddingResult"
+            embedding_obj_type = "ProteinEmbeddingResult"
             embedding_obj_data = {
                 'input_id': sequence[:50] + "..." if len(sequence) > 50 else sequence,
                 'input_type': 'sequence',
                 'embedding_ref': None,  # Self-reference
                 'embedding': embedding.tolist(),
                 'model_name': 'esm2_t6_8M_UR50D',
-                'pooling_method': 'mean',
+                'pooling_method': 'mean',  # Always mean pooling
                 'metadata': {
                     'sequence_length': sequence_length,
                     'embedding_norm': embedding_norm,
@@ -302,8 +319,17 @@ class kbase_protein_query_module:
                 }
             }
             
+            # Handle workspace parameter - could be workspace name or ID
+            workspace_param = workspace_name
+            if isinstance(workspace_name, str) and workspace_name.isdigit():
+                # It's a workspace ID
+                workspace_param = int(workspace_name)
+            elif isinstance(workspace_name, str) and ':' in workspace_name:
+                # It's a workspace name with owner
+                workspace_param = workspace_name
+            
             save_ret = ws.save_objects({
-                'workspace': workspace_name,
+                'workspace': workspace_param,
                 'objects': [{
                     'type': embedding_obj_type,
                     'data': embedding_obj_data,
@@ -391,11 +417,11 @@ class kbase_protein_query_module:
             raise ValueError("Parameter 'embedding_ref' must be provided.")
         
         # Get embedding from workspace object
-        # Get workspace URL from environment or use default
-        ws_url = os.environ.get('WS_URL')
+        # Get workspace URL from configuration
+        ws_url = self.config.get('workspace-url')
         if not ws_url:
-            # Try alternative environment variables or use a default
-            ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+            # Fallback to environment variable
+            ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
             if not ws_url.endswith('/ws'):
                 ws_url = ws_url + '/ws'
         ws = Workspace(ws_url)
@@ -415,7 +441,7 @@ class kbase_protein_query_module:
         # Reuse the same workspace connection
         assignment_ref = None
         assignment_obj_name = f"family_assignment_{uuid.uuid4().hex[:8]}"
-        assignment_obj_type = "KBaseProtein.ProteinFamilyAssignmentResult"
+        assignment_obj_type = "ProteinFamilyAssignmentResult"
         assignment_obj_data = {
             'input_id': str(embedding[:10]) + "..." if len(embedding) > 10 else str(embedding),
             'input_type': 'embedding',
@@ -430,8 +456,17 @@ class kbase_protein_query_module:
         }
         
         try:
+            # Handle workspace parameter - could be workspace name or ID
+            workspace_param = workspace_name
+            if isinstance(workspace_name, str) and workspace_name.isdigit():
+                # It's a workspace ID
+                workspace_param = int(workspace_name)
+            elif isinstance(workspace_name, str) and ':' in workspace_name:
+                # It's a workspace name with owner
+                workspace_param = workspace_name
+            
             save_ret = ws.save_objects({
-                'workspace': workspace_name,
+                'workspace': workspace_param,
                 'objects': [{
                     'type': assignment_obj_type,
                     'data': assignment_obj_data,
@@ -519,11 +554,11 @@ class kbase_protein_query_module:
             raise ValueError("Parameter 'embedding_ref' must be provided.")
         
         # Get embedding from workspace object
-        # Get workspace URL from environment or use default
-        ws_url = os.environ.get('WS_URL')
+        # Get workspace URL from configuration
+        ws_url = self.config.get('workspace-url')
         if not ws_url:
-            # Try alternative environment variables or use a default
-            ws_url = os.environ.get('KBASE_ENDPOINT', 'https://kbase.us/services/ws')
+            # Fallback to environment variable
+            ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
             if not ws_url.endswith('/ws'):
                 ws_url = ws_url + '/ws'
         ws = Workspace(ws_url)
@@ -556,7 +591,7 @@ class kbase_protein_query_module:
         # Reuse the same workspace connection
         search_ref = None
         search_obj_name = f"similarity_search_{uuid.uuid4().hex[:8]}"
-        search_obj_type = "KBaseProtein.SummarizeVisualizeResult"
+        search_obj_type = "SummarizeVisualizeResult"
         search_obj_data = {
             'input_id': str(embedding[:10]) + "..." if len(embedding) > 10 else str(embedding),
             'input_type': 'embedding',
@@ -577,8 +612,18 @@ class kbase_protein_query_module:
         }
         
         try:
+            # Handle workspace parameter - could be workspace name or ID
+            workspace_name = params.get('workspace_name')
+            workspace_param = workspace_name
+            if isinstance(workspace_name, str) and workspace_name.isdigit():
+                # It's a workspace ID
+                workspace_param = int(workspace_name)
+            elif isinstance(workspace_name, str) and ':' in workspace_name:
+                # It's a workspace name with owner
+                workspace_param = workspace_name
+            
             save_ret = ws.save_objects({
-                'workspace': params.get('workspace_name'),
+                'workspace': workspace_param,
                 'objects': [{
                     'type': search_obj_type,
                     'data': search_obj_data,

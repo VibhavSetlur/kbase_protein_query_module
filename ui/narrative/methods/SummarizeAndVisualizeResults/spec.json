@@ -18,7 +18,7 @@
             "default_values": [""],
             "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": ["kbase_protein_query_module.FindTopMatchesFromEmbeddingResults"],
+                "valid_ws_types": ["FindTopMatchesFromEmbeddingResults"],
                 "example": "Select a previous top matches result."
             }
         },

@@ -1,0 +1,5 @@
+
+description: When operations fail, provide graceful degradation rather than hard failures. Continue with core functionality when possible. Log warnings instead of crashing. Give users actionable feedback about what went wrong and what they can do.
+globs: ["**/*.py", "**/*.js", "**/*.ts"]
+alwaysApply: true
+---

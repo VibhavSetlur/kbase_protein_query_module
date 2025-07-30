@@ -1,0 +1,5 @@
+
+description: Focus on robust, production-ready code. Handle edge cases and errors gracefully. Provide clear error messages with actionable information. Prefer defensive programming - validate inputs, handle failures, and continue operation when possible rather than hard failures.
+globs: ["**/*.py", "**/*.js", "**/*.ts", "**/*.java"]
+alwaysApply: true
+---
