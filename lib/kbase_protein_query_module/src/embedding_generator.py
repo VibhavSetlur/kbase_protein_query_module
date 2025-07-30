@@ -101,7 +101,14 @@ class ProteinEmbeddingGenerator:
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
             except Exception as e:
                 logger.warning(f"Failed to load tokenizer locally: {e}")
-                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+                try:
+                    self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+                except Exception as e2:
+                    logger.error(f"Failed to load tokenizer: {e2}")
+                    raise RuntimeError(f"Could not load tokenizer from {model_path}: {e2}")
+            
+            if self.tokenizer is None:
+                raise RuntimeError("Tokenizer loading failed - tokenizer is None")
             
             # Determine appropriate dtype based on device
             if isinstance(self.device, str):
@@ -121,7 +128,19 @@ class ProteinEmbeddingGenerator:
                 )
             except Exception as e:
                 logger.warning(f"Failed to load model locally: {e}")
+                # Try without local_files_only
+                try:
+                    self.model = EsmModel.from_pretrained(
+                        model_path, 
+                        torch_dtype=model_dtype
+                    )
+                except Exception as e2:
+                    logger.error(f"Failed to load model: {e2}")
+                    raise RuntimeError(f"Could not load model from {model_path}: {e2}")
 
+            if self.model is None:
+                raise RuntimeError("Model loading failed - model is None")
+                
             self.model = self.model.to(self.device)
             self.model.eval()
             
@@ -154,6 +173,13 @@ class ProteinEmbeddingGenerator:
         """
         if not sequence or not isinstance(sequence, str):
             raise ValueError("Sequence must be a non-empty string")
+        
+        # Check if model and tokenizer are properly loaded
+        if self.model is None:
+            raise RuntimeError("Model not loaded. Please check model initialization.")
+        if self.tokenizer is None:
+            raise RuntimeError("Tokenizer not loaded. Please check tokenizer initialization.")
+            
         try:
             # Tokenize the sequence
             inputs = self.tokenizer(sequence, return_tensors="pt", padding=True, truncation=True)

@@ -31,7 +31,7 @@ class kbase_protein_query_module:
     ######################################### noqa
     VERSION = "0.0.1"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "8b39ef0deb55b71aea168c9f451b9f60d24db5ce"
+    GIT_COMMIT_HASH = "40111353b65678814ad1c89a992ab40cde81977e"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
