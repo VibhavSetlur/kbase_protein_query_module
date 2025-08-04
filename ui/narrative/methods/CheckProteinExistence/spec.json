@@ -21,6 +21,18 @@
                 "valid_ws_types": [],
                 "example": "P12345, family_0_prot_1, or any protein identifier"
             }
+        },
+        {
+            "id": "generate_embedding",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["true"],
+            "field_type": "checkbox",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Generate embedding for the protein if found"
+            }
         }
     ],
     "behavior": {
@@ -36,6 +48,10 @@
                 {
                     "input_parameter": "protein_id",
                     "target_property": "protein_id"
+                },
+                {
+                    "input_parameter": "generate_embedding",
+                    "target_property": "generate_embedding"
                 }
             ],
             "output_mapping": [
@@ -46,7 +62,8 @@
                 { "service_method_output_path": [0, "metadata"], "target_property": "metadata" },
                 { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
                 { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
-                { "service_method_output_path": [0, "summary"], "target_property": "summary" }
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
+                { "service_method_output_path": [0, "protein_existence_result_ref"], "target_property": "protein_existence_result_ref" }
             ]
         }
     },

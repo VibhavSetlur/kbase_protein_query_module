@@ -19,19 +19,36 @@ kbase_protein_network_analysis_toolkit/
 ├── kbase.yml                    # Module metadata and configuration
 ├── kbase_protein_query_module.spec # KIDL interface specification
 ├── Dockerfile                   # Container configuration
-├── Makefile                     # Build system
+├── Makefile                     # Build system with KBase targets
 ├── deploy.cfg                   # Deployment configuration
 ├── requirements.txt             # Python dependencies
 ├── pyproject.toml              # Project configuration
 ├── lib/                        # Source code implementation
-│   ├── kbase_protein_query_module/
-│   │   ├── src/               # Core modules
-│   │   ├── kbase_protein_query_moduleImpl.py
-│   │   └── kbase_protein_query_moduleServer.py
-│   └── installed_clients/      # KBase service clients
+│   └── kbase_protein_query_module/
+│       ├── src/                # Core modules
+│       │   ├── check_existence.py
+│       │   ├── embedding_generator.py
+│       │   ├── assign_protein_family.py
+│       │   ├── similarity_index.py
+│       │   ├── network_builder.py
+│       │   ├── storage.py
+│       │   ├── workflow_orchestrator.py
+│       │   ├── sequence_analyzer.py
+│       │   └── html_report_generator.py
+│       ├── kbase_protein_query_moduleImpl.py
+│       └── kbase_protein_query_moduleServer.py
 ├── scripts/                    # Utility and deployment scripts
-├── test/                       # Test framework and unit tests
+├── test/                       # Comprehensive test suite
+│   ├── unit_tests_query/       # Unit tests
+│   ├── run_tests.py           # Test runner
+│   ├── test.cfg               # Test configuration
+│   └── README.md              # Testing documentation
 ├── ui/narrative/methods/       # KBase app UI specifications
+│   ├── CheckProteinExistence/
+│   ├── GenerateProteinEmbeddings/
+│   ├── AssignProteinFamilyWithEmbedding/
+│   ├── FindTopMatchesFromEmbedding/
+│   └── SummarizeAndVisualizeResults/
 └── data/                       # Reference data and examples
 ```
 
@@ -89,7 +106,7 @@ The module provides five main KBase apps:
 
 5. **Summarize and Visualize Results** (`SummarizeAndVisualizeResults`)
    - Input: Search results
-   - Output: Interactive visualizations and reports
+   - Output: Interactive visualizations and reports with sequence analysis
 
 ### API Reference
 
@@ -98,6 +115,61 @@ The module provides five main KBase apps:
 - `check_protein_existence(params)` - Check if protein exists in database
 - `generate_protein_embedding(params)` - Generate embedding from sequence
 - `assign_family_fast(params)` - Assign embedding to protein family
+- `find_top_matches_from_embedding(params)` - Find similar proteins
+- `summarize_and_visualize_results(params)` - Generate comprehensive reports
+
+## Testing
+
+### Test Categories
+
+The module includes comprehensive testing following KBase guidelines:
+
+1. **Unit Tests** (`test/unit_tests_query/`)
+   - Core functionality testing for each module
+   - Isolated testing without external dependencies
+   - Fast execution for development feedback
+
+2. **Integration Tests** (`test/kbase_protein_query_module_query_server_test.py`)
+   - Workspace integration testing
+   - KBase service functionality
+   - Real data testing with actual protein data
+
+3. **HTML Report Tests** (`test/test_html_report_generator.py`)
+   - Report generation functionality
+   - Sequence analysis integration
+   - Visualization components
+
+4. **KBase SDK Tests**
+   - SDK compliance testing
+   - Deployment validation
+
+### Running Tests
+
+```bash
+# Comprehensive test suite
+make test-comprehensive
+
+# Specific test categories
+make test-unit
+make test-integration
+make test-html
+make test-kbase
+
+# Manual test execution
+cd test
+python3 run_tests.py
+```
+
+### Test Configuration
+
+The `test/test.cfg` file contains configuration for:
+- Data paths and directories
+- Test parameters (protein IDs, sequences, etc.)
+- Model configuration (ESM-2 parameters)
+- Network parameters (similarity thresholds)
+- Timeout settings for long-running tests
+
+For detailed testing information, see [test/README.md](test/README.md).
 - `find_top_matches_from_embedding(params)` - Find similar proteins
 - `summarize_and_visualize_results(params)` - Create visualizations
 

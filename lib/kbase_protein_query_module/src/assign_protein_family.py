@@ -7,9 +7,11 @@ analysis pipeline and is compatible with the workflow orchestrator and test suit
 """
 
 import logging
-from typing import Optional, Union, Any, Dict
+from typing import Optional, Union, Any, Dict, Tuple, List
 import numpy as np
 import faiss
+import time
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ class AssignProteinFamily:
         self.family_ids: Optional[np.ndarray] = None
         self.centroids: Optional[np.ndarray] = None
         self.eigenprotein_ids: Optional[np.ndarray] = None
+        self.expected_dimension: Optional[int] = None
 
     def load_family_centroids(self, npz_path: str) -> None:
         """
@@ -39,6 +42,7 @@ class AssignProteinFamily:
             self.centroids = np.ascontiguousarray(data['centroids'])  # keep as float, do not cast to uint8
             self.eigenprotein_ids = data['eigenprotein_ids']
             self._faiss_index = None
+            self.expected_dimension = self.centroids.shape[1]
             logger.info(f"Loaded {len(self.family_ids)} family centroids from {npz_path}")
         except Exception as e:
             logger.error(f"Failed to load family centroids from {npz_path}: {e}")
@@ -103,4 +107,96 @@ class AssignProteinFamily:
             Tuple of (family_id, confidence)
         """
         result = self.assign_family(embedding)
-        return result['family_id'], result['confidence'] 
+        return result['family_id'], result['confidence']
+
+    def validate_embedding(self, embedding: np.ndarray) -> bool:
+        """Validate embedding before family assignment."""
+        if embedding is None or embedding.size == 0:
+            return False
+        if embedding.shape[0] != self.expected_dimension:
+            return False
+        return True
+
+    def assign_family_with_monitoring(self, embedding: np.ndarray) -> Dict[str, Any]:
+        """
+        Assign family with detailed monitoring and timing.
+        
+        Args:
+            embedding: Query protein embedding
+            
+        Returns:
+            Dict with assignment results and timing information
+        """
+        start_time = time.time()
+        
+        try:
+            result = self.assign_family(embedding)
+            execution_time = time.time() - start_time
+            
+            result['execution_time'] = execution_time
+            result['status'] = 'success'
+            
+            logger.info(f"Family assignment completed in {execution_time:.4f}s")
+            return result
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Family assignment failed after {execution_time:.4f}s: {e}")
+            
+            return {
+                'family_id': None,
+                'confidence': 0.0,
+                'eigenprotein_id': None,
+                'execution_time': execution_time,
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def search_similar_proteins(self, embedding: np.ndarray, family_id: str, top_k: int = 10) -> List[Dict]:
+        """
+        Search for similar proteins within a specific family.
+        
+        Args:
+            embedding: Query protein embedding
+            family_id: Family ID to search within
+            top_k: Number of similar proteins to return
+            
+        Returns:
+            List of dictionaries with protein information
+        """
+        try:
+            # Load family data
+            family_file = f"data/families/{family_id}.h5"
+            if not os.path.exists(family_file):
+                logger.warning(f"Family file not found: {family_file}")
+                return []
+            
+            import h5py
+            with h5py.File(family_file, 'r') as f:
+                family_embeddings = f['embeddings'][:]
+                family_protein_ids = [pid.decode('utf-8') if isinstance(pid, bytes) else pid 
+                                      for pid in f['protein_ids'][:]]
+            
+            # Compute similarities
+            embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+            family_embeddings_norm = family_embeddings / (np.linalg.norm(family_embeddings, axis=1, keepdims=True) + 1e-8)
+            
+            similarities = np.dot(family_embeddings_norm, embedding_norm)
+            
+            # Get top k similar proteins
+            top_indices = np.argsort(similarities)[::-1][:top_k]
+            
+            similar_proteins = []
+            for idx in top_indices:
+                similar_proteins.append({
+                    'protein_id': family_protein_ids[idx],
+                    'similarity': float(similarities[idx]),
+                    'family_id': family_id
+                })
+            
+            logger.info(f"Found {len(similar_proteins)} similar proteins in family {family_id}")
+            return similar_proteins
+            
+        except Exception as e:
+            logger.error(f"Similarity search failed for family {family_id}: {e}")
+            return [] 

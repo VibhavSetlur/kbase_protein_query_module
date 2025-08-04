@@ -11,8 +11,24 @@
     },
     "parameters": [
         {
-            "id": "embedding_ref",
+            "id": "input_type",
             "optional": false,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["embedding"],
+            "field_type": "dropdown",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Choose input type",
+                "options": [
+                    {"value": "embedding", "display": "Protein Embedding"},
+                    {"value": "existence_result", "display": "Protein Existence Result"}
+                ]
+            }
+        },
+        {
+            "id": "embedding_ref",
+            "optional": true,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
@@ -20,6 +36,18 @@
             "text_options": {
                 "valid_ws_types": ["ProteinEmbeddingResult"],
                 "example": "Select a previously generated embedding."
+            }
+        },
+        {
+            "id": "existence_result_ref",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "workspaceObjectRef",
+            "text_options": {
+                "valid_ws_types": ["ProteinExistenceResult"],
+                "example": "Select a protein existence result."
             }
         }
     ],
@@ -34,8 +62,16 @@
                     "target_property": "workspace_name"
                 },
                 {
+                    "input_parameter": "input_type",
+                    "target_property": "input_type"
+                },
+                {
                     "input_parameter": "embedding_ref",
                     "target_property": "embedding_ref"
+                },
+                {
+                    "input_parameter": "existence_result_ref",
+                    "target_property": "existence_result_ref"
                 }
             ],
             "output_mapping": [
@@ -43,7 +79,8 @@
                 { "service_method_output_path": [0, "confidence"], "target_property": "confidence" },
                 { "service_method_output_path": [0, "eigenprotein_id"], "target_property": "eigenprotein_id" },
                 { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
-                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" }
+                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
+                { "service_method_output_path": [0, "family_assignment_result_ref"], "target_property": "family_assignment_result_ref" }
             ]
         }
     },

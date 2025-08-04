@@ -15,8 +15,24 @@
     },
     "parameters": [
         {
-            "id": "sequence",
+            "id": "input_type",
             "optional": false,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["sequence"],
+            "field_type": "dropdown",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Choose input type",
+                "options": [
+                    {"value": "sequence", "display": "Protein Sequence (Text)"},
+                    {"value": "workspace_object", "display": "Workspace Object"}
+                ]
+            }
+        },
+        {
+            "id": "sequence",
+            "optional": true,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
@@ -24,6 +40,18 @@
             "text_options": {
                 "valid_ws_types": [],
                 "example": ">ExampleProtein\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+            }
+        },
+        {
+            "id": "workspace_object_ref",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "workspaceObjectRef",
+            "text_options": {
+                "valid_ws_types": ["ProteinExistenceResult", "ProteinEmbeddingResult"],
+                "example": "Select a workspace object containing protein data"
             }
         }
     ],
@@ -38,8 +66,16 @@
                     "target_property": "workspace_name"
                 },
                 {
+                    "input_parameter": "input_type",
+                    "target_property": "input_type"
+                },
+                {
                     "input_parameter": "sequence",
                     "target_property": "sequence"
+                },
+                {
+                    "input_parameter": "workspace_object_ref",
+                    "target_property": "workspace_object_ref"
                 }
             ],
             "output_mapping": [

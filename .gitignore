@@ -1,5 +1,98 @@
+# KBase SDK files
 test_local
 sdk.cfg
 
+# Temporary and backup files
 TRASHFILE
 trash
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files (EXCEPT .cursor which contains important rules)
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+test.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Data files (large files that shouldn't be in git)
+data/esm2_t6_8M_UR50D_local/
+data/families/
+data/indexes/
+data/metadata/
+data/family_centroids/
+
+# Test outputs
+test/outputs/
+test/results/
+test/test.log

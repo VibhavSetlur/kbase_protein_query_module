@@ -32,12 +32,13 @@ parameters :
         short-hint : Directory to save the summary report and files.
 
 description : |
-    <p>Generate a summary report and interactive plots from protein similarity search results. Download files for further analysis.</p>
+    <p>Generate a comprehensive HTML report with sequence analysis, network visualizations, and statistical summaries from protein similarity search results.</p>
     <ul>
     <li><b>Input:</b> Search results from FindTopMatchesFromEmbedding</li>
-    <li><b>Output:</b> HTML/JSON report, plots, and downloadable files</li>
+    <li><b>Output:</b> Interactive HTML report with sequence analysis, network visualization, bioinformatics links, and downloadable files</li>
+    <li><b>Features:</b> Amino acid composition, physicochemical properties, secondary structure prediction, sequence motifs, and network statistics</li>
     </ul>
-    <p>Click <b>Summarize Results</b> to run.</p>
+    <p>Click <b>Generate Comprehensive Report</b> to run.</p>
 
 publications :
     -
@@ -47,4 +48,24 @@ publications :
     -
         display-text: |
             NetworkX: Network Analysis in Python
-        link: https://networkx.org/ 
+        link: https://networkx.org/
+    -
+        display-text: |
+            Chart.js: Simple yet flexible JavaScript charting
+        link: https://www.chartjs.org/
+    -
+        display-text: |
+            Plotly: The front-end for ML and data science models
+        link: https://plotly.com/
+    -
+        display-text: |
+            UniProt: a worldwide hub of protein knowledge
+        link: https://www.uniprot.org/
+    -
+        display-text: |
+            InterPro: protein sequence analysis and classification
+        link: https://www.ebi.ac.uk/interpro/
+    -
+        display-text: |
+            KBase: A United States Department of Energy Systems Biology Knowledgebase
+        link: https://www.nature.com/articles/nbt.4163 

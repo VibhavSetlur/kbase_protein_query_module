@@ -63,6 +63,29 @@ class ProteinStorage:
         self.metadata_dir = self.base_dir / "metadata"
         self.cache_dir = self.base_dir / "cache"
         
+    def _make_file_safe(self, family_id: str) -> str:
+        """
+        Convert any family ID to a file-safe format.
+        
+        Args:
+            family_id: Family ID (can be any string)
+            
+        Returns:
+            File-safe version of the family ID
+        """
+        import re
+        # Replace any non-alphanumeric characters with underscores
+        # This ensures the filename is safe for all operating systems
+        file_safe = re.sub(r'[^a-zA-Z0-9]', '_', family_id)
+        # Remove multiple consecutive underscores
+        file_safe = re.sub(r'_+', '_', file_safe)
+        # Remove leading/trailing underscores
+        file_safe = file_safe.strip('_')
+        # Ensure it's not empty
+        if not file_safe:
+            file_safe = 'unknown_family'
+        return file_safe
+        
     def _create_directory_structure(self):
         """Create optimized directory structure."""
         directories = [
@@ -133,7 +156,11 @@ class ProteinStorage:
         """
         if embeddings.dtype not in [np.uint8, np.float32]:
             raise ValueError("Embeddings must be np.uint8 (binary) or np.float32 (float) for storage.")
-        family_file = self.family_dir / f"family_{family_id}.h5"
+        
+        # Create file-safe family ID
+        file_safe_id = self._make_file_safe(family_id)
+        family_file = self.family_dir / f"{file_safe_id}.h5"
+        
         embedding_dim = embeddings.shape[1]
         num_proteins = embeddings.shape[0]
         optimal_chunk_size = min(self.chunk_size, max(1, min(num_proteins, 10000 // embedding_dim)))
@@ -155,7 +182,7 @@ class ProteinStorage:
                 compression_opts=self.compression_opts
             )
             if metadata is not None:
-                metadata_file = self.metadata_dir / f"family_{family_id}_metadata.parquet"
+                metadata_file = self.metadata_dir / f"{file_safe_id}_metadata.parquet"
                 metadata.to_parquet(metadata_file, compression='gzip')
                 f.attrs['metadata_file'] = str(metadata_file)
             f.attrs['num_proteins'] = len(protein_ids)
@@ -174,21 +201,17 @@ class ProteinStorage:
         Load embeddings for a protein family with optional slicing.
         
         Args:
-            family_id: Family identifier (with or without 'family_' prefix)
+            family_id: Family identifier (can be any string like 'ABC_transporter', 'G_protein_coupled_receptor', etc.)
             start_idx: Start index for slicing
             end_idx: End index for slicing
             
         Returns:
             Tuple of (embeddings, protein_ids)
         """
-        # Handle family_id with or without 'family_' prefix
-        if family_id.startswith('family_'):
-            # Remove 'family_' prefix for file naming
-            file_family_id = family_id[7:]  # Remove 'family_' prefix
-        else:
-            file_family_id = family_id
-            
-        family_file = self.family_dir / f"family_{file_family_id}.h5"
+        # For real protein families, we need to handle any family name format
+        # Create a file-safe version of the family ID
+        file_safe_id = self._make_file_safe(family_id)
+        family_file = self.family_dir / f"{file_safe_id}.h5"
         
         if not family_file.exists():
             raise FileNotFoundError(f"Family file not found: {family_file}")
@@ -206,64 +229,11 @@ class ProteinStorage:
         
         return embeddings, protein_ids
     
-    def create_family_index(self, family_id: str, **kwargs) -> str:
-        """
-        Create and store FAISS IVF binary similarity index for a family.
-        Args:
-            family_id: Family identifier
-        Returns:
-            Path to stored index file
-        """
-        import faiss
-        embeddings, protein_ids = self.load_family_embeddings(family_id)
-        # Convert embeddings to binary (uint8) if not already
-        if embeddings.dtype != np.uint8:
-            raise ValueError("Embeddings must be np.uint8 for binary FAISS indexing.")
-        dimension = embeddings.shape[1] * 8  # D in bits
-        
-        # Ensure we have enough training points for FAISS clustering
-        # According to FAISS FAQ: minimum 39 training points per centroid
-        nlist = min(100, len(embeddings) // 10) or 1
-        min_training_points = nlist * 39
-        
-        if len(embeddings) < min_training_points:
-            # Adjust nlist to meet training requirements
-            nlist = max(1, len(embeddings) // 39)
-            if nlist < 1:
-                # If we still don't have enough points, use a flat index instead
-                logger.warning(f"Not enough training points for binary IVF index in family {family_id}. Using flat index.")
-                index = faiss.IndexBinaryFlat(dimension)
-                index.add(embeddings)
-            else:
-                # Use adjusted nlist
-                logger.info(f"Adjusted nlist to {nlist} for binary family {family_id} to meet training requirements")
-                quantizer = faiss.IndexBinaryFlat(dimension)
-                index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
-                index.train(embeddings)
-                index.add(embeddings)
-        else:
-            # We have enough training points, proceed normally
-            quantizer = faiss.IndexBinaryFlat(dimension)
-            index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
-            index.train(embeddings)
-            index.add(embeddings)
-        index_file = self.base_dir / "families" / f"{family_id}.faissbin"
-        faiss.write_index(index, str(index_file))
-        metadata = {
-            'protein_ids': protein_ids,
-            'index_type': 'faiss_binary',
-            'dimension': dimension,
-            'num_proteins': len(protein_ids)
-        }
-        metadata_file = self.base_dir / "metadata" / f"{family_id}_metadata.json"
-        with open(metadata_file, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        logger.info(f"Created FAISS IVF binary index for family {family_id}: {len(protein_ids)} proteins, {dimension} bits")
-        return str(index_file)
-    
     def create_family_index_float(self, family_id: str, nlist: int = 10) -> str:
         """
         Create and store FAISS IVF float32 similarity index for a family.
+        This is used for within-family similarity search (more accurate).
+        
         Args:
             family_id: Family identifier
             nlist: Number of clusters for IVF
@@ -271,74 +241,71 @@ class ProteinStorage:
             Path to stored index file
         """
         import faiss
-        family_file = self.family_dir / f"family_{family_id}.h5"
-        if not family_file.exists():
-            raise FileNotFoundError(f"Family file not found: {family_file}")
+        embeddings, protein_ids = self.load_family_embeddings(family_id)
         
-        with h5py.File(family_file, 'r') as f:
-            embeddings = f['embeddings'][:]
-            protein_ids = [pid.decode('utf-8') if isinstance(pid, bytes) else pid for pid in f['protein_ids'][:]]
-            if embeddings.dtype != np.float32:
-                embeddings = embeddings.astype(np.float32)
+        # Ensure embeddings are float32
+        if embeddings.dtype != np.float32:
+            embeddings = embeddings.astype(np.float32)
         
         dimension = embeddings.shape[1]
         
         # Ensure we have enough training points for FAISS clustering
         # According to FAISS FAQ: minimum 39 training points per centroid
         min_training_points = nlist * 39
+        
         if len(embeddings) < min_training_points:
             # Adjust nlist to meet training requirements
             nlist = max(1, len(embeddings) // 39)
-            if nlist < 1:
-                # If we still don't have enough points, use a flat index instead
-                logger.warning(f"Not enough training points for IVF index in family {family_id}. Using flat index.")
-                index = faiss.IndexFlatL2(dimension)
-                index.add(embeddings)
-            else:
-                # Use adjusted nlist
-                logger.info(f"Adjusted nlist to {nlist} for family {family_id} to meet training requirements")
-                quantizer = faiss.IndexFlatL2(dimension)
-                index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
-                index.train(embeddings)
-                index.add(embeddings)
-        else:
-            # We have enough training points, proceed normally
-            nlist = min(nlist, max(1, len(embeddings)//10))
-            quantizer = faiss.IndexFlatL2(dimension)
-            index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
-            index.train(embeddings)
-            index.add(embeddings)
+            logger.info(f"Adjusted nlist to {nlist} for family {family_id} to meet training requirements")
         
-        # Ensure the indexes directory exists
-        indexes_dir = self.base_dir / "indexes" / "families"
-        indexes_dir.mkdir(parents=True, exist_ok=True)
+        # Create FAISS IVF float index
+        quantizer = faiss.IndexFlatL2(dimension)
+        index = faiss.IndexIVFFlat(quantizer, dimension, nlist)
         
-        # Save the index
-        index_file = indexes_dir / f"{family_id}.faiss"
+        # Train and add embeddings
+        index.train(embeddings)
+        index.add(embeddings)
+        
+        # Create file-safe family ID for any family name format
+        file_safe_id = self._make_file_safe(family_id)
+        
+        index_file = self.base_dir / "indexes" / "families" / f"{file_safe_id}.faiss"
+        index_file.parent.mkdir(parents=True, exist_ok=True)
+        
         faiss.write_index(index, str(index_file))
         
         # Create metadata
         metadata = {
-            'protein_ids': protein_ids,
-            'index_type': 'faiss_float',
-            'dimension': dimension,
+            'family_id': family_id,
             'num_proteins': len(protein_ids),
+            'embedding_dim': dimension,
+            'index_type': 'faiss_ivf_float',
             'nlist': nlist,
-            'metric': 'L2',
-            'training_points': len(embeddings),
-            'family_id': family_id
+            'protein_ids': protein_ids
         }
         
-        # Ensure metadata directory exists
-        metadata_dir = self.base_dir / "indexes" / "metadata"
-        metadata_dir.mkdir(parents=True, exist_ok=True)
+        metadata_file = self.base_dir / "indexes" / "metadata" / f"{file_safe_id}_float_metadata.json"
+        metadata_file.parent.mkdir(parents=True, exist_ok=True)
         
-        metadata_file = metadata_dir / f"{family_id}_float_metadata.json"
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
         
         logger.info(f"Created FAISS IVF float index for family {family_id}: {len(protein_ids)} proteins, {dimension} dim")
         return str(index_file)
+    
+    def create_family_index(self, family_id: str, **kwargs) -> str:
+        """
+        Create and store FAISS IVF binary similarity index for a family.
+        NOTE: This is deprecated. Use create_family_index_float for within-family search.
+        Binary indexes should only be used for centroids.
+        
+        Args:
+            family_id: Family identifier
+        Returns:
+            Path to stored index file
+        """
+        logger.warning("create_family_index is deprecated. Use create_family_index_float for within-family search.")
+        return self.create_family_index_float(family_id)
     
     def create_family_centroid_binary(self, output_npz: str = None) -> str:
         """
@@ -415,15 +382,16 @@ class ProteinStorage:
     
     def get_family_list(self) -> List[str]:
         """Get list of all available families."""
-        family_files = list(self.family_dir.glob("family_*.h5"))
-        return [f.stem.replace("family_", "") for f in family_files]
+        family_files = list(self.family_dir.glob("*.h5"))
+        # Extract family IDs from file names (remove .h5 extension)
+        return [f.stem for f in family_files]
     
     def get_family_stats(self) -> Dict[str, Dict]:
         """Get statistics for all families."""
         stats = {}
         
         for family_id in self.get_family_list():
-            family_file = self.family_dir / f"family_{family_id}.h5"
+            family_file = self.family_dir / f"{family_id}.h5"
             
             with h5py.File(family_file, 'r') as f:
                 stats[family_id] = {
@@ -449,14 +417,9 @@ class ProteinStorage:
         Yields:
             Tuples of (embeddings_batch, protein_ids_batch)
         """
-        # Handle family_id with or without 'family_' prefix
-        if family_id.startswith('family_'):
-            # Remove 'family_' prefix for file naming
-            file_family_id = family_id[7:]  # Remove 'family_' prefix
-        else:
-            file_family_id = family_id
-            
-        family_file = self.family_dir / f"family_{file_family_id}.h5"
+        # Create file-safe family ID for any family name format
+        file_safe_id = self._make_file_safe(family_id)
+        family_file = self.family_dir / f"{file_safe_id}.h5"
         
         with h5py.File(family_file, 'r') as f:
             num_proteins = f.attrs['num_proteins']
@@ -490,6 +453,29 @@ class CompressedMetadataStorage:
     def __init__(self, metadata_dir: str = "data/metadata"):
         self.metadata_dir = Path(metadata_dir)
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        
+    def _make_file_safe(self, family_id: str) -> str:
+        """
+        Convert any family ID to a file-safe format.
+        
+        Args:
+            family_id: Family ID (can be any string)
+            
+        Returns:
+            File-safe version of the family ID
+        """
+        import re
+        # Replace any non-alphanumeric characters with underscores
+        # This ensures the filename is safe for all operating systems
+        file_safe = re.sub(r'[^a-zA-Z0-9]', '_', family_id)
+        # Remove multiple consecutive underscores
+        file_safe = re.sub(r'_+', '_', file_safe)
+        # Remove leading/trailing underscores
+        file_safe = file_safe.strip('_')
+        # Ensure it's not empty
+        if not file_safe:
+            file_safe = 'unknown_family'
+        return file_safe
     
     def store_metadata(self, 
                       metadata: pd.DataFrame,
@@ -507,7 +493,9 @@ class CompressedMetadataStorage:
             Path to stored metadata file
         """
         if family_id:
-            filename = f"family_{family_id}_metadata.parquet"
+            # Create file-safe family ID
+            file_safe_id = self._make_file_safe(family_id)
+            filename = f"{file_safe_id}_metadata.parquet"
         else:
             filename = "global_metadata.parquet"
         
@@ -533,7 +521,8 @@ class CompressedMetadataStorage:
         }
         
         if family_id:
-            index_file = self.metadata_dir / f"family_{family_id}_index.pkl"
+            file_safe_id = self._make_file_safe(family_id)
+            index_file = self.metadata_dir / f"{file_safe_id}_index.pkl"
         else:
             index_file = self.metadata_dir / "global_index.pkl"
         
@@ -554,16 +543,13 @@ class CompressedMetadataStorage:
             Metadata DataFrame
         """
         if family_id:
-            filepath = self.metadata_dir / f"family_{family_id}_metadata.parquet"
+            file_safe_id = self._make_file_safe(family_id)
+            filepath = self.metadata_dir / f"{file_safe_id}_metadata.parquet"
         else:
             filepath = self.metadata_dir / "global_metadata.parquet"
         
         if not filepath.exists():
-            # Create empty metadata for test families
-            logger.warning(f"No metadata found for family {family_id}, creating empty metadata")
-            empty_metadata = pd.DataFrame(columns=['protein_id', 'organism', 'family', 'function'])
-            empty_metadata.to_parquet(filepath)
-            return empty_metadata
+            raise FileNotFoundError(f"Metadata file not found for family {family_id}: {filepath}")
         
         metadata = pd.read_parquet(filepath)
         

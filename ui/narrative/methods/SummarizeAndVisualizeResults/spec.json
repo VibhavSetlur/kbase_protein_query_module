@@ -51,7 +51,9 @@
                 { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
                 { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
                 { "service_method_output_path": [0, "output_dir"], "target_property": "output_dir" },
-                { "service_method_output_path": [0, "summary"], "target_property": "summary" }
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
+                { "service_method_output_path": [0, "html_report_path"], "target_property": "html_report_path" },
+                { "service_method_output_path": [0, "sequence_analysis_ref"], "target_property": "sequence_analysis_ref" }
             ]
         }
     },

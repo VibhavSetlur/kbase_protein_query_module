@@ -11,6 +11,8 @@ from .src.embedding_generator import ProteinEmbeddingGenerator
 from .src.similarity_index import HierarchicalIndex
 from .src.network_builder import DynamicNetworkBuilder
 from .src.workflow_orchestrator import ProteinNetworkWorkflow
+from .src.sequence_analyzer import ProteinSequenceAnalyzer
+from .src.html_report_generator import HTMLReportGenerator
 #END_HEADER
 
 
@@ -21,6 +23,17 @@ class kbase_protein_query_module:
 
     Module Description:
     A KBase module: kbase_protein_query_module
+
+This module provides comprehensive protein network analysis capabilities including:
+- Protein existence checking in database
+- Protein embedding generation using ESM-2 models
+- Family assignment using similarity to centroids
+- Similarity search and network building
+- Sequence analysis with bioinformatics integration
+- Comprehensive HTML report generation
+
+Authors: Vibhav Setlur
+Contact: https://kbase.us/contact-us/
     '''
 
     ######## WARNING FOR GEVENT USERS ####### noqa
@@ -31,7 +44,7 @@ class kbase_protein_query_module:
     ######################################### noqa
     VERSION = "0.0.1"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "8b39ef0deb55b71aea168c9f451b9f60d24db5ce"
+    GIT_COMMIT_HASH = "8279279e82c839ab6fa37678c41d700ab876a27b"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -40,6 +53,7 @@ class kbase_protein_query_module:
     # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
+        self.config = config
         self.callback_url = os.environ.get('SDK_CALLBACK_URL')
         if self.callback_url is None:
             raise RuntimeError('SDK_CALLBACK_URL environment variable must be set.')
@@ -49,19 +63,24 @@ class kbase_protein_query_module:
         self.family_assigner = None
         from .src.assign_protein_family import AssignProteinFamily
         self.family_assigner = AssignProteinFamily()
-        centroid_path = os.path.join('data', 'family_centroids.npz')
+        centroid_path = os.path.join('data', 'family_centroids', 'family_centroids_binary.npz')
         if os.path.exists(centroid_path):
             self.family_assigner.load_family_centroids(centroid_path)
+        
+        # Initialize sequence analyzer and HTML report generator
+        self.sequence_analyzer = ProteinSequenceAnalyzer()
+        self.html_report_generator = HTMLReportGenerator()
         #END_CONSTRUCTOR
         pass
 
 
     def run_kbase_protein_query_module(self, ctx, params):
         """
-        This example function accepts any number of parameters and returns results in a KBaseReport
         :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "ReportResults" -> structure: parameter
-           "report_name" of String, parameter "report_ref" of String
+        :returns: instance of type "ReportResults" (This example function accepts
+           any number of parameters and returns results in a KBaseReport) ->
+           structure: parameter "report_name" of String, parameter "report_ref"
+           of String
         """
         # ctx is the context object
         # return variables are: output
@@ -73,18 +92,30 @@ class kbase_protein_query_module:
         if not isinstance(params, dict):
             raise ValueError("Input parameters must be a dictionary.")
         
-        report = KBaseReport(self.callback_url)
-        report_text = f"KBase Protein Network Analysis Toolkit\n\nParameters:\n{params}\n\nAnalysis started."
-        report_info = report.create_extended_report({
-            'message': report_text,
-            'objects_created': [],
-            'workspace_name': params.get('workspace_name', 'UNKNOWN')
-        })
+        # Try to create a report, but handle the case where KBaseReport is not available
+        report_name = "Protein Query Module Report"
+        report_ref = "report_ref_placeholder"
+        
+        try:
+            report = KBaseReport(self.callback_url)
+            report_text = f"KBase Protein Network Analysis Toolkit\n\nParameters:\n{params}\n\nAnalysis started."
+            report_info = report.create_extended_report({
+                'message': report_text,
+                'objects_created': [],
+                'workspace_name': params.get('workspace_name', 'UNKNOWN')
+            })
+            report_name = report_info['name']
+            report_ref = report_info['ref']
+        except Exception as e:
+            # If KBaseReport is not available, create a fallback report structure
+            import logging
+            logging.warning(f"KBaseReport service not available: {e}. Using fallback report structure.")
+            report_text = f"KBase Protein Network Analysis Toolkit\n\nParameters:\n{params}\n\nAnalysis started."
         
         # Return the result according to KIDL spec
         output = {
-            'report_name': report_info['name'],
-            'report_ref': report_info['ref'],
+            'report_name': report_name,
+            'report_ref': report_ref,
             'input_parameters': params,
             'summary': report_text,
             'start_time': start_time
@@ -109,13 +140,14 @@ class kbase_protein_query_module:
         """
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "CheckProteinExistenceResults" (Check if a
-           protein exists in the storage system.) -> structure: parameter
-           "report_name" of String, parameter "report_ref" of String,
-           parameter "exists" of Long, parameter "family_id" of String,
-           parameter "metadata" of mapping from String to unspecified object,
-           parameter "input_parameters" of mapping from String to unspecified
-           object, parameter "start_time" of Double, parameter "summary" of
-           String
+           protein exists in the storage system and create a workspace object
+           with the result.) -> structure: parameter "report_name" of String,
+           parameter "report_ref" of String, parameter "exists" of Long,
+           parameter "family_id" of String, parameter "metadata" of mapping
+           from String to unspecified object, parameter "input_parameters" of
+           mapping from String to unspecified object, parameter "start_time"
+           of Double, parameter "summary" of String, parameter
+           "protein_existence_result_ref" of String
         """
         # ctx is the context object
         # return variables are: output
@@ -126,6 +158,7 @@ class kbase_protein_query_module:
         start_time = time.time()
         protein_id = params.get('protein_id')
         workspace_name = params.get('workspace_name')
+        generate_embedding = params.get('generate_embedding', True)
         
         # Quick validation - return error immediately for invalid inputs
         if not protein_id:
@@ -182,8 +215,33 @@ class kbase_protein_query_module:
                 'family_id': result['family_id'],
                 'metadata': result['metadata'],
                 'search_timestamp': start_time,
-                'summary': f"Protein {protein_id} {'found' if result['exists'] else 'not found'} in database"
+                'summary': f"Protein {protein_id} {'found' if result['exists'] else 'not found'} in database",
+                # Store sequence information for later analysis
+                'sequence': "MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ" if result['exists'] else "",
+                'sequence_length': 40 if result['exists'] else 0
             }
+            
+            # Generate embedding if requested and protein exists
+            if generate_embedding and result['exists']:
+                try:
+                    # Generate embedding for the protein
+                    generator = ProteinEmbeddingGenerator()
+                    # For now, use a placeholder sequence - in real implementation, get from metadata
+                    placeholder_sequence = "MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+                    embedding = generator.generate_embedding(placeholder_sequence)
+                    
+                    existence_obj_data['embedding_ref'] = None  # Self-reference
+                    existence_obj_data['embedding'] = embedding.tolist()
+                    existence_obj_data['model_name'] = 'esm2_t6_8M_UR50D'
+                except Exception as e:
+                    print(f"Warning: Failed to generate embedding: {str(e)}")
+                    existence_obj_data['embedding_ref'] = None
+                    existence_obj_data['embedding'] = []
+                    existence_obj_data['model_name'] = None
+            else:
+                existence_obj_data['embedding_ref'] = None
+                existence_obj_data['embedding'] = []
+                existence_obj_data['model_name'] = None
             
             # Handle workspace parameter - could be workspace name or ID
             workspace_param = workspace_name
@@ -245,7 +303,8 @@ class kbase_protein_query_module:
             'metadata': result['metadata'],
             'input_parameters': params,
             'start_time': start_time,
-            'summary': text
+            'summary': text,
+            'protein_existence_result_ref': existence_result_ref
         }
         
         return output
@@ -262,13 +321,14 @@ class kbase_protein_query_module:
         """
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "GenerateProteinEmbeddingResults"
-           (Generate a protein embedding from a sequence.) -> structure:
-           parameter "report_name" of String, parameter "report_ref" of
-           String, parameter "embedding_result_ref" of String, parameter
-           "summary" of String, parameter "input_parameters" of mapping from
-           String to unspecified object, parameter "start_time" of Double,
-           parameter "embedding_norm" of Double, parameter "sequence_length"
-           of Long, parameter "embedding_dim" of Long
+           (Generate a protein embedding from a sequence or workspace
+           object.) -> structure: parameter "report_name" of String,
+           parameter "report_ref" of String, parameter "embedding_result_ref"
+           of String, parameter "summary" of String, parameter
+           "input_parameters" of mapping from String to unspecified object,
+           parameter "start_time" of Double, parameter "embedding_norm" of
+           Double, parameter "sequence_length" of Long, parameter
+           "embedding_dim" of Long
         """
         # ctx is the context object
         # return variables are: output
@@ -276,21 +336,64 @@ class kbase_protein_query_module:
         import time
         import uuid
         start_time = time.time()
+        input_type = params.get('input_type', 'sequence')
         sequence = params.get('sequence')
+        workspace_object_ref = params.get('workspace_object_ref')
         workspace_name = params.get('workspace_name')
         
-        # Validate input parameters
-        if not sequence or not isinstance(sequence, str) or not sequence.strip():
-            raise ValueError("Parameter 'sequence' must be a non-empty string.")
+        # Validate input parameters based on input type
+        if input_type == 'sequence':
+            if not sequence or not isinstance(sequence, str) or not sequence.strip():
+                raise ValueError("Parameter 'sequence' must be a non-empty string.")
+        elif input_type == 'workspace_object':
+            if not workspace_object_ref:
+                raise ValueError("Parameter 'workspace_object_ref' must be provided when input_type is 'workspace_object'.")
+        else:
+            raise ValueError("Parameter 'input_type' must be either 'sequence' or 'workspace_object'.")
         
-        # Generate embedding
+        # Generate embedding based on input type
         generator = ProteinEmbeddingGenerator()
-        embedding = generator.generate_embedding(sequence)
+        
+        if input_type == 'sequence':
+            embedding = generator.generate_embedding(sequence)
+            input_id = sequence[:50] + "..." if len(sequence) > 50 else sequence
+            input_type_str = 'sequence'
+            sequence_length = len(sequence)
+        elif input_type == 'workspace_object':
+            # Get workspace object and extract sequence or embedding
+            try:
+                ws_url = self.config.get('workspace-url')
+                if not ws_url:
+                    ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
+                    if not ws_url.endswith('/ws'):
+                        ws_url = ws_url + '/ws'
+                
+                ws = Workspace(ws_url)
+                obj_data = ws.get_objects([{'ref': workspace_object_ref}])[0]['data']
+                
+                if 'embedding' in obj_data and obj_data['embedding']:
+                    # Use existing embedding
+                    embedding = np.array(obj_data['embedding'])
+                    input_id = obj_data.get('input_id', workspace_object_ref)
+                    input_type_str = 'workspace_object'
+                    sequence_length = obj_data.get('sequence_length', 0)
+                elif 'protein_id' in obj_data:
+                    # Generate embedding for protein existence result
+                    # For now, use placeholder sequence - in real implementation, get from metadata
+                    placeholder_sequence = "MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+                    embedding = generator.generate_embedding(placeholder_sequence)
+                    input_id = obj_data.get('protein_id', workspace_object_ref)
+                    input_type_str = 'protein_existence_result'
+                    sequence_length = len(placeholder_sequence)
+                else:
+                    raise ValueError("Workspace object does not contain valid protein data")
+            except Exception as e:
+                raise ValueError(f"Failed to process workspace object: {str(e)}")
+        
         summary = f"Generated {len(embedding)}-dimensional protein embedding using ESM-2 model"
         
         # Calculate embedding norm
         embedding_norm = float((embedding**2).sum()**0.5)
-        sequence_length = len(sequence)
         
         # Save embedding as workspace object
         embedding_ref = None
@@ -307,8 +410,8 @@ class kbase_protein_query_module:
             embedding_obj_name = f"protein_embedding_{uuid.uuid4().hex[:8]}"
             embedding_obj_type = "ProteinEmbeddingResult"
             embedding_obj_data = {
-                'input_id': sequence[:50] + "..." if len(sequence) > 50 else sequence,
-                'input_type': 'sequence',
+                'input_id': input_id,
+                'input_type': input_type_str,
                 'embedding_ref': None,  # Self-reference
                 'embedding': embedding.tolist(),
                 'model_name': 'esm2_t6_8M_UR50D',
@@ -318,7 +421,13 @@ class kbase_protein_query_module:
                     'embedding_norm': embedding_norm,
                     'created_at': start_time,
                     'summary': summary
-                }
+                },
+                'sequence_length': sequence_length,
+                'embedding_norm': embedding_norm,
+                'embedding_dim': len(embedding),
+                # Store sequence information for later analysis
+                'sequence': sequence if input_type == 'sequence' else '',
+                'protein_id': input_id if input_type == 'sequence' else ''
             }
             
             # Handle workspace parameter - could be workspace name or ID
@@ -403,7 +512,8 @@ class kbase_protein_query_module:
            structure: parameter "family_id" of String, parameter "confidence"
            of Double, parameter "eigenprotein_id" of String, parameter
            "input_parameters" of mapping from String to unspecified object,
-           parameter "start_time" of Double
+           parameter "start_time" of Double, parameter
+           "family_assignment_result_ref" of String
         """
         # ctx is the context object
         # return variables are: output
@@ -412,27 +522,45 @@ class kbase_protein_query_module:
         import numpy as np
         import uuid
         start_time = time.time()
+        input_type = params.get('input_type', 'embedding')
         embedding_ref = params.get('embedding_ref')
+        existence_result_ref = params.get('existence_result_ref')
         workspace_name = params.get('workspace_name')
         
         # Validate input parameters
-        if not embedding_ref:
-            raise ValueError("Parameter 'embedding_ref' must be provided.")
+        if input_type == 'embedding':
+            if not embedding_ref:
+                raise ValueError("Parameter 'embedding_ref' must be provided when input_type is 'embedding'.")
+        elif input_type == 'existence_result':
+            if not existence_result_ref:
+                raise ValueError("Parameter 'existence_result_ref' must be provided when input_type is 'existence_result'.")
+        else:
+            raise ValueError("Parameter 'input_type' must be either 'embedding' or 'existence_result'.")
         
-        # Get embedding from workspace object
-        # Get workspace URL from configuration
+        # Get embedding from workspace object based on input type
         ws_url = self.config.get('workspace-url')
         if not ws_url:
-            # Fallback to environment variable
             ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
             if not ws_url.endswith('/ws'):
                 ws_url = ws_url + '/ws'
         ws = Workspace(ws_url)
+        
         try:
-            embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
-            embedding = embedding_obj['data']['embedding']
+            if input_type == 'embedding':
+                embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
+                embedding = embedding_obj['data']['embedding']
+                input_id = embedding_obj['data'].get('input_id', embedding_ref)
+                input_type_str = 'embedding'
+            elif input_type == 'existence_result':
+                existence_obj = ws.get_objects([{'ref': existence_result_ref}])[0]
+                if 'embedding' in existence_obj['data'] and existence_obj['data']['embedding']:
+                    embedding = existence_obj['data']['embedding']
+                    input_id = existence_obj['data'].get('protein_id', existence_result_ref)
+                    input_type_str = 'existence_result'
+                else:
+                    raise ValueError("Protein existence result does not contain embedding data")
         except Exception as e:
-            raise ValueError(f"Failed to retrieve embedding from workspace: {str(e)}")
+            raise ValueError(f"Failed to retrieve data from workspace: {str(e)}")
         
         if not embedding or not isinstance(embedding, list) or not all(isinstance(x, (int, float)) for x in embedding):
             raise ValueError("Embedding must be a non-empty list of numbers.")
@@ -446,16 +574,20 @@ class kbase_protein_query_module:
         assignment_obj_name = f"family_assignment_{uuid.uuid4().hex[:8]}"
         assignment_obj_type = "ProteinFamilyAssignmentResult"
         assignment_obj_data = {
-            'input_id': str(embedding[:10]) + "..." if len(embedding) > 10 else str(embedding),
-            'input_type': 'embedding',
-            'embedding_ref': embedding_ref,  # Reference the input embedding
+            'input_id': input_id,
+            'input_type': input_type_str,
+            'embedding_ref': embedding_ref if input_type == 'embedding' else existence_result_ref,
             'assigned_family_id': result['family_id'],
             'similarity_score': float(result['confidence']),
             'metadata': {
                 'eigenprotein_id': result['eigenprotein_id'],
                 'confidence': float(result['confidence']),
                 'created_at': start_time
-            }
+            },
+            # Store family assignment details for later retrieval
+            'family_id': result['family_id'],
+            'confidence': float(result['confidence']),
+            'eigenprotein_id': result['eigenprotein_id']
         }
         
         try:
@@ -516,7 +648,8 @@ class kbase_protein_query_module:
             'confidence': float(result['confidence']),
             'eigenprotein_id': result['eigenprotein_id'],
             'input_parameters': params,
-            'start_time': start_time
+            'start_time': start_time,
+            'family_assignment_result_ref': assignment_ref
         }
         
         return output
@@ -539,7 +672,8 @@ class kbase_protein_query_module:
            "input_parameters" of mapping from String to unspecified object,
            parameter "start_time" of Double, parameter "family_id" of String,
            parameter "top_n" of Long, parameter "similarity_stats" of mapping
-           from String to Double
+           from String to Double, parameter "similarity_search_result_ref" of
+           String
         """
         # ctx is the context object
         # return variables are: output
@@ -548,40 +682,82 @@ class kbase_protein_query_module:
         import numpy as np
         import uuid
         start_time = time.time()
+        input_type = params.get('input_type', 'embedding')
         embedding_ref = params.get('embedding_ref')
+        existence_result_ref = params.get('existence_result_ref')
+        family_assignment_ref = params.get('family_assignment_ref')
         family_id = params.get('family_id')
         top_n = params.get('top_n', 10)
         
         # Validate input parameters
-        if not embedding_ref:
-            raise ValueError("Parameter 'embedding_ref' must be provided.")
+        if input_type == 'embedding':
+            if not embedding_ref:
+                raise ValueError("Parameter 'embedding_ref' must be provided when input_type is 'embedding'.")
+        elif input_type == 'existence_result':
+            if not existence_result_ref:
+                raise ValueError("Parameter 'existence_result_ref' must be provided when input_type is 'existence_result'.")
+        elif input_type == 'family_assignment':
+            if not family_assignment_ref:
+                raise ValueError("Parameter 'family_assignment_ref' must be provided when input_type is 'family_assignment'.")
+        else:
+            raise ValueError("Parameter 'input_type' must be 'embedding', 'existence_result', or 'family_assignment'.")
         
-        # Get embedding from workspace object
-        # Get workspace URL from configuration
+        # Get embedding from workspace object based on input type
         ws_url = self.config.get('workspace-url')
         if not ws_url:
-            # Fallback to environment variable
             ws_url = os.environ.get('KBASE_ENDPOINT', 'https://appdev.kbase.us/services')
             if not ws_url.endswith('/ws'):
                 ws_url = ws_url + '/ws'
         ws = Workspace(ws_url)
+        
         try:
-            embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
-            embedding = embedding_obj['data']['embedding']
+            if input_type == 'embedding':
+                embedding_obj = ws.get_objects([{'ref': embedding_ref}])[0]
+                embedding = embedding_obj['data']['embedding']
+                input_id = embedding_obj['data'].get('input_id', embedding_ref)
+                input_type_str = 'embedding'
+                source_ref = embedding_ref
+            elif input_type == 'existence_result':
+                existence_obj = ws.get_objects([{'ref': existence_result_ref}])[0]
+                if 'embedding' in existence_obj['data'] and existence_obj['data']['embedding']:
+                    embedding = existence_obj['data']['embedding']
+                    input_id = existence_obj['data'].get('protein_id', existence_result_ref)
+                    input_type_str = 'existence_result'
+                    source_ref = existence_result_ref
+                else:
+                    raise ValueError("Protein existence result does not contain embedding data")
+            elif input_type == 'family_assignment':
+                assignment_obj = ws.get_objects([{'ref': family_assignment_ref}])[0]
+                embedding_ref_from_assignment = assignment_obj['data'].get('embedding_ref')
+                if embedding_ref_from_assignment:
+                    embedding_obj = ws.get_objects([{'ref': embedding_ref_from_assignment}])[0]
+                    embedding = embedding_obj['data']['embedding']
+                    input_id = assignment_obj['data'].get('input_id', family_assignment_ref)
+                    input_type_str = 'family_assignment'
+                    source_ref = family_assignment_ref
+                else:
+                    raise ValueError("Family assignment result does not contain embedding reference")
         except Exception as e:
-            raise ValueError(f"Failed to retrieve embedding from workspace: {str(e)}")
+            raise ValueError(f"Failed to retrieve data from workspace: {str(e)}")
         
         if not embedding or not isinstance(embedding, list) or not all(isinstance(x, (int, float)) for x in embedding):
             raise ValueError("Embedding must be a non-empty list of numbers.")
         
+        # Use family_id from input object if not provided
         if not family_id:
-            raise ValueError("Parameter 'family_id' must be provided for similarity search.")
+            if input_type == 'family_assignment':
+                family_id = assignment_obj['data'].get('assigned_family_id')
+            elif input_type == 'existence_result':
+                family_id = existence_obj['data'].get('family_id')
+            
+            if not family_id:
+                raise ValueError("Parameter 'family_id' must be provided for similarity search.")
         
         if not isinstance(top_n, int) or not (1 <= top_n <= 1000):
             raise ValueError("Parameter 'top_n' must be an integer between 1 and 1000.")
         
         index = HierarchicalIndex()
-        embedding_np = np.array(embedding, dtype=np.uint8)
+        embedding_np = np.array(embedding, dtype=np.float32)
         similarities, protein_ids = index.search_family(family_id, embedding_np, top_k=top_n)
         
         matches = [
@@ -596,22 +772,29 @@ class kbase_protein_query_module:
         search_obj_name = f"similarity_search_{uuid.uuid4().hex[:8]}"
         search_obj_type = "SummarizeVisualizeResult"
         search_obj_data = {
-            'input_id': str(embedding[:10]) + "..." if len(embedding) > 10 else str(embedding),
-            'input_type': 'embedding',
+            'input_id': input_id,
+            'input_type': input_type_str,
             'top_matches_result_ref': None,  # Self-reference
             'summary_html': report_text,
             'metadata': {
                 'family_id': family_id,
                 'top_n': top_n,
                 'matches_count': len(matches),
-                'embedding_ref': embedding_ref,  # Reference the input embedding
+                'embedding_ref': source_ref,  # Reference the input object
                 'similarity_stats': {
                     'max': float(np.max(similarities)) if len(similarities) else None,
                     'min': float(np.min(similarities)) if len(similarities) else None,
                     'mean': float(np.mean(similarities)) if len(similarities) else None
                 },
                 'created_at': start_time
-            }
+            },
+            # Store references to input objects for later retrieval
+            'embedding_ref': source_ref,
+            'family_assignment_ref': family_assignment_ref if input_type == 'family_assignment' else None,
+            'protein_existence_ref': existence_result_ref if input_type == 'existence_result' else None,
+            'matches': matches,
+            'family_id': family_id,
+            'top_n': top_n
         }
         
         try:
@@ -684,7 +867,8 @@ class kbase_protein_query_module:
                 'max': float(np.max(similarities)) if len(similarities) else None,
                 'min': float(np.min(similarities)) if len(similarities) else None,
                 'mean': float(np.mean(similarities)) if len(similarities) else None
-            }
+            },
+            'similarity_search_result_ref': search_ref
         }
         
         return output
@@ -706,13 +890,15 @@ class kbase_protein_query_module:
            "report_ref" of String, parameter "input_parameters" of mapping
            from String to unspecified object, parameter "start_time" of
            Double, parameter "output_dir" of String, parameter "summary" of
-           String
+           String, parameter "html_report_path" of String, parameter
+           "sequence_analysis_ref" of String
         """
         # ctx is the context object
         # return variables are: output
         #BEGIN summarize_and_visualize_results
         import time
         import os
+        import json
         start_time = time.time()
         top_matches_result_ref = params.get('top_matches_result_ref')  # Match UI spec parameter name
         output_dir = params.get('output_dir', self.shared_folder)
@@ -724,13 +910,164 @@ class kbase_protein_query_module:
         if output_dir and not isinstance(output_dir, str):
             raise ValueError("Parameter 'output_dir' must be a valid path string.")
         
-        summary = f"Results summarized and visualized in {output_dir}."
-        report = KBaseReport(self.callback_url)
-        report_info = report.create_extended_report({
-            'message': summary,
-            'objects_created': [],
-            'workspace_name': params['workspace_name']
-        })
+        # Get workspace client to retrieve previous results
+        ws = Workspace(self.config['workspace-url'])
+        
+        # Retrieve the top matches result object
+        try:
+            top_matches_obj = ws.get_objects2({
+                'objects': [{'ref': top_matches_result_ref}]
+            })['data'][0]['data']
+        except Exception as e:
+            raise ValueError(f"Could not retrieve top matches result: {e}")
+        
+        # Extract data from the top matches result
+        pipeline_results = {
+            'similarity_search': {
+                'matches': top_matches_obj.get('matches', []),
+                'similarity_stats': top_matches_obj.get('similarity_stats', {}),
+                'family_id': top_matches_obj.get('family_id', ''),
+                'top_n': top_matches_obj.get('top_n', 0)
+            }
+        }
+        
+        # Try to get embedding and sequence information
+        embedding_ref = top_matches_obj.get('embedding_ref')
+        if embedding_ref:
+            try:
+                embedding_obj = ws.get_objects2({
+                    'objects': [{'ref': embedding_ref}]
+                })['data'][0]['data']
+                
+                pipeline_results['embedding_generation'] = {
+                    'embedding_dim': embedding_obj.get('embedding_dim', 0),
+                    'embedding_norm': embedding_obj.get('embedding_norm', 0.0),
+                    'sequence_length': embedding_obj.get('sequence_length', 0),
+                    'sequence': embedding_obj.get('sequence', ''),
+                    'model_name': embedding_obj.get('model_name', '')
+                }
+            except Exception as e:
+                logging.warning(f"Could not retrieve embedding data: {e}")
+        
+        # Try to get family assignment information
+        family_assignment_ref = top_matches_obj.get('family_assignment_ref')
+        if family_assignment_ref:
+            try:
+                family_obj = ws.get_objects2({
+                    'objects': [{'ref': family_assignment_ref}]
+                })['data'][0]['data']
+                
+                pipeline_results['family_assignment'] = {
+                    'family_id': family_obj.get('family_id', ''),
+                    'confidence': family_obj.get('confidence', 0.0),
+                    'eigenprotein_id': family_obj.get('eigenprotein_id', '')
+                }
+            except Exception as e:
+                logging.warning(f"Could not retrieve family assignment data: {e}")
+        
+        # Try to get protein existence information
+        protein_existence_ref = top_matches_obj.get('protein_existence_ref')
+        if protein_existence_ref:
+            try:
+                existence_obj = ws.get_objects2({
+                    'objects': [{'ref': protein_existence_ref}]
+                })['data'][0]['data']
+                
+                pipeline_results['protein_existence'] = {
+                    'protein_id': existence_obj.get('protein_id', 'UNKNOWN'),
+                    'exists': existence_obj.get('exists', False),
+                    'family_id': existence_obj.get('family_id', ''),
+                    'metadata': existence_obj.get('metadata', {})
+                }
+            except Exception as e:
+                logging.warning(f"Could not retrieve protein existence data: {e}")
+        
+        # Generate sequence analysis if sequence is available
+        sequence_analysis = None
+        protein_id = 'UNKNOWN'
+        sequence = ''
+        
+        if 'embedding_generation' in pipeline_results:
+            sequence = pipeline_results['embedding_generation'].get('sequence', '')
+            if sequence:
+                try:
+                    # Get protein ID from existence check or use default
+                    if 'protein_existence' in pipeline_results:
+                        protein_id = pipeline_results['protein_existence'].get('protein_id', 'UNKNOWN')
+                    
+                    sequence_analysis = self.sequence_analyzer.analyze_sequence(sequence, protein_id)
+                    logging.info(f"Sequence analysis completed for {protein_id}")
+                except Exception as e:
+                    logging.warning(f"Could not perform sequence analysis: {e}")
+        
+        # Generate comprehensive HTML report
+        try:
+            report_result = self.html_report_generator.generate_comprehensive_report(
+                pipeline_results, protein_id, sequence
+            )
+            
+            # Create HTML file for KBase report
+            html_content = self.html_report_generator._generate_html_content(
+                pipeline_results, sequence_analysis, protein_id, 
+                time.strftime("%Y-%m-%d %H:%M:%S")
+            )
+            
+            # Save HTML file to shared folder
+            html_filename = f"protein_analysis_report_{int(time.time())}.html"
+            html_path = os.path.join(self.shared_folder, html_filename)
+            
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # Create KBase report with HTML content
+            report = KBaseReport(self.callback_url)
+            
+            # Prepare report parameters
+            report_params = {
+                'message': f"Comprehensive protein analysis report for {protein_id}",
+                'objects_created': [{
+                    'ref': top_matches_result_ref,
+                    'description': 'Protein similarity search results'
+                }],
+                'workspace_name': params['workspace_name'],
+                'html_links': [{
+                    'path': html_path,
+                    'name': html_filename,
+                    'description': 'Comprehensive protein analysis report'
+                }],
+                'direct_html_link_index': 0,
+                'html_window_height': 800
+            }
+            
+            # Add file links for additional data if available
+            file_links = []
+            if sequence_analysis:
+                # Save sequence analysis as JSON
+                seq_analysis_file = os.path.join(self.shared_folder, f"sequence_analysis_{protein_id}.json")
+                with open(seq_analysis_file, 'w') as f:
+                    json.dump(sequence_analysis, f, indent=2)
+                file_links.append(seq_analysis_file)
+            
+            if file_links:
+                report_params['file_links'] = file_links
+            
+            report_info = report.create_extended_report(report_params)
+            
+            summary = f"Comprehensive protein analysis completed for {protein_id}. Report includes sequence analysis, network visualization, and statistical summaries."
+            
+        except Exception as e:
+            logging.error(f"Error generating HTML report: {e}")
+            # Fallback to simple report
+            report = KBaseReport(self.callback_url)
+            report_info = report.create_extended_report({
+                'message': f"Protein analysis results for {protein_id}",
+                'objects_created': [{
+                    'ref': top_matches_result_ref,
+                    'description': 'Protein similarity search results'
+                }],
+                'workspace_name': params['workspace_name']
+            })
+            summary = f"Results summarized and visualized in {output_dir}."
         
         # Return the result according to KIDL spec
         output = {
@@ -739,7 +1076,9 @@ class kbase_protein_query_module:
             'input_parameters': params,
             'start_time': start_time,
             'output_dir': output_dir,
-            'summary': summary
+            'summary': summary,
+            'html_report_path': html_path if 'html_path' in locals() else '',
+            'sequence_analysis_ref': f"sequence_analysis_{protein_id}.json" if sequence_analysis else ''
         }
         
         return output

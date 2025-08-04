@@ -1,7 +1,7 @@
 """
-Protein Network Builder Module
+Dynamic Network Builder Module
 
-This module handles the construction and visualization of localized protein networks using
+This module handles the construction of localized protein networks using
 mutual k-nearest neighbors and other network construction methods.
 """
 
@@ -12,8 +12,7 @@ from typing import List, Dict, Tuple, Optional, Union
 import logging
 from tqdm import tqdm
 import os
-import faiss
-from .similarity_index import HierarchicalIndex
+from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ def compute_cosine_similarity_matrix(embeddings):
     sim_matrix = np.dot(normed, normed.T)
     return sim_matrix
 
-def build_robust_network_edges(sim_matrix, ids, k_neighbors=5, similarity_threshold=0.1):
+def build_robust_network_edges(sim_matrix, ids, k_neighbors=5, similarity_threshold=0.5):
     """
     Build a network with robust edge selection to ensure connectivity.
     
@@ -132,15 +131,6 @@ def create_kamada_kawai_layout(G, seed=42):
     pos = nx.kamada_kawai_layout(G_weighted, weight='weight')
     return pos
 
-def compute_hamming_distance_matrix(embeddings):
-    """Compute Hamming distance matrix for binary embeddings (np.uint8)."""
-    unpacked = np.unpackbits(embeddings, axis=1)
-    n = unpacked.shape[0]
-    D = np.zeros((n, n), dtype=int)
-    for i in range(n):
-        D[i] = np.sum(unpacked[i] != unpacked, axis=1)
-    return D
-
 
 # ==============================================================================
 # 2. MAIN VISUALIZATION FUNCTION
@@ -151,12 +141,11 @@ def visualize_interactive_protein_network(
     protein_ids: list,
     metadata_df: pd.DataFrame,
     k_neighbors: int = 8,
-    similarity_threshold: float = 0.1,
+    similarity_threshold: float = 0.5,
     id_column: str = 'Entry',
     query_embedding: np.ndarray = None,
     query_protein_id: str = None,
-    output_file: Optional[str] = None,
-    storage: Optional[object] = None  # Accept ProteinStorage instance
+    output_file: Optional[str] = None
 ):
     """
     Generates a highly interactive visualization of protein network based on embeddings.
@@ -256,12 +245,6 @@ def visualize_interactive_protein_network(
     
     # Create Kamada-Kawai layout
     pos = create_kamada_kawai_layout(G)
-
-    # If output_file is specified, ensure directory exists (if any)
-    if output_file:
-        output_dir = os.path.dirname(output_file)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
     
     # Prepare data for visualization
     node_x, node_y = [], []
@@ -474,19 +457,25 @@ def visualize_interactive_protein_network(
 
     # Save to file if specified
     if output_file:
-        output_dir = os.path.dirname(output_file)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-        # If a storage instance is provided, use it
-        if storage is not None:
-            # Use the filename and subdir from output_file
-            filename = os.path.basename(output_file)
-            subdir = os.path.relpath(output_dir, str(storage.base_dir)) if output_dir else None
-            fig_html = fig.to_html(full_html=True)
-            storage.save_html_file(fig_html, filename, subdir=subdir)
-        else:
-            fig.write_html(output_file)
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        fig.write_html(output_file)
         logger.info(f"Interactive visualization saved to: {output_file}")
+
+    # --- 6. Display the Figure ---
+    logger.info("Interactive protein network created.")
+    logger.info("Features:")
+    logger.info("- Query protein highlighted as red star (larger size)")
+    logger.info("- Proteins connected to query shown in red")
+    logger.info("- Other proteins shown in gray")
+    logger.info("- Kamada-Kawai layout for optimal edge visibility")
+    logger.info("- Natural groupings revealed without forced clustering")
+    logger.info("- Clear edge relationships and protein connections")
+    logger.info("- Click on nodes to highlight their edges")
+    logger.info("- Double-click to reset edge highlighting")
+    logger.info("- Hover over nodes to see detailed protein information")
+    logger.info("- Edges show protein similarities")
+    logger.info("- Interactive zoom, pan, and hover")
+    logger.info("- Legend shows node types")
     
     return fig, G
 
@@ -523,200 +512,177 @@ class DynamicNetworkBuilder:
     def build_mutual_knn_network(self, embeddings: np.ndarray,
                                protein_ids: List[str],
                                query_embedding: Optional[np.ndarray] = None,
-                               query_protein_id: Optional[str] = None,
-                               family_id: Optional[str] = None,
-                               index: Optional[HierarchicalIndex] = None) -> nx.Graph:
+                               query_protein_id: Optional[str] = None) -> nx.Graph:
         """
-        Build a mutual k-nearest neighbors network using FAISS IVF float32.
+        Build a mutual k-nearest neighbors network.
+        
         Args:
-            embeddings: Protein embeddings array (float32)
+            embeddings: Protein embeddings array
             protein_ids: List of protein IDs
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
-            family_id: Family ID for index lookup
-            index: HierarchicalIndex instance
+            
         Returns:
             NetworkX graph
         """
-        logger.info("Building mutual k-NN network using FAISS IVF float32...")
+        logger.info("Building mutual k-NN network...")
+        
+        # Add query protein if provided
+        if query_embedding is not None:
+            embeddings = np.vstack([embeddings, query_embedding])
+            protein_ids = protein_ids + [query_protein_id or "QUERY_PROTEIN"]
+        
+        # Normalize embeddings
+        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
+        
+        # Compute similarity matrix
+        similarity_matrix = cosine_similarity(embeddings_norm)
+        
+        # Build mutual k-NN graph
         G = nx.Graph()
         
         # Add all nodes
-        for i, pid in enumerate(protein_ids):
-            G.add_node(pid)
+        for protein_id in protein_ids:
+            G.add_node(protein_id)
         
-        # Add query protein if provided
-        if query_protein_id is not None:
-            G.add_node(query_protein_id)
+        # Find k-nearest neighbors for each node
+        n_nodes = len(protein_ids)
+        for i in range(n_nodes):
+            # Get similarities to all other nodes
+            similarities = similarity_matrix[i]
+            
+            # Find top k neighbors (excluding self)
+            neighbor_indices = np.argsort(similarities)[::-1][1:self.k_neighbors+1]
+            
+            for j in neighbor_indices:
+                if similarities[j] >= self.similarity_threshold:
+                    # Check if this is a mutual edge
+                    if self.mutual_knn:
+                        # Check if j also has i as one of its top k neighbors
+                        j_similarities = similarity_matrix[j]
+                        j_neighbors = np.argsort(j_similarities)[::-1][1:self.k_neighbors+1]
+                        
+                        if i in j_neighbors and j_similarities[i] >= self.similarity_threshold:
+                            G.add_edge(protein_ids[i], protein_ids[j], 
+                                     weight=similarities[j])
+                    else:
+                        # Add directed edge
+                        G.add_edge(protein_ids[i], protein_ids[j], 
+                                 weight=similarities[j])
         
-        # If index is available, use FAISS search
-        if index is not None and family_id is not None:
-            for i, pid in enumerate(protein_ids):
-                query = embeddings[i].astype(np.float32)
-                try:
-                    D, I = index.search_family_float(family_id, query, len(protein_ids))
-                    # Debug: Check data types
-                    logger.debug(f"Mutual k-NN FAISS search returned D type: {type(D)}, I type: {type(I)}")
-                    logger.debug(f"First few D values: {D[:3]}, types: {[type(d) for d in D[:3]]}")
-                    
-                    # Ensure D and I are properly typed
-                    if not isinstance(D, np.ndarray):
-                        D = np.array(D, dtype=np.float32)
-                    if not isinstance(I, (list, np.ndarray)):
-                        I = list(I) if hasattr(I, '__iter__') else [I]
-                    
-                    for dist, idx in zip(D, I):
-                        # Ensure idx is an integer for comparison
-                        try:
-                            idx = int(idx) if idx is not None else -1
-                        except (ValueError, TypeError):
-                            idx = -1
-                            
-                        if idx == i or idx == -1 or idx >= len(protein_ids):
-                            continue
-                        neighbor_id = protein_ids[idx]
-                        # Use safe numeric conversion to prevent string vs int errors
-                        weight = self._safe_numeric_conversion(dist, default=0.0)
-                        G.add_edge(pid, neighbor_id, weight=weight)
-                except Exception as e:
-                    logger.error(f"FAISS search failed for {pid}: {e}")
-                    continue
-        else:
-            # No fallback - FAISS index is required
-            raise RuntimeError(f"FAISS index is required for network building. Index: {index}, Family ID: {family_id}")
+        # Ensure network size constraints
+        if len(G.nodes()) < self.min_network_size:
+            logger.warning(f"Network too small ({len(G.nodes())} nodes), adding more edges")
+            self._expand_network(G, similarity_matrix, protein_ids)
         
+        if len(G.nodes()) > self.max_network_size:
+            logger.warning(f"Network too large ({len(G.nodes())} nodes), trimming")
+            self._trim_network(G, query_protein_id)
+        
+        logger.info(f"Built network with {len(G.nodes())} nodes and {len(G.edges())} edges")
         return G
     
     def build_threshold_network(self, embeddings: np.ndarray,
                               protein_ids: List[str],
                               query_embedding: Optional[np.ndarray] = None,
-                              query_protein_id: Optional[str] = None,
-                              family_id: Optional[str] = None,
-                              index: Optional[HierarchicalIndex] = None) -> nx.Graph:
+                              query_protein_id: Optional[str] = None) -> nx.Graph:
         """
-        Build a network using FAISS IVF float32 and L2 threshold.
+        Build a network using similarity threshold.
+        
         Args:
-            embeddings: Protein embeddings array (float32)
+            embeddings: Protein embeddings array
             protein_ids: List of protein IDs
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
-            family_id: Family ID for index lookup
-            index: HierarchicalIndex instance
+            
         Returns:
             NetworkX graph
         """
-        logger.info("Building threshold-based network using FAISS IVF float32...")
+        logger.info("Building threshold-based network...")
+        
+        # Add query protein if provided
+        if query_embedding is not None:
+            embeddings = np.vstack([embeddings, query_embedding])
+            protein_ids = protein_ids + [query_protein_id or "QUERY_PROTEIN"]
+        
+        # Normalize embeddings
+        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
+        
+        # Compute similarity matrix
+        similarity_matrix = cosine_similarity(embeddings_norm)
+        
+        # Build graph
         G = nx.Graph()
         
         # Add all nodes
-        for i, pid in enumerate(protein_ids):
-            G.add_node(pid)
+        for protein_id in protein_ids:
+            G.add_node(protein_id)
         
-        # Add query protein if provided
-        if query_protein_id is not None:
-            G.add_node(query_protein_id)
+        # Add edges above threshold
+        n_nodes = len(protein_ids)
+        for i in range(n_nodes):
+            for j in range(i+1, n_nodes):
+                similarity = similarity_matrix[i, j]
+                if similarity >= self.similarity_threshold:
+                    G.add_edge(protein_ids[i], protein_ids[j], weight=similarity)
         
-        # If index is available, use FAISS search
-        if index is not None and family_id is not None:
-            for i, pid in enumerate(protein_ids):
-                query = embeddings[i].astype(np.float32)
-                try:
-                    D, I = index.search_family_float(family_id, query, len(protein_ids))
-                    # Debug: Check data types
-                    logger.debug(f"Threshold FAISS search returned D type: {type(D)}, I type: {type(I)}")
-                    logger.debug(f"First few D values: {D[:3]}, types: {[type(d) for d in D[:3]]}")
-                    
-                    # Ensure D and I are properly typed
-                    if not isinstance(D, np.ndarray):
-                        D = np.array(D, dtype=np.float32)
-                    if not isinstance(I, (list, np.ndarray)):
-                        I = list(I) if hasattr(I, '__iter__') else [I]
-                    
-                    for dist, idx in zip(D, I):
-                        # Ensure idx is an integer for comparison
-                        try:
-                            idx = int(idx) if idx is not None else -1
-                        except (ValueError, TypeError):
-                            idx = -1
-                            
-                        if idx == i or idx == -1 or idx >= len(protein_ids):
-                            continue
-                        # Use safe numeric comparison to prevent string vs int errors
-                        if self._safe_numeric_comparison(dist, self.similarity_threshold, '<='):
-                            neighbor_id = protein_ids[idx]
-                            weight = self._safe_numeric_conversion(dist)
-                            G.add_edge(pid, neighbor_id, weight=weight)
-                except Exception as e:
-                    logger.error(f"FAISS search failed for {pid}: {e}")
-                    continue
-        else:
-            # No fallback - FAISS index is required
-            raise RuntimeError(f"FAISS index is required for threshold network building. Index: {index}, Family ID: {family_id}")
-        
+        logger.info(f"Built network with {len(G.nodes())} nodes and {len(G.edges())} edges")
         return G
     
     def build_hybrid_network(self, embeddings: np.ndarray,
                            protein_ids: List[str],
                            query_embedding: Optional[np.ndarray] = None,
-                           query_protein_id: Optional[str] = None,
-                           family_id: Optional[str] = None,
-                           index: Optional[HierarchicalIndex] = None) -> nx.Graph:
+                           query_protein_id: Optional[str] = None) -> nx.Graph:
         """
-        Build a hybrid network combining k-NN and threshold using FAISS IVF float32.
+        Build a hybrid network combining k-NN and threshold methods.
+        
         Args:
-            embeddings: Protein embeddings array (float32)
+            embeddings: Protein embeddings array
             protein_ids: List of protein IDs
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
-            family_id: Family ID for index lookup
-            index: HierarchicalIndex instance
+            
         Returns:
             NetworkX graph
         """
-        logger.info("Building hybrid network using FAISS IVF float32...")
+        logger.info("Building hybrid network...")
+        
+        # Add query protein if provided
+        if query_embedding is not None:
+            embeddings = np.vstack([embeddings, query_embedding])
+            protein_ids = protein_ids + [query_protein_id or "QUERY_PROTEIN"]
+        
+        # Normalize embeddings
+        embeddings_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
+        
+        # Compute similarity matrix
+        similarity_matrix = cosine_similarity(embeddings_norm)
+        
+        # Build graph
         G = nx.Graph()
         
         # Add all nodes
-        for i, pid in enumerate(protein_ids):
-            G.add_node(pid)
+        for protein_id in protein_ids:
+            G.add_node(protein_id)
         
-        # Add query protein if provided
-        if query_protein_id is not None:
-            G.add_node(query_protein_id)
+        # Add edges using hybrid approach
+        n_nodes = len(protein_ids)
+        for i in range(n_nodes):
+            # Get similarities to all other nodes
+            similarities = similarity_matrix[i]
+            
+            # Find top k neighbors
+            neighbor_indices = np.argsort(similarities)[::-1][1:self.k_neighbors+1]
+            
+            for j in neighbor_indices:
+                similarity = similarities[j]
+                
+                # Add edge if it meets threshold OR is in top k
+                if similarity >= self.similarity_threshold:
+                    G.add_edge(protein_ids[i], protein_ids[j], weight=similarity)
         
-        # If index is available, use FAISS search
-        if index is not None and family_id is not None:
-            for i, pid in enumerate(protein_ids):
-                query = embeddings[i].astype(np.float32)
-                try:
-                    D, I = index.search_family_float(family_id, query, len(protein_ids))
-                    
-                    # Ensure D and I are properly typed
-                    if not isinstance(D, np.ndarray):
-                        D = np.array(D, dtype=np.float32)
-                    if not isinstance(I, (list, np.ndarray)):
-                        I = list(I) if hasattr(I, '__iter__') else [I]
-                    
-                    for dist, idx in zip(D, I):
-                        # Ensure idx is an integer for comparison
-                        try:
-                            idx = int(idx) if idx is not None else -1
-                        except (ValueError, TypeError):
-                            idx = -1
-                            
-                        if idx == i or idx == -1 or idx >= len(protein_ids):
-                            continue
-                        # Use safe numeric comparison to prevent string vs int errors
-                        if self._safe_numeric_comparison(dist, self.similarity_threshold, '<='):
-                            neighbor_id = protein_ids[idx]
-                            weight = self._safe_numeric_conversion(dist)
-                            G.add_edge(pid, neighbor_id, weight=weight)
-                except Exception as e:
-                    logger.error(f"FAISS search failed for {pid}: {e}")
-                    continue
-        else:
-            # No fallback - FAISS index is required
-            raise RuntimeError(f"FAISS index is required for hybrid network building. Index: {index}, Family ID: {family_id}")
+        logger.info(f"Built hybrid network with {len(G.nodes())} nodes and {len(G.edges())} edges")
+        return G
     
     def _expand_network(self, G: nx.Graph, similarity_matrix: np.ndarray, 
                        protein_ids: List[str]):
@@ -757,52 +723,6 @@ class DynamicNetworkBuilder:
                     break
                 G.remove_node(node)
     
-    def _safe_numeric_conversion(self, value, default=float('inf')):
-        """
-        Safely convert a value to float for numeric comparisons.
-        Based on StackAbuse guidance for handling incompatible type comparisons.
-        """
-        try:
-            if isinstance(value, str):
-                # Handle string values more robustly
-                if value.lower() in ['inf', 'infinity', 'nan']:
-                    return float('inf')
-                return float(value)
-            elif isinstance(value, (int, float, np.integer, np.floating)):
-                return float(value)
-            elif hasattr(value, 'item'):  # Handle numpy scalars
-                return float(value.item())
-            elif hasattr(value, '__iter__') and not isinstance(value, str):
-                # Handle array-like objects
-                return float(value[0]) if len(value) > 0 else default
-            else:
-                return default
-        except (ValueError, TypeError, AttributeError, IndexError):
-            return default
-    
-    def _safe_numeric_comparison(self, a, b, operator='<='):
-        """
-        Safely compare two values after converting them to numeric types.
-        """
-        try:
-            a_val = self._safe_numeric_conversion(a)
-            b_val = self._safe_numeric_conversion(b)
-            
-            if operator == '<=':
-                return a_val <= b_val
-            elif operator == '>=':
-                return a_val >= b_val
-            elif operator == '<':
-                return a_val < b_val
-            elif operator == '>':
-                return a_val > b_val
-            elif operator == '==':
-                return a_val == b_val
-            else:
-                return False
-        except Exception:
-            return False
-    
     def build_network_from_similar_proteins(self, 
                                           similar_proteins: List[Dict],
                                           embeddings: np.ndarray,
@@ -828,21 +748,33 @@ class DynamicNetworkBuilder:
         
         # Extract embeddings and IDs for similar proteins
         similar_ids = [p['protein_id'] for p in similar_proteins]
-        similar_indices = [protein_ids.index(pid) for pid in similar_ids if pid in protein_ids]
+        
+        # Find indices of similar proteins in the full protein list
+        similar_indices = []
+        for pid in similar_ids:
+            if pid in protein_ids:
+                similar_indices.append(protein_ids.index(pid))
+        
+        if not similar_indices:
+            logger.warning("No similar proteins found in the full protein list")
+            # Use a subset of the full embeddings
+            similar_indices = list(range(min(50, len(protein_ids))))
+        
         similar_embeddings = embeddings[similar_indices]
+        similar_protein_ids = [protein_ids[i] for i in similar_indices]
         
         # Build network using specified method
         if method == "mutual_knn":
             return self.build_mutual_knn_network(
-                similar_embeddings, similar_ids, query_embedding, query_protein_id
+                similar_embeddings, similar_protein_ids, query_embedding, query_protein_id
             )
         elif method == "threshold":
             return self.build_threshold_network(
-                similar_embeddings, similar_ids, query_embedding, query_protein_id
+                similar_embeddings, similar_protein_ids, query_embedding, query_protein_id
             )
         elif method == "hybrid":
             return self.build_hybrid_network(
-                similar_embeddings, similar_ids, query_embedding, query_protein_id
+                similar_embeddings, similar_protein_ids, query_embedding, query_protein_id
             )
         else:
             raise ValueError(f"Unknown network construction method: {method}")
@@ -853,8 +785,7 @@ class DynamicNetworkBuilder:
                                        metadata_df: pd.DataFrame,
                                        query_embedding: Optional[np.ndarray] = None,
                                        query_protein_id: Optional[str] = None,
-                                       output_file: Optional[str] = None,
-                                       storage: Optional[object] = None) -> Tuple[Optional[object], Optional[nx.Graph]]:
+                                       output_file: Optional[str] = None) -> Tuple[Optional[object], Optional[nx.Graph]]:
         """
         Create an interactive visualization of the protein network.
         
@@ -865,7 +796,7 @@ class DynamicNetworkBuilder:
             query_embedding: Optional query protein embedding
             query_protein_id: Optional query protein ID
             output_file: Optional path to save the visualization as HTML
-            storage: Optional ProteinStorage instance for managed saving
+            
         Returns:
             Tuple of (Plotly figure, NetworkX graph)
         """
@@ -878,8 +809,7 @@ class DynamicNetworkBuilder:
             id_column=None,  # Use index instead of column name
             query_embedding=query_embedding,
             query_protein_id=query_protein_id,
-            output_file=output_file,
-            storage=storage
+            output_file=output_file
         )
     
     def analyze_network_properties(self, G: nx.Graph) -> Dict:

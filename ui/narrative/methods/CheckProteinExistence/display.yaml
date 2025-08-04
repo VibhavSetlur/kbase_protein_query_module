@@ -27,12 +27,16 @@ parameters :
         ui-name : Protein ID (UniProt)
         short-hint : Check if this UniProt ID exists in the KBase Protein Network.
         long-hint  : Enter a valid UniProt accession (e.g., P12345).
+    generate_embedding :
+        ui-name : Generate Embedding
+        short-hint : Generate protein embedding if found.
+        long-hint  : If checked, will generate a protein embedding for the found protein.
 
 description : |
     <p>Enter a UniProt ID to check if it exists in the KBase Protein Network. If found, you will see its family and metadata.</p>
     <ul>
     <li><b>Input:</b> UniProt protein ID (e.g., P12345)</li>
-    <li><b>Output:</b> Existence status, family ID, and metadata</li>
+    <li><b>Output:</b> Existence status, family ID, metadata, and optional embedding</li>
     </ul>
     <p>Use this as the first step in your protein analysis workflow.</p>
 
@@ -44,4 +48,12 @@ publications :
     -
         display-text: |
             UniProt: a worldwide hub of protein knowledge
-        link: https://www.uniprot.org/ 
+        link: https://www.uniprot.org/
+    -
+        display-text: |
+            ESM-2: Language models of protein sequences
+        link: https://www.biorxiv.org/content/10.1101/2022.07.20.500902v2
+    -
+        display-text: |
+            KBase: A United States Department of Energy Systems Biology Knowledgebase
+        link: https://www.nature.com/articles/nbt.4163 

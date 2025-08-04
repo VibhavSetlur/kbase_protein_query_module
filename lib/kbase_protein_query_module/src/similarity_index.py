@@ -66,6 +66,29 @@ class HierarchicalIndex:
         
         # Load family mapping
         self.family_mapping = self._load_family_mapping()
+        
+    def _make_file_safe(self, family_id: str) -> str:
+        """
+        Convert any family ID to a file-safe format.
+        
+        Args:
+            family_id: Family ID (can be any string)
+            
+        Returns:
+            File-safe version of the family ID
+        """
+        import re
+        # Replace any non-alphanumeric characters with underscores
+        # This ensures the filename is safe for all operating systems
+        file_safe = re.sub(r'[^a-zA-Z0-9]', '_', family_id)
+        # Remove multiple consecutive underscores
+        file_safe = re.sub(r'_+', '_', file_safe)
+        # Remove leading/trailing underscores
+        file_safe = file_safe.strip('_')
+        # Ensure it's not empty
+        if not file_safe:
+            file_safe = 'unknown_family'
+        return file_safe
     
     def _create_directory_structure(self):
         """Create directory structure for indexes."""
@@ -129,7 +152,10 @@ class HierarchicalIndex:
             index = faiss.IndexBinaryIVF(quantizer, dimension, nlist)
             index.train(embeddings)
             index.add(embeddings)
-        index_file = self.base_dir / "families" / f"{family_id}.faissbin"
+        # Create file-safe family ID for any family name format
+        file_safe_id = self._make_file_safe(family_id)
+        
+        index_file = self.base_dir / "families" / f"{file_safe_id}.faissbin"
         faiss.write_index_binary(index, str(index_file))
         metadata = {
             'protein_ids': protein_ids,
@@ -137,7 +163,7 @@ class HierarchicalIndex:
             'num_proteins': num_proteins,
             'index_type': 'faiss_binary'
         }
-        metadata_file = self.base_dir / "metadata" / f"{family_id}_metadata.json"
+        metadata_file = self.base_dir / "metadata" / f"{file_safe_id}_metadata.json"
         with open(metadata_file, 'w') as f:
             json.dump(metadata, f, indent=2)
         logger.info(f"Created FAISS IVF binary index for family {family_id}: {num_proteins} proteins, {dimension} bits")
@@ -146,54 +172,79 @@ class HierarchicalIndex:
         return str(index_file)
 
     def create_family_index_float(self, family_id: str, embeddings: np.ndarray, protein_ids: List[str], nlist: int = 10) -> str:
-        import faiss
-        if embeddings.dtype != np.float32:
-            raise ValueError("Embeddings must be np.float32 for float FAISS indexing.")
-        dimension = embeddings.shape[1]
+        """
+        Create FAISS IVF float index for a family.
         
-        # Ensure we have enough training points for FAISS clustering
-        # According to FAISS FAQ: minimum 39 training points per centroid
-        min_training_points = nlist * 39
-        if len(embeddings) < min_training_points:
-            # Adjust nlist to meet training requirements
-            nlist = max(1, len(embeddings) // 39)
-            if nlist < 1:
-                # If we still don't have enough points, use a flat index instead
-                logger.warning(f"Not enough training points for IVF index in family {family_id}. Using flat index.")
-                index = faiss.IndexFlatL2(dimension)
+        Args:
+            family_id: Family identifier
+            embeddings: Protein embeddings (N x D)
+            protein_ids: List of protein IDs
+            nlist: Number of clusters for IVF (adjusted based on data size)
+            
+        Returns:
+            Path to the created index file
+        """
+        try:
+            # Ensure we have enough data for FAISS clustering
+            n_embeddings = embeddings.shape[0]
+            embedding_dim = embeddings.shape[1]
+            
+            # FAISS IVF requires at least 39 training points per centroid
+            min_training_points = 39
+            max_nlist = max(1, n_embeddings // min_training_points)
+            
+            # Adjust nlist to meet FAISS requirements
+            if nlist > max_nlist:
+                nlist = max_nlist
+                logger.info(f"Adjusted nlist to {nlist} for family {family_id} to meet training requirements")
+            
+            # Ensure nlist is at least 1
+            nlist = max(1, nlist)
+            
+            # If we don't have enough data for IVF, use flat index
+            if n_embeddings < min_training_points:
+                logger.info(f"Not enough data for IVF training in {family_id} ({n_embeddings} < {min_training_points}), using flat index")
+                index = faiss.IndexFlatIP(embedding_dim)
+                faiss.normalize_L2(embeddings)
                 index.add(embeddings)
             else:
-                # Use adjusted nlist
-                logger.info(f"Adjusted nlist to {nlist} for family {family_id} to meet training requirements")
-                quantizer = faiss.IndexFlatL2(dimension)
-                index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
+                # Create FAISS IVF index
+                quantizer = faiss.IndexFlatIP(embedding_dim)
+                index = faiss.IndexIVFFlat(quantizer, embedding_dim, nlist, faiss.METRIC_INNER_PRODUCT)
+                
+                # Normalize embeddings for cosine similarity
+                faiss.normalize_L2(embeddings)
+                
+                # Train and add
                 index.train(embeddings)
                 index.add(embeddings)
-        else:
-            # We have enough training points, proceed normally
-            nlist = min(nlist, max(1, len(embeddings)//10))
-            quantizer = faiss.IndexFlatL2(dimension)
-            index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
-            index.train(embeddings)
-            index.add(embeddings)
-        
-        index_file = self.base_dir / "families" / f"{family_id}.faiss"
-        faiss.write_index(index, str(index_file))
-        metadata = {
-            'protein_ids': protein_ids,
-            'dimension': dimension,
-            'num_proteins': len(protein_ids),
-            'index_type': 'faiss_float',
-            'nlist': nlist,
-            'training_points': len(embeddings)
-        }
-        metadata_file = self.base_dir / "metadata" / f"{family_id}_float_metadata.json"
-        with open(metadata_file, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        logger.info(f"Created FAISS IVF float index for family {family_id}: {len(protein_ids)} proteins, {dimension} dim")
-        self.family_mapping[family_id] = str(index_file)
-        self._save_family_mapping()
-        return str(index_file)
+            
+            # Save index
+            file_safe_id = self._make_file_safe(family_id)
+            index_path = self.base_dir / "families" / f"{file_safe_id}.faiss"
+            faiss.write_index(index, str(index_path))
+            
+            # Save metadata
+            metadata = {
+                'family_id': family_id,
+                'protein_ids': protein_ids,
+                'num_proteins': len(protein_ids),
+                'embedding_dim': embedding_dim,
+                'index_type': 'IVF_float' if n_embeddings >= min_training_points else 'Flat_float',
+                'nlist': nlist,
+                'metric': 'cosine'
+            }
+            
+            metadata_path = self.base_dir / "metadata" / f"{file_safe_id}_float_metadata.json"
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            logger.info(f"Created FAISS {'IVF' if n_embeddings >= min_training_points else 'Flat'} float index for family {family_id}: {len(protein_ids)} proteins, {embedding_dim} dim")
+            return str(index_path)
+            
+        except Exception as e:
+            logger.error(f"Failed to create FAISS float index for {family_id}: {e}")
+            raise
 
     def _get_cached_index(self, family_id: str):
         if family_id in self._family_cache:
@@ -238,18 +289,40 @@ class HierarchicalIndex:
     
     def search_family_float(self, family_id: str, query_embedding: np.ndarray, top_k: int = 50) -> Tuple[np.ndarray, List[str]]:
         import faiss
-        # Fix the filename pattern - look in the correct indexes directory
-        index_file = self.base_dir / "families" / f"{family_id}.faiss"
-        metadata_file = self.base_dir / "metadata" / f"{family_id}_float_metadata.json"
+        # Create file-safe family ID for any family name format
+        file_safe_id = self._make_file_safe(family_id)
         
-        # If not found in the main directories, try the indexes subdirectories
-        if not index_file.exists():
-            index_file = self.base_dir / "indexes" / "families" / f"{family_id}.faiss"
-        if not metadata_file.exists():
-            metadata_file = self.base_dir / "indexes" / "metadata" / f"{family_id}_float_metadata.json"
+        # Look for index files in multiple possible locations
+        possible_index_paths = [
+            self.base_dir / "families" / f"{file_safe_id}.faiss",
+            self.base_dir / "indexes" / "families" / f"{file_safe_id}.faiss",
+            self.base_dir / "families" / f"{family_id}.faiss",
+            self.base_dir / "indexes" / "families" / f"{family_id}.faiss"
+        ]
         
-        if not index_file.exists() or not metadata_file.exists():
-            raise FileNotFoundError(f"Float index or metadata missing for family {family_id}. Index: {index_file}, Metadata: {metadata_file}")
+        possible_metadata_paths = [
+            self.base_dir / "metadata" / f"{file_safe_id}_float_metadata.json",
+            self.base_dir / "indexes" / "metadata" / f"{file_safe_id}_float_metadata.json",
+            self.base_dir / "metadata" / f"{family_id}_float_metadata.json",
+            self.base_dir / "indexes" / "metadata" / f"{family_id}_float_metadata.json"
+        ]
+        
+        # Find existing index and metadata files
+        index_file = None
+        metadata_file = None
+        
+        for path in possible_index_paths:
+            if path.exists():
+                index_file = path
+                break
+                
+        for path in possible_metadata_paths:
+            if path.exists():
+                metadata_file = path
+                break
+        
+        if not index_file or not metadata_file:
+            raise FileNotFoundError(f"Float index or metadata missing for family {family_id}. Tried paths: {possible_index_paths}, {possible_metadata_paths}")
         
         # Load metadata
         with open(metadata_file, 'r') as f:

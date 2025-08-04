@@ -4,7 +4,7 @@
 name: Generate Protein Embeddings
 
 tooltip: |
-    Generate a protein embedding from a sequence or UniProt ID for downstream analysis.
+    Generate a protein embedding from a sequence or workspace object for downstream analysis.
 
 screenshots: []
 
@@ -23,15 +23,23 @@ suggestions:
             ["FindTopMatchesFromEmbedding"]
 
 parameters :
+    input_type :
+        ui-name : Input Type
+        short-hint : Choose whether to input a sequence or select a workspace object.
+        long-hint  : Select "Protein Sequence (Text)" to enter a sequence directly, or "Workspace Object" to select from existing objects.
     sequence :
         ui-name : Protein Sequence
-        short-hint : Enter the amino acid sequence (optional).
-        long-hint  : Provide either a UniProt ID or a raw sequence.
+        short-hint : Enter the amino acid sequence.
+        long-hint  : Provide the amino acid sequence in FASTA format or plain text.
+    workspace_object_ref :
+        ui-name : Workspace Object
+        short-hint : Select a workspace object containing protein data.
+        long-hint  : Choose from existing protein existence results or embedding objects.
 
 description : |
-    <p>Generate a high-dimensional embedding for a protein using its amino acid sequence. The embedding is saved as a workspace object for use in downstream analysis.</p>
+    <p>Generate a high-dimensional embedding for a protein using its amino acid sequence or from existing workspace objects. The embedding is saved as a workspace object for use in downstream analysis.</p>
     <ul>
-    <li><b>Input:</b> Amino acid sequence</li>
+    <li><b>Input:</b> Amino acid sequence or workspace object</li>
     <li><b>Output:</b> Saved embedding object and summary statistics</li>
     </ul>
     <p>Click <b>Generate Embedding</b> to run.</p>
@@ -44,4 +52,12 @@ publications :
     -
         display-text: |
             ESM-2 Model Documentation
-        link: https://github.com/facebookresearch/esm 
+        link: https://github.com/facebookresearch/esm
+    -
+        display-text: |
+            Lin Z, et al. Evolutionary-scale prediction of atomic-level protein structure with a language model. Science. 2023.
+        link: https://www.science.org/doi/10.1126/science.ade2574
+    -
+        display-text: |
+            KBase: A United States Department of Energy Systems Biology Knowledgebase
+        link: https://www.nature.com/articles/nbt.4163 

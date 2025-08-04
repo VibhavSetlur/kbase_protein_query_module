@@ -23,6 +23,10 @@ warnings.filterwarnings("ignore", message=".*gradient checkpointing.*")
 warnings.filterwarnings("ignore", message=".*position_ids.*")
 warnings.filterwarnings("ignore", message=".*attention_mask.*")
 
+# Suppress model initialization warnings
+warnings.filterwarnings("ignore", message="Some weights of EsmModel were not initialized")
+warnings.filterwarnings("ignore", message="You should probably TRAIN this model")
+
 logger = logging.getLogger(__name__)
 
 class ProteinEmbeddingGenerator:
@@ -120,28 +124,63 @@ class ProteinEmbeddingGenerator:
                     model_dtype = torch.float
             
             # Load model with proper dtype for large models
+            # Handle HeaderTooLarge error by trying different loading strategies
+            model_loaded = False
+            
+            # Strategy 1: Try basic loading without memory optimizations
             try:
                 self.model = EsmModel.from_pretrained(
                     model_path, 
                     torch_dtype=model_dtype,
                     local_files_only=True
                 )
+                model_loaded = True
+                logger.info("Model loaded successfully with basic loading")
             except Exception as e:
-                logger.warning(f"Failed to load model locally: {e}")
-                # Try without local_files_only
+                logger.warning(f"Strategy 1 failed: {e}")
+                
+                # Strategy 2: Try without local_files_only
                 try:
                     self.model = EsmModel.from_pretrained(
                         model_path, 
                         torch_dtype=model_dtype
                     )
+                    model_loaded = True
+                    logger.info("Model loaded successfully without local_files_only")
                 except Exception as e2:
-                    logger.error(f"Failed to load model: {e2}")
-                    raise RuntimeError(f"Could not load model from {model_path}: {e2}")
+                    logger.warning(f"Strategy 2 failed: {e2}")
+                    
+                    # Strategy 3: Try with trust_remote_code
+                    try:
+                        self.model = EsmModel.from_pretrained(
+                            model_path, 
+                            torch_dtype=model_dtype,
+                            trust_remote_code=True
+                        )
+                        model_loaded = True
+                        logger.info("Model loaded successfully with trust_remote_code")
+                    except Exception as e3:
+                        logger.warning(f"Strategy 3 failed: {e3}")
+                        
+                        # Strategy 4: Try with a smaller model as fallback
+                        try:
+                            logger.warning("Trying fallback to smaller model...")
+                            self.model = EsmModel.from_pretrained(
+                                "facebook/esm2_t6_8M_UR50D",  # Use the smaller model directly
+                                torch_dtype=model_dtype
+                            )
+                            model_loaded = True
+                            logger.info("Model loaded successfully with fallback to smaller model")
+                        except Exception as e4:
+                            logger.error(f"All loading strategies failed. Last error: {e4}")
+                            raise RuntimeError(f"Could not load model from {model_path} or fallback model. Last error: {e4}")
 
-            if self.model is None:
+            if not model_loaded or self.model is None:
                 raise RuntimeError("Model loading failed - model is None")
                 
-            self.model = self.model.to(self.device)
+            # Move model to device only if not using device_map
+            if not hasattr(self.model, 'device_map') or self.model.device_map is None:
+                self.model = self.model.to(self.device)
             self.model.eval()
             
             # Get embedding dimension - ensure it's correct for the local model
@@ -162,40 +201,49 @@ class ProteinEmbeddingGenerator:
             logger.error(f"Failed to load model: {e}")
             raise
     
-    def generate_embedding(self, sequence: str) -> np.ndarray:
+    def generate_embedding(self, sequence: str, protein_id: str = None) -> np.ndarray:
         """
-        Generate mean-pooled embedding for a single protein sequence.
+        Generate embedding for a single protein sequence.
         
         Args:
-            sequence: Amino acid sequence string
-        Returns:
-            numpy.ndarray: Protein embedding vector (mean pooled)
-        """
-        if not sequence or not isinstance(sequence, str):
-            raise ValueError("Sequence must be a non-empty string")
-        
-        # Check if model and tokenizer are properly loaded
-        if self.model is None:
-            raise RuntimeError("Model not loaded. Please check model initialization.")
-        if self.tokenizer is None:
-            raise RuntimeError("Tokenizer not loaded. Please check tokenizer initialization.")
+            sequence: Protein sequence string
+            protein_id: Optional protein identifier for logging
             
+        Returns:
+            Protein embedding as numpy array
+        """
         try:
-            # Tokenize the sequence
-            inputs = self.tokenizer(sequence, return_tensors="pt", padding=True, truncation=True)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            # Generate embeddings
+            if not sequence or len(sequence.strip()) == 0:
+                raise ValueError("Empty or invalid protein sequence")
+            
+            # Clean sequence
+            sequence = sequence.strip().upper()
+            
+            # Tokenize with proper max_length
+            max_length = 1024  # Set a reasonable max length for ESM-2
+            tokens = self.tokenizer(sequence, 
+                                  return_tensors="pt", 
+                                  max_length=max_length,
+                                  truncation=True,
+                                  padding=True)
+            
+            # Move tokens to device
+            tokens = {k: v.to(self.device) for k, v in tokens.items()}
+            
+            # Generate embedding
             with torch.no_grad():
-                outputs = self.model(**inputs)
-                embeddings = outputs.last_hidden_state
-                # Mean pooling over all tokens (excluding padding)
-                attention_mask = inputs['attention_mask']
-                masked_embeddings = embeddings * attention_mask.unsqueeze(-1)
-                pooled_embedding = masked_embeddings.sum(dim=1) / attention_mask.sum(dim=1, keepdim=True)
-                # Convert to numpy and return
-                return pooled_embedding.cpu().numpy().flatten()
+                outputs = self.model(**tokens)
+                # Use mean pooling over sequence length
+                embeddings = outputs.last_hidden_state.mean(dim=1)
+                embedding = embeddings.squeeze().cpu().numpy().astype(np.float32)
+            
+            if protein_id:
+                logger.info(f"Generated embedding with shape: {embedding.shape}")
+            
+            return embedding
+            
         except Exception as e:
-            logger.error(f"Error generating embedding: {e}")
+            logger.error(f"Failed to generate embedding for {protein_id or 'sequence'}: {e}")
             raise
     
     def generate_embeddings_batch(self, sequences: List[str], 
@@ -225,8 +273,10 @@ class ProteinEmbeddingGenerator:
                     padding="longest",
                     add_special_tokens=True
                 )
-                input_ids = tokenized_inputs['input_ids'].to(self.device)
-                attention_mask = tokenized_inputs['attention_mask'].to(self.device)
+                # Move all tensors to device
+                tokenized_inputs = {k: v.to(self.device) for k, v in tokenized_inputs.items()}
+                input_ids = tokenized_inputs['input_ids']
+                attention_mask = tokenized_inputs['attention_mask']
                 # Generate embeddings
                 with torch.no_grad():
                     outputs = self.model(input_ids, attention_mask=attention_mask)
