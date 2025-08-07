@@ -15,7 +15,7 @@
     },
     "parameters": [
         {
-            "id": "input_type",
+            "id": "input_source",
             "optional": false,
             "advanced": false,
             "allow_multiple": false,
@@ -23,15 +23,15 @@
             "field_type": "dropdown",
             "text_options": {
                 "valid_ws_types": [],
-                "example": "Choose input type",
+                "example": "Choose input source",
                 "options": [
-                    {"value": "sequence", "display": "Protein Sequence (Text)"},
-                    {"value": "workspace_object", "display": "Workspace Object"}
+                    {"value": "sequence", "display": "Protein Sequence (Direct Input)"},
+                    {"value": "workspace_object", "display": "From Protein Check Result"}
                 ]
             }
         },
         {
-            "id": "sequence",
+            "id": "protein_sequence",
             "optional": true,
             "advanced": false,
             "allow_multiple": false,
@@ -39,19 +39,31 @@
             "field_type": "textarea",
             "text_options": {
                 "valid_ws_types": [],
-                "example": ">ExampleProtein\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+                "example": ">ExampleProtein\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ\n\nOr just the sequence:\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
             }
         },
         {
-            "id": "workspace_object_ref",
+            "id": "protein_check_result_ref",
             "optional": true,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [""],
             "field_type": "workspaceObjectRef",
             "text_options": {
-                "valid_ws_types": ["ProteinExistenceResult", "ProteinEmbeddingResult"],
-                "example": "Select a workspace object containing protein data"
+                "valid_ws_types": ["ProteinExistenceResult"],
+                "example": "Select a protein check result containing protein data and metadata"
+            }
+        },
+        {
+            "id": "output_name",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["protein_embedding"],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Name for the output embedding object (e.g., collagen_embedding, insulin_embedding)"
             }
         }
     ],
@@ -66,16 +78,20 @@
                     "target_property": "workspace_name"
                 },
                 {
-                    "input_parameter": "input_type",
-                    "target_property": "input_type"
+                    "input_parameter": "input_source",
+                    "target_property": "input_source"
                 },
                 {
-                    "input_parameter": "sequence",
-                    "target_property": "sequence"
+                    "input_parameter": "protein_sequence",
+                    "target_property": "protein_sequence"
                 },
                 {
-                    "input_parameter": "workspace_object_ref",
-                    "target_property": "workspace_object_ref"
+                    "input_parameter": "protein_check_result_ref",
+                    "target_property": "protein_check_result_ref"
+                },
+                {
+                    "input_parameter": "output_name",
+                    "target_property": "output_name"
                 }
             ],
             "output_mapping": [
@@ -85,7 +101,9 @@
                 { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
                 { "service_method_output_path": [0, "embedding_norm"], "target_property": "embedding_norm" },
                 { "service_method_output_path": [0, "sequence_length"], "target_property": "sequence_length" },
-                { "service_method_output_path": [0, "embedding_dim"], "target_property": "embedding_dim" }
+                { "service_method_output_path": [0, "embedding_dim"], "target_property": "embedding_dim" },
+                { "service_method_output_path": [0, "protein_id"], "target_property": "protein_id" },
+                { "service_method_output_path": [0, "family_id"], "target_property": "family_id" }
             ]
         }
     },

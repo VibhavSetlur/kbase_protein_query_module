@@ -4,7 +4,7 @@
 name: Generate Protein Embeddings
 
 tooltip: |
-    Generate a protein embedding from a sequence or workspace object for downstream analysis.
+    Generate protein embeddings from sequence input or existing protein check results for comprehensive downstream analysis.
 
 screenshots: []
 
@@ -23,26 +23,43 @@ suggestions:
             ["FindTopMatchesFromEmbedding"]
 
 parameters :
-    input_type :
-        ui-name : Input Type
-        short-hint : Choose whether to input a sequence or select a workspace object.
-        long-hint  : Select "Protein Sequence (Text)" to enter a sequence directly, or "Workspace Object" to select from existing objects.
-    sequence :
+    input_source :
+        ui-name : Input Source
+        short-hint : Choose how to provide protein data.
+        long-hint  : Select "Protein Sequence (Direct Input)" to enter a sequence directly, or "From Protein Check Result" to use existing protein check data.
+    protein_sequence :
         ui-name : Protein Sequence
         short-hint : Enter the amino acid sequence.
-        long-hint  : Provide the amino acid sequence in FASTA format or plain text.
-    workspace_object_ref :
-        ui-name : Workspace Object
-        short-hint : Select a workspace object containing protein data.
-        long-hint  : Choose from existing protein existence results or embedding objects.
+        long-hint  : "Provide the amino acid sequence in FASTA format or plain text. Example: MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
+    protein_check_result_ref :
+        ui-name : Protein Check Result
+        short-hint : Select a protein check result containing protein data.
+        long-hint  : Choose from existing protein check results that contain protein data and metadata.
+    output_name :
+        ui-name : Output Name
+        short-hint : Name for the embedding object.
+        long-hint  : Provide a descriptive name for the output embedding object (e.g., collagen_embedding, insulin_embedding).
 
 description : |
-    <p>Generate a high-dimensional embedding for a protein using its amino acid sequence or from existing workspace objects. The embedding is saved as a workspace object for use in downstream analysis.</p>
+    <p>Generate high-dimensional protein embeddings for comprehensive downstream analysis using ESM-2 language model. This is part of the advanced protein query analysis system.</p>
+    
+    <h4>Comprehensive Analysis Workflow:</h4>
     <ul>
-    <li><b>Input:</b> Amino acid sequence or workspace object</li>
-    <li><b>Output:</b> Saved embedding object and summary statistics</li>
+    <li><b>Direct Sequence Input:</b> Enter a protein sequence directly to generate an embedding</li>
+    <li><b>From Protein Check:</b> Use existing protein check results that already contain protein data and metadata</li>
     </ul>
-    <p>Click <b>Generate Embedding</b> to run.</p>
+    
+    <h4>Advanced Capabilities:</h4>
+    <ul>
+    <li><b>Embedding Object:</b> Saved workspace object with protein embedding vector</li>
+    <li><b>Metadata:</b> Protein ID, family assignment, sequence length, embedding dimensions</li>
+    <li><b>Summary:</b> Processing statistics and validation results</li>
+    <li><b>Bioinformatics Integration:</b> Seamless connection with major protein databases</li>
+    <li><b>Network Analysis:</b> Advanced protein relationship mapping and analysis</li>
+    <li><b>Statistical Analysis:</b> Comprehensive similarity metrics and statistical evaluation</li>
+    </ul>
+    
+    <p><b>Usage:</b> Choose your input source, provide the data, and click <b>Generate Embedding</b> to create a workspace object for downstream analysis.</p>
 
 publications :
     -

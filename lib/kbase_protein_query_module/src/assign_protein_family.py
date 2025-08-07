@@ -2,8 +2,8 @@
 Protein Family Assignment Module
 
 This module provides fast assignment of protein embeddings to precomputed protein families
-using centroid similarity. It is designed for integration with the KBase protein network
-analysis pipeline and is compatible with the workflow orchestrator and test suite.
+using centroid similarity. All protein identifiers are UniProt IDs (exact match only).
+It is designed for integration with the KBase protein network analysis pipeline and is compatible with the workflow orchestrator and test suite.
 """
 
 import logging
@@ -18,10 +18,7 @@ logger = logging.getLogger(__name__)
 class AssignProteinFamily:
     """
     Assigns protein embeddings to precomputed protein families using centroid similarity.
-
-    This class loads family centroids from a .npz file and provides methods to assign
-    a query embedding to the closest family centroid using cosine similarity.
-    Compatible with the workflow orchestrator and test suite.
+    All protein identifiers are UniProt IDs (exact match only).
     """
     def __init__(self):
         self.family_ids: Optional[np.ndarray] = None

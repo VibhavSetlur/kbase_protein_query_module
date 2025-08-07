@@ -9,24 +9,22 @@ Integrates with the storage and workflow modules for seamless pipeline use.
 import logging
 from typing import Optional, Dict, Any
 import pandas as pd
-from .storage import ProteinStorage, ProteinNamesIndex
+from .storage import ProteinStorage, ProteinIDsIndex
 
 logger = logging.getLogger(__name__)
 
 class ProteinExistenceChecker:
     """
     Checks if a protein exists in the storage and returns its family and metadata.
-    Uses efficient protein names index for fast searching.
+    Uses efficient protein IDs index for fast searching (exact UniProt ID match).
     """
     def __init__(self, storage: Optional[ProteinStorage] = None, base_dir: str = "data"):
         if storage is not None:
             self.storage = storage
         else:
             self.storage = ProteinStorage(base_dir=base_dir)
-        
-        # Initialize protein names index for efficient searching
-        self.protein_names_index = ProteinNamesIndex(base_dir=base_dir)
-        
+        # Initialize protein IDs index for efficient searching
+        self.protein_ids_index = ProteinIDsIndex(base_dir=base_dir)
         self.family_list = self.storage.get_family_list()
         self.metadata_storage = None
         try:
@@ -35,72 +33,28 @@ class ProteinExistenceChecker:
         except Exception as e:
             logger.warning(f"Could not initialize CompressedMetadataStorage: {e}")
 
-    def check_protein_existence(self, protein_id: str) -> Dict[str, Any]:
+    def check_protein_existence(self, uniprot_id: str) -> Dict[str, Any]:
         """
-        Check if a protein exists by any identifier (UniProt ID, protein name, etc.).
-        Uses efficient index-based search.
-        
+        Check if a protein exists by UniProt ID (exact match only).
         Args:
-            protein_id: Any protein identifier (UniProt ID, protein name, etc.)
+            uniprot_id: UniProt ID (e.g., P00001)
         Returns:
             Dict with keys: exists (bool), family_id (str or None), metadata (dict or None)
         """
-        if not protein_id:
-            raise ValueError("Must provide a protein_id.")
-        
-        # Clean the input
-        protein_id = protein_id.strip()
-        if not protein_id:
-            raise ValueError("Protein ID cannot be empty or whitespace only.")
-        
-        # First, try the efficient protein names index
-        index_result = self.protein_names_index.search_protein(protein_id)
+        if not uniprot_id:
+            raise ValueError("Must provide a UniProt ID.")
+        uniprot_id = uniprot_id.strip()
+        if not uniprot_id:
+            raise ValueError("UniProt ID cannot be empty or whitespace only.")
+        # Use the efficient protein IDs index (exact match)
+        index_result = self.protein_ids_index.search_protein(uniprot_id)
         if index_result:
-            # Found in index
             family_id = index_result['family_id']
             metadata = index_result.get('metadata')
-            
             return {
                 "exists": True,
                 "family_id": family_id,
                 "metadata": metadata
             }
-        
-        # Fallback to traditional search if not found in index
-        logger.debug(f"Protein {protein_id} not found in index, trying traditional search")
-        
-        for family_id in self.family_list:
-            try:
-                if self.metadata_storage:
-                    try:
-                        metadata = self.metadata_storage.load_metadata(family_id=family_id, protein_ids=[protein_id])
-                        if not metadata.empty:
-                            return {
-                                "exists": True,
-                                "family_id": family_id,
-                                "metadata": metadata.iloc[0].to_dict()
-                            }
-                    except Exception:
-                        pass
-                
-                _, protein_ids = self.storage.load_family_embeddings(family_id)
-                if protein_id in protein_ids:
-                    meta = None
-                    if self.metadata_storage:
-                        try:
-                            meta_df = self.metadata_storage.load_metadata(family_id=family_id, protein_ids=[protein_id])
-                            if not meta_df.empty:
-                                meta = meta_df.iloc[0].to_dict()
-                        except Exception:
-                            pass
-                    return {
-                        "exists": True,
-                        "family_id": family_id,
-                        "metadata": meta
-                    }
-            except Exception as e:
-                logger.debug(f"Error checking family {family_id}: {e}")
-                continue
-        
         # Not found
         return {"exists": False, "family_id": None, "metadata": None} 

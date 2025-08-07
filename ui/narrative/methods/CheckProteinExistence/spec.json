@@ -19,7 +19,7 @@
             "field_type": "text",
             "text_options": {
                 "valid_ws_types": [],
-                "example": "Any protein identifier (e.g., Collagen, Insulin, P12345, family_0_prot_1, Alpha-1-antitrypsin, etc.)"
+                "example": "UniProt ID (e.g., P00001, P12345, Q9H0H5)"
             }
         },
         {
@@ -31,7 +31,7 @@
             "field_type": "checkbox",
             "text_options": {
                 "valid_ws_types": [],
-                "example": "Generate embedding for the protein if found using ESM-2 model"
+                "example": "Generate and save protein embedding as workspace object if found"
             }
         }
     ],
@@ -63,7 +63,8 @@
                 { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
                 { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
                 { "service_method_output_path": [0, "summary"], "target_property": "summary" },
-                { "service_method_output_path": [0, "protein_existence_result_ref"], "target_property": "protein_existence_result_ref" }
+                { "service_method_output_path": [0, "protein_existence_result_ref"], "target_property": "protein_existence_result_ref" },
+                { "service_method_output_path": [0, "embedding_result_ref"], "target_property": "embedding_result_ref" }
             ]
         }
     },

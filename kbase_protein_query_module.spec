@@ -1,13 +1,26 @@
 /*
 A KBase module: kbase_protein_query_module
 
-This module provides comprehensive protein network analysis capabilities including:
-- Protein existence checking in database
-- Protein embedding generation using ESM-2 models
-- Family assignment using similarity to centroids
-- Similarity search and network building
-- Sequence analysis with bioinformatics integration
-- Comprehensive HTML report generation
+This module provides comprehensive protein query analysis capabilities using UniProt IDs as the canonical identifier:
+
+COMPREHENSIVE ANALYSIS WORKFLOW:
+1. CheckProteinExistence: Verify protein exists using UniProt ID, optionally generate embedding
+2. GenerateProteinEmbeddings: Create embeddings from sequence input or protein check results
+3. AssignProteinFamily: Assign proteins to families using similarity to centroids
+4. FindTopMatches: Perform similarity search within families
+5. SummarizeAndVisualize: Generate comprehensive HTML reports with network analysis
+
+ADVANCED CAPABILITIES:
+- UniProt ID canonical identifier system (exact match only)
+- ESM-2 protein language model for embedding generation
+- Efficient FAISS-based similarity search and clustering
+- Family assignment using binary centroid similarity
+- Comprehensive metadata storage and retrieval
+- HTML report generation with network visualization
+- Workspace object management for downstream analysis
+- Bioinformatics integration with protein databases
+- Network analysis and protein relationship mapping
+- Advanced similarity metrics and statistical analysis
 
 Authors: Vibhav Setlur
 Contact: https://kbase.us/contact-us/
@@ -20,12 +33,9 @@ module kbase_protein_query_module {
     } ReportResults;
 
     /*
-        This example function accepts any number of parameters and returns results in a KBaseReport
-    */
-    funcdef run_kbase_protein_query_module(mapping<string,UnspecifiedObject> params) returns (ReportResults output) authentication required;
-
-    /*
-        Check if a protein exists in the storage system and create a workspace object with the result.
+        Check if a protein exists in the storage system using UniProt ID and create a workspace object with the result.
+        Input: UniProt ID (e.g., P00001, P12345)
+        Output: Existence status, family assignment, metadata, optional embedding
     */
     typedef structure {
         string report_name;
@@ -37,6 +47,7 @@ module kbase_protein_query_module {
         float start_time;
         string summary;
         string protein_existence_result_ref;
+        string embedding_result_ref;
     } CheckProteinExistenceResults;
     
     typedef structure {
@@ -54,7 +65,10 @@ module kbase_protein_query_module {
     funcdef check_protein_existence(mapping<string, UnspecifiedObject> params) returns (CheckProteinExistenceResults output) authentication required;
 
     /*
-        Generate a protein embedding from a sequence or workspace object.
+        Generate protein embeddings from sequence input or existing protein check results.
+        Two workflow options:
+        1. Direct sequence input: User provides protein sequence directly
+        2. From protein check result: Use existing protein check workspace object
     */
     typedef structure {
         string report_name;
@@ -66,11 +80,13 @@ module kbase_protein_query_module {
         float embedding_norm;
         int sequence_length;
         int embedding_dim;
+        string protein_id;
+        string family_id;
     } GenerateProteinEmbeddingResults;
     
     typedef structure {
         string input_id;
-        string input_type;
+        string input_source;
         string embedding_ref;
         list<float> embedding;
         string model_name;
@@ -79,12 +95,15 @@ module kbase_protein_query_module {
         int sequence_length;
         float embedding_norm;
         int embedding_dim;
+        string protein_id;
+        string family_id;
     } ProteinEmbeddingResult;
     
     funcdef generate_protein_embedding(mapping<string, UnspecifiedObject> params) returns (GenerateProteinEmbeddingResults output) authentication required;
 
     /*
-        Quickly assign a protein embedding to a family by similarity to the medoid.
+        Assign a protein embedding to a family using similarity to family centroids.
+        Uses binary Hamming distance for fast family assignment.
     */
     typedef structure {
         string family_id;
@@ -109,7 +128,8 @@ module kbase_protein_query_module {
     funcdef assign_family_fast(mapping<string, UnspecifiedObject> params) returns (AssignFamilyFastResults output) authentication required;
 
     /*
-        Find top matches for a given protein embedding.
+        Find top matches for a given protein embedding within a family.
+        Uses FAISS IVF float index for efficient similarity search.
     */
     typedef structure {
         list<mapping<string, UnspecifiedObject>> matches;
@@ -137,6 +157,7 @@ module kbase_protein_query_module {
 
     /*
         Summarize and visualize protein network analysis results.
+        Generates comprehensive HTML reports with network visualization.
     */
     typedef structure {
         string report_name;

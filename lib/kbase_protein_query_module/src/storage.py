@@ -597,78 +597,54 @@ class MemoryEfficientLoader:
                 yield family_id, embeddings, protein_ids
 
 
-class ProteinNamesIndex:
+class ProteinIDsIndex:
     """
-    Efficient protein names index for fast searching.
-    Supports both protein IDs and protein names with case-insensitive search.
+    Efficient protein IDs index for fast searching (exact UniProt ID match only).
     """
-    
     def __init__(self, base_dir: str = "data"):
         self.base_dir = Path(base_dir)
-        self.index_dir = self.base_dir / "indexes" / "protein_names"
-        self.index_file = self.index_dir / "protein_names_index.json"
+        self.index_dir = self.base_dir / "indexes" / "protein_ids"
+        self.index_file = self.index_dir / "protein_ids_index.json"
         self.mapping_file = self.index_dir / "protein_to_family.json"
-        
-        # Load index if it exists
-        self.protein_names_index = {}
+        self.protein_ids_index = {}
         self.protein_to_family = {}
         self._load_index()
-    
+
     def _load_index(self):
-        """Load the protein names index from disk."""
+        """Load the protein IDs index from disk."""
         try:
             if self.index_file.exists():
                 with open(self.index_file, 'r') as f:
-                    self.protein_names_index = json.load(f)
-                logger.info(f"Loaded protein names index with {len(self.protein_names_index)} entries")
-            
+                    self.protein_ids_index = json.load(f)
+                logger.info(f"Loaded protein IDs index with {len(self.protein_ids_index)} entries")
             if self.mapping_file.exists():
                 with open(self.mapping_file, 'r') as f:
                     self.protein_to_family = json.load(f)
                 logger.info(f"Loaded protein to family mapping with {len(self.protein_to_family)} entries")
         except Exception as e:
-            logger.warning(f"Failed to load protein names index: {e}")
-    
-    def search_protein(self, query: str) -> Optional[Dict[str, Any]]:
+            logger.warning(f"Failed to load protein IDs index: {e}")
+
+    def search_protein(self, uniprot_id: str) -> Optional[Dict[str, Any]]:
         """
-        Search for a protein by name or ID (case-insensitive).
-        
+        Search for a protein by UniProt ID (exact match only).
         Args:
-            query: Protein name or ID to search for
-            
+            uniprot_id: UniProt ID to search for
         Returns:
             Dict with protein information if found, None otherwise
         """
-        if not query:
+        if not uniprot_id:
             return None
-        
-        query_lower = query.lower().strip()
-        
-        # Direct lookup
-        if query_lower in self.protein_names_index:
-            return self.protein_names_index[query_lower]
-        
-        # Partial match search
-        for key, value in self.protein_names_index.items():
-            if query_lower in key or key in query_lower:
-                return value
-        
-        # Fuzzy search for protein names
-        for key, value in self.protein_names_index.items():
-            original_name = value.get('original_name', '')
-            if original_name and query_lower in original_name.lower():
-                return value
-        
-        return None
-    
+        uniprot_id = uniprot_id.strip()
+        return self.protein_ids_index.get(uniprot_id)
+
     def get_protein_family(self, protein_id: str) -> Optional[str]:
         """Get the family ID for a protein ID."""
         return self.protein_to_family.get(protein_id)
-    
+
     def get_all_proteins(self) -> List[str]:
         """Get all protein IDs in the index."""
         return list(self.protein_to_family.keys())
-    
+
     def get_proteins_by_family(self, family_id: str) -> List[str]:
         """Get all protein IDs for a specific family."""
         return [pid for pid, fid in self.protein_to_family.items() if fid == family_id]

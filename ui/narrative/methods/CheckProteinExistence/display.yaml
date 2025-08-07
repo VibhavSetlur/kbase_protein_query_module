@@ -4,7 +4,7 @@
 name: Check Protein Existence
 
 tooltip: |
-    Quickly check if any protein identifier exists in the KBase Protein Network and view its family and metadata.
+    Check if a protein exists in the database and optionally generate embeddings. Part of the comprehensive protein query analysis system.
 
 screenshots: []
 
@@ -24,34 +24,42 @@ suggestions:
 
 parameters :
     protein_id :
-        ui-name : Protein Identifier
-        short-hint : Enter any protein identifier (name, ID, or accession number).
+        ui-name : UniProt ID
+        short-hint : Enter a UniProt ID (e.g., P00001, P12345).
         long-hint  : |
-                    Enter any protein identifier such as:
-                    • Protein names (e.g., "Collagen", "Insulin", "Alpha-1-antitrypsin")
-                    • UniProt IDs (e.g., "P12345", "Q9H0H5")
-                    • Custom IDs (e.g., "family_0_prot_1", "ABC_transporter_protein_0001")
-                    • Any other protein identifier
+                    Enter a UniProt ID in the format P##### or Q#####.
+                    Examples: P00001, P12345, Q9H0H5
     generate_embedding :
         ui-name : Generate Embedding
-        short-hint : Generate protein embedding if found.
-        long-hint  : If checked, will generate a protein embedding for the found protein using ESM-2 model.
+        short-hint : Generate and save protein embedding if found.
+        long-hint  : If checked, will generate a protein embedding using ESM-2 model and save it as a workspace object for use in downstream analysis.
 
 description : |
-    <p>Check if any protein identifier exists in the KBase Protein Network. The system accepts any protein identifier format and will search efficiently through the database.</p>
+    <p>Check if a protein exists in the database using UniProt ID and optionally generate embeddings for downstream analysis. This is the first step in the comprehensive protein query analysis workflow.</p>
+    
+    <h4>Comprehensive Analysis Workflow:</h4>
     <ul>
-    <li><b>Input:</b> Any protein identifier (name, ID, accession number, etc.)</li>
-    <li><b>Search:</b> Fast index-based search with fallback to comprehensive scanning</li>
-    <li><b>Output:</b> Existence status, family ID, metadata, and optional embedding</li>
-    <li><b>Features:</b> Case-insensitive search, partial matching, fuzzy search</li>
+    <li><b>Step 1:</b> Enter a UniProt ID to check if the protein exists</li>
+    <li><b>Step 2:</b> Optionally generate embedding (saves as workspace object)</li>
+    <li><b>Step 3:</b> Use the saved workspace object in downstream analysis</li>
     </ul>
-    <p>Use this as the first step in your protein analysis workflow. The system will find proteins regardless of the input format.</p>
+    
+    <h4>Advanced Capabilities:</h4>
+    <ul>
+    <li><b>Existence Status:</b> Whether the protein was found in the database</li>
+    <li><b>Family Assignment:</b> Protein family classification if found</li>
+    <li><b>Metadata:</b> Comprehensive protein information and properties</li>
+    <li><b>Embedding Object:</b> (Optional) Saved workspace object with protein embedding</li>
+    <li><b>Bioinformatics Integration:</b> Seamless connection with major protein databases</li>
+    </ul>
+    
+    <p><b>Usage:</b> Enter a UniProt ID, optionally check "Generate Embedding", and click <b>Check Protein</b>. The results are saved as workspace objects for use in subsequent analysis steps.</p>
 
 publications :
     -
         display-text: |
-            KBase Protein Network Analysis Toolkit Documentation
-        link: https://github.com/kbaseapps/kbase_protein_network_analysis_toolkit
+            KBase Protein Query Analysis Module Documentation
+        link: https://github.com/kbaseapps/kbase_protein_query_module
     -
         display-text: |
             UniProt: a worldwide hub of protein knowledge

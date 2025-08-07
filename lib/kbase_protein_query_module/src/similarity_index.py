@@ -24,12 +24,7 @@ logger = logging.getLogger(__name__)
 class HierarchicalIndex:
     """
     Hierarchical index structure for massive protein datasets.
-    
-    Features:
-    - Multi-level indexing (family -> subfamily -> individual)
-    - Quantization for memory efficiency
-    - Streaming search capabilities
-    - Caching for frequently accessed families
+    All search and indexing is performed using UniProt IDs as the canonical identifier (exact match only).
     """
     
     def __init__(self, 
@@ -121,6 +116,15 @@ class HierarchicalIndex:
             json.dump(self.family_mapping, f, indent=2)
     
     def create_family_index(self, family_id: str, embeddings: np.ndarray, protein_ids: List[str], **kwargs) -> str:
+        """
+        Create a FAISS binary index for a family using UniProt IDs as canonical identifiers.
+        Args:
+            family_id: Family identifier
+            embeddings: Protein embeddings (N x D, np.uint8)
+            protein_ids: List of UniProt IDs (exact match only)
+        Returns:
+            Path to the created index file
+        """
         dimension = embeddings.shape[1] * 8  # bits
         num_proteins = len(embeddings)
         if embeddings.dtype != np.uint8:
@@ -277,6 +281,15 @@ class HierarchicalIndex:
         return index, metadata
 
     def search_family(self, family_id: str, query_embedding: np.ndarray, top_k: int = 50, **kwargs) -> Tuple[np.ndarray, List[str]]:
+        """
+        Search for similar proteins within a family using UniProt IDs (exact match only).
+        Args:
+            family_id: Family identifier
+            query_embedding: Query embedding (np.uint8)
+            top_k: Number of results to return
+        Returns:
+            Tuple of (distances, UniProt IDs)
+        """
         index, metadata = self._get_cached_index(family_id)
         if query_embedding.dtype != np.uint8:
             raise ValueError("Query embedding must be np.uint8 for binary FAISS search.")
@@ -288,6 +301,15 @@ class HierarchicalIndex:
         return D, protein_ids
     
     def search_family_float(self, family_id: str, query_embedding: np.ndarray, top_k: int = 50) -> Tuple[np.ndarray, List[str]]:
+        """
+        Search for similar proteins within a family using UniProt IDs (exact match only, float index).
+        Args:
+            family_id: Family identifier
+            query_embedding: Query embedding (np.float32)
+            top_k: Number of results to return
+        Returns:
+            Tuple of (distances, UniProt IDs)
+        """
         import faiss
         # Create file-safe family ID for any family name format
         file_safe_id = self._make_file_safe(family_id)
