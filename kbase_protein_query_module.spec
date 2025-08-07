@@ -65,10 +65,8 @@ module kbase_protein_query_module {
     funcdef check_protein_existence(mapping<string, UnspecifiedObject> params) returns (CheckProteinExistenceResults output) authentication required;
 
     /*
-        Generate protein embeddings from sequence input or existing protein check results.
-        Two workflow options:
-        1. Direct sequence input: User provides protein sequence directly
-        2. From protein check result: Use existing protein check workspace object
+        Generate protein embeddings from direct sequence input.
+        Creates embeddings using ESM-2 model for downstream analysis.
     */
     typedef structure {
         string report_name;
@@ -80,8 +78,6 @@ module kbase_protein_query_module {
         float embedding_norm;
         int sequence_length;
         int embedding_dim;
-        string protein_id;
-        string family_id;
     } GenerateProteinEmbeddingResults;
     
     typedef structure {
@@ -95,8 +91,6 @@ module kbase_protein_query_module {
         int sequence_length;
         float embedding_norm;
         int embedding_dim;
-        string protein_id;
-        string family_id;
     } ProteinEmbeddingResult;
     
     funcdef generate_protein_embedding(mapping<string, UnspecifiedObject> params) returns (GenerateProteinEmbeddingResults output) authentication required;

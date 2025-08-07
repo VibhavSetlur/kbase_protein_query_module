@@ -4,23 +4,23 @@
 name: Check Protein Existence
 
 tooltip: |
-    Check if a protein exists in the database and optionally generate embeddings. Part of the comprehensive protein query analysis system.
+    Check if a protein exists in the database using UniProt ID and automatically generate embeddings if found. Part of the comprehensive protein query analysis system.
 
 screenshots: []
 
-icon: search.png
+icon: protein_check.png
 
 suggestions:
     apps:
         related:
-            [GenerateProteinEmbeddings, FindTopMatchesFromEmbedding, AssignProteinFamilyWithEmbedding]
+            [GenerateProteinEmbeddings, FindTopMatchesFromEmbedding]
         next:
-            [GenerateProteinEmbeddings]
+            [FindTopMatchesFromEmbedding]
     methods:
         related:
             []
         next:
-            ["GenerateProteinEmbeddings"]
+            ["FindTopMatchesFromEmbedding"]
 
 parameters :
     protein_id :
@@ -31,17 +31,18 @@ parameters :
                     Examples: P00001, P12345, Q9H0H5
     generate_embedding :
         ui-name : Generate Embedding
-        short-hint : Generate and save protein embedding if found.
-        long-hint  : If checked, will generate a protein embedding using ESM-2 model and save it as a workspace object for use in downstream analysis.
+        short-hint : Automatically generate embedding if protein found.
+        long-hint  : If checked, will automatically generate a protein embedding using ESM-2 model and save it as a workspace object when the protein is found in the database.
 
 description : |
-    <p>Check if a protein exists in the database using UniProt ID and optionally generate embeddings for downstream analysis. This is the first step in the comprehensive protein query analysis workflow.</p>
+    <p>Check if a protein exists in the database using UniProt ID and automatically generate embeddings for downstream analysis. This is the first step in the comprehensive protein query analysis workflow.</p>
     
     <h4>Comprehensive Analysis Workflow:</h4>
     <ul>
     <li><b>Step 1:</b> Enter a UniProt ID to check if the protein exists</li>
-    <li><b>Step 2:</b> Optionally generate embedding (saves as workspace object)</li>
+    <li><b>Step 2:</b> If found, automatically generates embedding (saves as workspace object)</li>
     <li><b>Step 3:</b> Use the saved workspace object in downstream analysis</li>
+    <li><b>For New Sequences:</b> Use GenerateProteinEmbeddings for direct sequence input</li>
     </ul>
     
     <h4>Advanced Capabilities:</h4>
@@ -49,25 +50,21 @@ description : |
     <li><b>Existence Status:</b> Whether the protein was found in the database</li>
     <li><b>Family Assignment:</b> Protein family classification if found</li>
     <li><b>Metadata:</b> Comprehensive protein information and properties</li>
-    <li><b>Embedding Object:</b> (Optional) Saved workspace object with protein embedding</li>
+    <li><b>Automatic Embedding:</b> Automatically generates and saves embedding workspace object</li>
     <li><b>Bioinformatics Integration:</b> Seamless connection with major protein databases</li>
     </ul>
     
-    <p><b>Usage:</b> Enter a UniProt ID, optionally check "Generate Embedding", and click <b>Check Protein</b>. The results are saved as workspace objects for use in subsequent analysis steps.</p>
+    <p><b>Note:</b> For proteins not in the database, use GenerateProteinEmbeddings to create embeddings from direct sequence input.</p>
 
 publications :
     -
         display-text: |
-            KBase Protein Query Analysis Module Documentation
-        link: https://github.com/kbaseapps/kbase_protein_query_module
+            Rives A, et al. Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences. PNAS. 2021.
+        link: https://www.pnas.org/doi/10.1073/pnas.2016239118
     -
         display-text: |
-            UniProt: a worldwide hub of protein knowledge
-        link: https://www.uniprot.org/
-    -
-        display-text: |
-            ESM-2: Language models of protein sequences
-        link: https://www.biorxiv.org/content/10.1101/2022.07.20.500902v2
+            ESM-2 Model Documentation
+        link: https://github.com/facebookresearch/esm
     -
         display-text: |
             KBase: A United States Department of Energy Systems Biology Knowledgebase

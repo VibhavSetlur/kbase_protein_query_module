@@ -15,43 +15,15 @@
     },
     "parameters": [
         {
-            "id": "input_source",
+            "id": "sequence",
             "optional": false,
             "advanced": false,
             "allow_multiple": false,
-            "default_values": ["sequence"],
-            "field_type": "dropdown",
-            "text_options": {
-                "valid_ws_types": [],
-                "example": "Choose input source",
-                "options": [
-                    {"value": "sequence", "display": "Protein Sequence (Direct Input)"},
-                    {"value": "workspace_object", "display": "From Protein Check Result"}
-                ]
-            }
-        },
-        {
-            "id": "protein_sequence",
-            "optional": true,
-            "advanced": false,
-            "allow_multiple": false,
             "default_values": [""],
-            "field_type": "textarea",
+            "field_type": "text",
             "text_options": {
                 "valid_ws_types": [],
                 "example": ">ExampleProtein\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ\n\nOr just the sequence:\nMKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ"
-            }
-        },
-        {
-            "id": "protein_check_result_ref",
-            "optional": true,
-            "advanced": false,
-            "allow_multiple": false,
-            "default_values": [""],
-            "field_type": "workspaceObjectRef",
-            "text_options": {
-                "valid_ws_types": ["ProteinExistenceResult"],
-                "example": "Select a protein check result containing protein data and metadata"
             }
         },
         {
@@ -78,16 +50,8 @@
                     "target_property": "workspace_name"
                 },
                 {
-                    "input_parameter": "input_source",
-                    "target_property": "input_source"
-                },
-                {
-                    "input_parameter": "protein_sequence",
-                    "target_property": "protein_sequence"
-                },
-                {
-                    "input_parameter": "protein_check_result_ref",
-                    "target_property": "protein_check_result_ref"
+                    "input_parameter": "sequence",
+                    "target_property": "sequence"
                 },
                 {
                     "input_parameter": "output_name",
@@ -95,15 +59,12 @@
                 }
             ],
             "output_mapping": [
+                { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
+                { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
                 { "service_method_output_path": [0, "embedding_result_ref"], "target_property": "embedding_result_ref" },
                 { "service_method_output_path": [0, "summary"], "target_property": "summary" },
                 { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
-                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
-                { "service_method_output_path": [0, "embedding_norm"], "target_property": "embedding_norm" },
-                { "service_method_output_path": [0, "sequence_length"], "target_property": "sequence_length" },
-                { "service_method_output_path": [0, "embedding_dim"], "target_property": "embedding_dim" },
-                { "service_method_output_path": [0, "protein_id"], "target_property": "protein_id" },
-                { "service_method_output_path": [0, "family_id"], "target_property": "family_id" }
+                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" }
             ]
         }
     },
