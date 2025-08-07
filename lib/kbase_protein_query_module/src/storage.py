@@ -12,7 +12,7 @@ import pandas as pd
 import pickle
 import gzip
 import zlib
-from typing import Dict, List, Tuple, Optional, Union, Iterator
+from typing import Dict, List, Tuple, Optional, Union, Iterator, Any
 import logging
 from collections import defaultdict
 import json
@@ -357,7 +357,7 @@ class ProteinStorage:
         if query_vector.dtype != np.float32:
             raise ValueError("Query vector must be float32 for assignment.")
         if centroids_npz is None:
-            centroids_npz = self.base_dir / "family_centroids_binary.npz"
+            centroids_npz = self.base_dir / "family_centroids" / "files" / "family_centroids_binary.npz"
         data = np.load(centroids_npz, allow_pickle=True)
         family_ids = data['family_ids']
         centroids = data['centroids']
@@ -595,6 +595,83 @@ class MemoryEfficientLoader:
                 # Load entire family
                 embeddings, protein_ids = self.storage.load_family_embeddings(family_id)
                 yield family_id, embeddings, protein_ids
+
+
+class ProteinNamesIndex:
+    """
+    Efficient protein names index for fast searching.
+    Supports both protein IDs and protein names with case-insensitive search.
+    """
+    
+    def __init__(self, base_dir: str = "data"):
+        self.base_dir = Path(base_dir)
+        self.index_dir = self.base_dir / "indexes" / "protein_names"
+        self.index_file = self.index_dir / "protein_names_index.json"
+        self.mapping_file = self.index_dir / "protein_to_family.json"
+        
+        # Load index if it exists
+        self.protein_names_index = {}
+        self.protein_to_family = {}
+        self._load_index()
+    
+    def _load_index(self):
+        """Load the protein names index from disk."""
+        try:
+            if self.index_file.exists():
+                with open(self.index_file, 'r') as f:
+                    self.protein_names_index = json.load(f)
+                logger.info(f"Loaded protein names index with {len(self.protein_names_index)} entries")
+            
+            if self.mapping_file.exists():
+                with open(self.mapping_file, 'r') as f:
+                    self.protein_to_family = json.load(f)
+                logger.info(f"Loaded protein to family mapping with {len(self.protein_to_family)} entries")
+        except Exception as e:
+            logger.warning(f"Failed to load protein names index: {e}")
+    
+    def search_protein(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Search for a protein by name or ID (case-insensitive).
+        
+        Args:
+            query: Protein name or ID to search for
+            
+        Returns:
+            Dict with protein information if found, None otherwise
+        """
+        if not query:
+            return None
+        
+        query_lower = query.lower().strip()
+        
+        # Direct lookup
+        if query_lower in self.protein_names_index:
+            return self.protein_names_index[query_lower]
+        
+        # Partial match search
+        for key, value in self.protein_names_index.items():
+            if query_lower in key or key in query_lower:
+                return value
+        
+        # Fuzzy search for protein names
+        for key, value in self.protein_names_index.items():
+            original_name = value.get('original_name', '')
+            if original_name and query_lower in original_name.lower():
+                return value
+        
+        return None
+    
+    def get_protein_family(self, protein_id: str) -> Optional[str]:
+        """Get the family ID for a protein ID."""
+        return self.protein_to_family.get(protein_id)
+    
+    def get_all_proteins(self) -> List[str]:
+        """Get all protein IDs in the index."""
+        return list(self.protein_to_family.keys())
+    
+    def get_proteins_by_family(self, family_id: str) -> List[str]:
+        """Get all protein IDs for a specific family."""
+        return [pid for pid, fid in self.protein_to_family.items() if fid == family_id]
 
 
 def create_storage_structure(embeddings_file: str,

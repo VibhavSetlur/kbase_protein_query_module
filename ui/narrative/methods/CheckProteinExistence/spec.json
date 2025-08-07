@@ -19,7 +19,7 @@
             "field_type": "text",
             "text_options": {
                 "valid_ws_types": [],
-                "example": "P12345, family_0_prot_1, or any protein identifier"
+                "example": "Any protein identifier (e.g., Collagen, Insulin, P12345, family_0_prot_1, Alpha-1-antitrypsin, etc.)"
             }
         },
         {
@@ -31,7 +31,7 @@
             "field_type": "checkbox",
             "text_options": {
                 "valid_ws_types": [],
-                "example": "Generate embedding for the protein if found"
+                "example": "Generate embedding for the protein if found using ESM-2 model"
             }
         }
     ],

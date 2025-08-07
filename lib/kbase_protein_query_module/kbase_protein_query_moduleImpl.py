@@ -160,7 +160,7 @@ Contact: https://kbase.us/contact-us/
         workspace_name = params.get('workspace_name')
         generate_embedding = params.get('generate_embedding', True)
         
-        # Quick validation - return error immediately for invalid inputs
+        # Basic validation - accept any non-empty string
         if not protein_id:
             raise ValueError("Parameter 'protein_id' is required and cannot be empty.")
         
@@ -171,26 +171,8 @@ Contact: https://kbase.us/contact-us/
         if not protein_id:
             raise ValueError("Parameter 'protein_id' cannot be empty or whitespace only.")
         
-        # More flexible validation - accept various formats
-        # UniProt format: P12345, Q1A2B3, etc.
-        uniprot_regex = r"^[A-NR-Z][0-9][A-Z0-9]{3}[0-9]$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$"
-        # Dummy data format: family_X_prot_Y
-        dummy_regex = r"^family_\d+_prot_\d+$"
-        # UniProt-like format: P followed by 8 digits
-        uniprot_like_regex = r"^P\d{8}$"
-        # Generic alphanumeric format (6-10 characters)
-        generic_regex = r"^[A-Z0-9]{6,10}$"
-        
-        # Check if protein_id matches any of the accepted formats
-        is_valid = (re.match(uniprot_regex, protein_id) or 
-                   re.match(dummy_regex, protein_id) or 
-                   re.match(uniprot_like_regex, protein_id) or
-                   re.match(generic_regex, protein_id))
-        
-        if not is_valid:
-            raise ValueError(f"Parameter 'protein_id' '{protein_id}' does not match expected formats. "
-                           f"Accepted formats: UniProt IDs (e.g., P12345), dummy IDs (e.g., family_0_prot_1), "
-                           f"or generic alphanumeric IDs (6-10 characters).")
+        # Accept any non-empty string as protein_id - no format restrictions
+        # The checker will handle existence regardless of format
         
         checker = ProteinExistenceChecker()
         result = checker.check_protein_existence(protein_id)

@@ -444,7 +444,7 @@ class Application(object):
                     status = '200 OK'
                 except JSONRPCError as jre:
                     err = {'error': {'code': jre.code,
-                                     'name': jre.message,
+                                     'name': str(jre),
                                      'message': jre.data
                                      }
                            }
@@ -599,7 +599,7 @@ def process_async_cli(input_file_path, output_file_path, token):
         resp = {'id': req['id'],
                 'version': req['version'],
                 'error': {'code': jre.code,
-                          'name': jre.message,
+                          'name': str(jre),
                           'message': jre.data,
                           'error': trace}
                 }

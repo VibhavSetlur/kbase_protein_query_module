@@ -4,7 +4,7 @@
 name: Check Protein Existence
 
 tooltip: |
-    Quickly check if a UniProt protein exists in the KBase Protein Network and view its family and metadata.
+    Quickly check if any protein identifier exists in the KBase Protein Network and view its family and metadata.
 
 screenshots: []
 
@@ -13,7 +13,7 @@ icon: search.png
 suggestions:
     apps:
         related:
-            [GenerateProteinEmbeddings, FindTopMatchesFromEmbedding]
+            [GenerateProteinEmbeddings, FindTopMatchesFromEmbedding, AssignProteinFamilyWithEmbedding]
         next:
             [GenerateProteinEmbeddings]
     methods:
@@ -24,21 +24,28 @@ suggestions:
 
 parameters :
     protein_id :
-        ui-name : Protein ID (UniProt)
-        short-hint : Check if this UniProt ID exists in the KBase Protein Network.
-        long-hint  : Enter a valid UniProt accession (e.g., P12345).
+        ui-name : Protein Identifier
+        short-hint : Enter any protein identifier (name, ID, or accession number).
+        long-hint  : |
+                    Enter any protein identifier such as:
+                    • Protein names (e.g., "Collagen", "Insulin", "Alpha-1-antitrypsin")
+                    • UniProt IDs (e.g., "P12345", "Q9H0H5")
+                    • Custom IDs (e.g., "family_0_prot_1", "ABC_transporter_protein_0001")
+                    • Any other protein identifier
     generate_embedding :
         ui-name : Generate Embedding
         short-hint : Generate protein embedding if found.
-        long-hint  : If checked, will generate a protein embedding for the found protein.
+        long-hint  : If checked, will generate a protein embedding for the found protein using ESM-2 model.
 
 description : |
-    <p>Enter a UniProt ID to check if it exists in the KBase Protein Network. If found, you will see its family and metadata.</p>
+    <p>Check if any protein identifier exists in the KBase Protein Network. The system accepts any protein identifier format and will search efficiently through the database.</p>
     <ul>
-    <li><b>Input:</b> UniProt protein ID (e.g., P12345)</li>
+    <li><b>Input:</b> Any protein identifier (name, ID, accession number, etc.)</li>
+    <li><b>Search:</b> Fast index-based search with fallback to comprehensive scanning</li>
     <li><b>Output:</b> Existence status, family ID, metadata, and optional embedding</li>
+    <li><b>Features:</b> Case-insensitive search, partial matching, fuzzy search</li>
     </ul>
-    <p>Use this as the first step in your protein analysis workflow.</p>
+    <p>Use this as the first step in your protein analysis workflow. The system will find proteins regardless of the input format.</p>
 
 publications :
     -

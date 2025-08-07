@@ -199,7 +199,9 @@ def create_directory_structure():
         os.path.join(DATA_DIR, "indexes", "metadata"),
         os.path.join(DATA_DIR, "indexes", "cache"),
         os.path.join(DATA_DIR, "indexes", "quantized"),
+        os.path.join(DATA_DIR, "indexes", "protein_names"),
         os.path.join(DATA_DIR, "family_centroids"),
+        os.path.join(DATA_DIR, "family_centroids", "files"),
         os.path.join(DATA_DIR, "cache"),
         os.path.join(DATA_DIR, "temp"),
         os.path.join(DATA_DIR, "streaming")
@@ -209,6 +211,74 @@ def create_directory_structure():
         os.makedirs(directory, exist_ok=True)
     
     logger.info("Directory structure created")
+
+def create_protein_names_index(family_mapping: Dict[str, str]):
+    """Create an efficient protein names index for fast searching."""
+    logger.info("Creating protein names index...")
+    
+    protein_names_index = {}
+    protein_to_family = {}
+    
+    for family_id, family_path in family_mapping.items():
+        try:
+            # Load metadata to get protein names
+            file_safe_id = family_id.replace(' ', '_').replace('-', '_')
+            metadata_file = os.path.join(DATA_DIR, "metadata", f"{file_safe_id}_metadata.parquet")
+            
+            if os.path.exists(metadata_file):
+                metadata = pd.read_parquet(metadata_file)
+                
+                # Create index for protein names (case-insensitive)
+                for protein_id, row in metadata.iterrows():
+                    protein_name = row.get('Protein names', '')
+                    if protein_name:
+                        # Store both original and lowercase versions
+                        protein_names_index[protein_name.lower()] = {
+                            'protein_id': protein_id,
+                            'family_id': family_id,
+                            'original_name': protein_name,
+                            'metadata': row.to_dict()
+                        }
+                        protein_to_family[protein_id] = family_id
+                        
+                        # Also index by protein ID for direct lookups
+                        protein_names_index[protein_id.lower()] = {
+                            'protein_id': protein_id,
+                            'family_id': family_id,
+                            'original_name': protein_name,
+                            'metadata': row.to_dict()
+                        }
+            
+            # Also index protein IDs from HDF5 files
+            with h5py.File(family_path, 'r') as f:
+                protein_ids = [pid.decode('utf-8') if isinstance(pid, bytes) else pid 
+                              for pid in f['protein_ids'][:]]
+                
+                for protein_id in protein_ids:
+                    if protein_id not in protein_to_family:
+                        protein_to_family[protein_id] = family_id
+                        protein_names_index[protein_id.lower()] = {
+                            'protein_id': protein_id,
+                            'family_id': family_id,
+                            'original_name': protein_id,
+                            'metadata': None
+                        }
+                        
+        except Exception as e:
+            logger.warning(f"Failed to create index for family {family_id}: {e}")
+    
+    # Save the index
+    index_file = os.path.join(DATA_DIR, "indexes", "protein_names", "protein_names_index.json")
+    with open(index_file, 'w') as f:
+        json.dump(protein_names_index, f, indent=2)
+    
+    # Save protein to family mapping
+    mapping_file = os.path.join(DATA_DIR, "indexes", "protein_names", "protein_to_family.json")
+    with open(mapping_file, 'w') as f:
+        json.dump(protein_to_family, f, indent=2)
+    
+    logger.info(f"Created protein names index with {len(protein_names_index)} entries")
+    return protein_names_index, protein_to_family
 
 def create_family_data(family_id: str, num_proteins: int = N_PROTEINS_PER_FAMILY) -> Tuple[str, str]:
     """Create comprehensive family data with embeddings and metadata."""
@@ -322,7 +392,7 @@ def create_family_centroids_file(family_mapping: Dict[str, str]):
     
     if centroids:
         centroids_array = np.array(centroids, dtype=np.float32)
-        family_centroids_file = os.path.join(DATA_DIR, "family_centroids", "family_centroids_binary.npz")
+        family_centroids_file = os.path.join(DATA_DIR, "family_centroids", "files", "family_centroids_binary.npz")
         np.savez_compressed(
             family_centroids_file,
             centroids=centroids_array,
@@ -380,6 +450,9 @@ def setup_complete_test_data():
     # Create family centroids file
     create_family_centroids_file(family_mapping)
     
+    # Create protein names index
+    create_protein_names_index(family_mapping)
+    
     logger.info("Complete test data setup finished!")
     
     # Print summary
@@ -397,6 +470,7 @@ def setup_complete_test_data():
     print(f"Family mapping created: ✅")
     print(f"Centroids file created: ✅")
     print(f"FAISS indexes created: ✅")
+    print(f"Protein names index created: ✅")
     print("="*60)
 
 if __name__ == "__main__":
