@@ -86,18 +86,6 @@ test-indexes: setup-test-data
 	@echo "Creating FAISS indexes for test data..."
 	python $(SCRIPTS_DIR)/create_faiss_indexes.py --all --force
 
-clean:
-	rm -rfv $(LBIN_DIR)
-	rm -rf $(LIB_DIR)/$(SERVICE_CAPS)
-	rm -rf $(LIB_DIR)/installed_clients
-	rm -rf $(LIB_DIR)/$(SERVICE_CAPS)_src.egg-info
-	rm -rf $(LIB_DIR)/$(SERVICE_CAPS).egg-info
-
-clean-all: clean
-	rm -rf data/indexes
-	rm -rf data/family_centroids
-	rm -rf data/cache
-	rm -rf data/temp
 
 install:
 	pip install -r requirements.txt

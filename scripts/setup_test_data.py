@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = "data"
 MODEL_DIR = os.path.join(DATA_DIR, "esm2_t6_8M_UR50D_local")
 EMBEDDING_DIM = 320
-N_PROTEINS_PER_FAMILY = 1000  # Increased to meet FAISS clustering requirements (39 * nlist)
+N_PROTEINS_PER_FAMILY = 2000  # Increased to meet FAISS clustering requirements (39 * nlist)
 N_FAMILIES = 20  # Comprehensive set of families
 
 # Realistic protein data for metadata generation
@@ -287,7 +287,18 @@ def create_faiss_indexes(family_id: str):
         
         with h5py.File(family_file, 'r') as f:
             embeddings = f['embeddings'][:]
-            protein_ids = f['protein_ids'][:]
+            protein_ids_raw = f['protein_ids'][:]
+            
+            # Convert protein_ids to strings if they are bytes
+            if hasattr(protein_ids_raw, 'dtype') and protein_ids_raw.dtype.kind == 'S':
+                protein_ids = [pid.decode('utf-8') if isinstance(pid, bytes) else str(pid) for pid in protein_ids_raw]
+            elif hasattr(protein_ids_raw, 'tolist'):
+                protein_ids = protein_ids_raw.tolist()
+            else:
+                protein_ids = list(protein_ids_raw)
+            
+            # Ensure all protein_ids are strings
+            protein_ids = [str(pid) for pid in protein_ids]
         
         # Create float index
         n_embeddings = embeddings.shape[0]
@@ -298,8 +309,11 @@ def create_faiss_indexes(family_id: str):
         max_nlist = max(1, n_embeddings // min_training_points)
         nlist = min(10, max_nlist)  # Use reasonable nlist
         
-        if n_embeddings >= nlist:
-            # Create IVF index
+        # Create file-safe family ID
+        file_safe_id = family_id.replace('/', '_').replace('\\', '_').replace(' ', '_')
+        
+        if n_embeddings >= (nlist * min_training_points):
+            # Create IVF index with sufficient training data
             quantizer = faiss.IndexFlatIP(embedding_dim)
             index = faiss.IndexIVFFlat(quantizer, embedding_dim, nlist, faiss.METRIC_INNER_PRODUCT)
             
@@ -309,18 +323,40 @@ def create_faiss_indexes(family_id: str):
             # Train and add
             index.train(embeddings)
             index.add(embeddings)
+            
+            index_type = 'IVF_float'
         else:
             # Use flat index for small datasets
             index = faiss.IndexFlatIP(embedding_dim)
             faiss.normalize_L2(embeddings)
             index.add(embeddings)
+            
+            index_type = 'Flat_float'
         
         # Save index
-        index_path = f"data/indexes/families/{family_id}.faiss"
+        index_path = f"data/indexes/families/{file_safe_id}.faiss"
         os.makedirs(os.path.dirname(index_path), exist_ok=True)
         faiss.write_index(index, index_path)
         
-        logger.info(f"Created FAISS index for {family_id}: {n_embeddings} proteins, {embedding_dim} dim")
+        # Save metadata
+        metadata = {
+            'family_id': family_id,
+            'protein_ids': protein_ids,  # This is already a list of strings
+            'num_proteins': len(protein_ids),
+            'embedding_dim': embedding_dim,
+            'index_type': index_type,
+            'nlist': nlist,
+            'metric': 'cosine'
+        }
+        
+        metadata_path = f"data/indexes/metadata/{file_safe_id}_float_metadata.json"
+        os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+        
+        import json
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        logger.info(f"Created FAISS {index_type} index for {family_id}: {n_embeddings} proteins, {embedding_dim} dim")
         
     except Exception as e:
         logger.warning(f"Failed to create FAISS index for {family_id}: {e}")
@@ -372,6 +408,8 @@ def setup_complete_test_data():
     family_mapping = {}
     all_uniprot_ids = []
     uniprot_offset = 0
+    
+    # Create family data and indexes
     for family_id in test_families:
         try:
             family_file, metadata_file, protein_ids = create_family_data(family_id, N_PROTEINS_PER_FAMILY, uniprot_offset)
@@ -381,9 +419,19 @@ def setup_complete_test_data():
             create_faiss_indexes(family_id)
         except Exception as e:
             logger.error(f"Failed to create test data for {family_id}: {e}")
+    # Create family mapping for hierarchical index
     mapping_file = os.path.join(DATA_DIR, "indexes", "family_mapping.json")
+    hierarchical_mapping = {}
+    
+    for family_id in test_families:
+        file_safe_id = family_id.replace('/', '_').replace('\\', '_').replace(' ', '_')
+        index_path = os.path.join(DATA_DIR, "indexes", "families", f"{file_safe_id}.faiss")
+        if os.path.exists(index_path):
+            hierarchical_mapping[family_id] = index_path
+    
     with open(mapping_file, 'w') as f:
-        json.dump(family_mapping, f, indent=2)
+        json.dump(hierarchical_mapping, f, indent=2)
+    
     create_family_centroids_file(family_mapping)
     create_protein_ids_index(family_mapping)
     # Save UniProt ID list for test reference

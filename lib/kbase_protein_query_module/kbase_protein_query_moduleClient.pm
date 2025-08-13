@@ -28,13 +28,26 @@ kbase_protein_query_module::kbase_protein_query_moduleClient
 
 A KBase module: kbase_protein_query_module
 
-This module provides comprehensive protein network analysis capabilities including:
-- Protein existence checking in database
-- Protein embedding generation using ESM-2 models
-- Family assignment using similarity to centroids
-- Similarity search and network building
-- Sequence analysis with bioinformatics integration
-- Comprehensive HTML report generation
+This module provides comprehensive protein query analysis capabilities using UniProt IDs as the canonical identifier:
+
+COMPREHENSIVE ANALYSIS WORKFLOW:
+1. CheckProteinExistence: Verify protein exists using UniProt ID, optionally generate embedding
+2. GenerateProteinEmbeddings: Create embeddings from sequence input or protein check results
+3. AssignProteinFamily: Assign proteins to families using similarity to centroids
+4. FindTopMatches: Perform similarity search within families
+5. SummarizeAndVisualize: Generate comprehensive HTML reports with network analysis
+
+ADVANCED CAPABILITIES:
+- UniProt ID canonical identifier system (exact match only)
+- ESM-2 protein language model for embedding generation
+- Efficient FAISS-based similarity search and clustering
+- Family assignment using binary centroid similarity
+- Comprehensive metadata storage and retrieval
+- HTML report generation with network visualization
+- Workspace object management for downstream analysis
+- Bioinformatics integration with protein databases
+- Network analysis and protein relationship mapping
+- Advanced similarity metrics and statistical analysis
 
 Authors: Vibhav Setlur
 Contact: https://kbase.us/contact-us/
@@ -119,94 +132,6 @@ sub new
 
 
 
-=head2 run_kbase_protein_query_module
-
-  $output = $obj->run_kbase_protein_query_module($params)
-
-=over 4
-
-=item Parameter and return types
-
-=begin html
-
-<pre>
-$params is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
-$output is a kbase_protein_query_module.ReportResults
-ReportResults is a reference to a hash where the following keys are defined:
-	report_name has a value which is a string
-	report_ref has a value which is a string
-
-</pre>
-
-=end html
-
-=begin text
-
-$params is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
-$output is a kbase_protein_query_module.ReportResults
-ReportResults is a reference to a hash where the following keys are defined:
-	report_name has a value which is a string
-	report_ref has a value which is a string
-
-
-=end text
-
-=item Description
-
-This example function accepts any number of parameters and returns results in a KBaseReport
-
-=back
-
-=cut
-
- sub run_kbase_protein_query_module
-{
-    my($self, @args) = @_;
-
-# Authentication: required
-
-    if ((my $n = @args) != 1)
-    {
-	Bio::KBase::Exceptions::ArgumentValidationError->throw(error =>
-							       "Invalid argument count for function run_kbase_protein_query_module (received $n, expecting 1)");
-    }
-    {
-	my($params) = @args;
-
-	my @_bad_arguments;
-        (ref($params) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"params\" (value was \"$params\")");
-        if (@_bad_arguments) {
-	    my $msg = "Invalid arguments passed to run_kbase_protein_query_module:\n" . join("", map { "\t$_\n" } @_bad_arguments);
-	    Bio::KBase::Exceptions::ArgumentValidationError->throw(error => $msg,
-								   method_name => 'run_kbase_protein_query_module');
-	}
-    }
-
-    my $url = $self->{url};
-    my $result = $self->{client}->call($url, $self->{headers}, {
-	    method => "kbase_protein_query_module.run_kbase_protein_query_module",
-	    params => \@args,
-    });
-    if ($result) {
-	if ($result->is_error) {
-	    Bio::KBase::Exceptions::JSONRPC->throw(error => $result->error_message,
-					       code => $result->content->{error}->{code},
-					       method_name => 'run_kbase_protein_query_module',
-					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
-					      );
-	} else {
-	    return wantarray ? @{$result->result} : $result->result->[0];
-	}
-    } else {
-        Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method run_kbase_protein_query_module",
-					    status_line => $self->{client}->status_line,
-					    method_name => 'run_kbase_protein_query_module',
-				       );
-    }
-}
- 
-
-
 =head2 check_protein_existence
 
   $output = $obj->check_protein_existence($params)
@@ -230,6 +155,7 @@ CheckProteinExistenceResults is a reference to a hash where the following keys a
 	start_time has a value which is a float
 	summary has a value which is a string
 	protein_existence_result_ref has a value which is a string
+	embedding_result_ref has a value which is a string
 
 </pre>
 
@@ -249,6 +175,7 @@ CheckProteinExistenceResults is a reference to a hash where the following keys a
 	start_time has a value which is a float
 	summary has a value which is a string
 	protein_existence_result_ref has a value which is a string
+	embedding_result_ref has a value which is a string
 
 
 =end text
@@ -705,6 +632,108 @@ SummarizeAndVisualizeResultsResults is a reference to a hash where the following
     }
 }
  
+
+
+=head2 run_protein_query_analysis
+
+  $output = $obj->run_protein_query_analysis($params)
+
+=over 4
+
+=item Parameter and return types
+
+=begin html
+
+<pre>
+$params is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
+$output is a kbase_protein_query_module.ProteinQueryAnalysisResults
+ProteinQueryAnalysisResults is a reference to a hash where the following keys are defined:
+	report_name has a value which is a string
+	report_ref has a value which is a string
+	analysis_result_ref has a value which is a string
+	summary has a value which is a string
+	input_parameters has a value which is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
+	start_time has a value which is a float
+	html_report_path has a value which is a string
+	protein_count has a value which is an int
+	stages_completed has a value which is a reference to a list where each element is a string
+
+</pre>
+
+=end html
+
+=begin text
+
+$params is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
+$output is a kbase_protein_query_module.ProteinQueryAnalysisResults
+ProteinQueryAnalysisResults is a reference to a hash where the following keys are defined:
+	report_name has a value which is a string
+	report_ref has a value which is a string
+	analysis_result_ref has a value which is a string
+	summary has a value which is a string
+	input_parameters has a value which is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
+	start_time has a value which is a float
+	html_report_path has a value which is a string
+	protein_count has a value which is an int
+	stages_completed has a value which is a reference to a list where each element is a string
+
+
+=end text
+
+=item Description
+
+
+
+=back
+
+=cut
+
+ sub run_protein_query_analysis
+{
+    my($self, @args) = @_;
+
+# Authentication: required
+
+    if ((my $n = @args) != 1)
+    {
+	Bio::KBase::Exceptions::ArgumentValidationError->throw(error =>
+							       "Invalid argument count for function run_protein_query_analysis (received $n, expecting 1)");
+    }
+    {
+	my($params) = @args;
+
+	my @_bad_arguments;
+        (ref($params) eq 'HASH') or push(@_bad_arguments, "Invalid type for argument 1 \"params\" (value was \"$params\")");
+        if (@_bad_arguments) {
+	    my $msg = "Invalid arguments passed to run_protein_query_analysis:\n" . join("", map { "\t$_\n" } @_bad_arguments);
+	    Bio::KBase::Exceptions::ArgumentValidationError->throw(error => $msg,
+								   method_name => 'run_protein_query_analysis');
+	}
+    }
+
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "kbase_protein_query_module.run_protein_query_analysis",
+	    params => \@args,
+    });
+    if ($result) {
+	if ($result->is_error) {
+	    Bio::KBase::Exceptions::JSONRPC->throw(error => $result->error_message,
+					       code => $result->content->{error}->{code},
+					       method_name => 'run_protein_query_analysis',
+					       data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
+					      );
+	} else {
+	    return wantarray ? @{$result->result} : $result->result->[0];
+	}
+    } else {
+        Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method run_protein_query_analysis",
+					    status_line => $self->{client}->status_line,
+					    method_name => 'run_protein_query_analysis',
+				       );
+    }
+}
+ 
   
 sub status
 {
@@ -748,16 +777,16 @@ sub version {
             Bio::KBase::Exceptions::JSONRPC->throw(
                 error => $result->error_message,
                 code => $result->content->{code},
-                method_name => 'summarize_and_visualize_results',
+                method_name => 'run_protein_query_analysis',
             );
         } else {
             return wantarray ? @{$result->result} : $result->result->[0];
         }
     } else {
         Bio::KBase::Exceptions::HTTP->throw(
-            error => "Error invoking method summarize_and_visualize_results",
+            error => "Error invoking method run_protein_query_analysis",
             status_line => $self->{client}->status_line,
-            method_name => 'summarize_and_visualize_results',
+            method_name => 'run_protein_query_analysis',
         );
     }
 }
@@ -834,7 +863,9 @@ report_ref has a value which is a string
 
 =item Description
 
-Check if a protein exists in the storage system and create a workspace object with the result.
+Check if a protein exists in the storage system using UniProt ID and create a workspace object with the result.
+Input: UniProt ID (e.g., P00001, P12345)
+Output: Existence status, family assignment, metadata, optional embedding
 
 
 =item Definition
@@ -852,6 +883,7 @@ input_parameters has a value which is a reference to a hash where the key is a s
 start_time has a value which is a float
 summary has a value which is a string
 protein_existence_result_ref has a value which is a string
+embedding_result_ref has a value which is a string
 
 </pre>
 
@@ -869,6 +901,7 @@ input_parameters has a value which is a reference to a hash where the key is a s
 start_time has a value which is a float
 summary has a value which is a string
 protein_existence_result_ref has a value which is a string
+embedding_result_ref has a value which is a string
 
 
 =end text
@@ -931,7 +964,8 @@ summary has a value which is a string
 
 =item Description
 
-Generate a protein embedding from a sequence or workspace object.
+Generate protein embeddings from direct sequence input.
+Creates embeddings using ESM-2 model for downstream analysis.
 
 
 =item Definition
@@ -987,7 +1021,7 @@ embedding_dim has a value which is an int
 <pre>
 a reference to a hash where the following keys are defined:
 input_id has a value which is a string
-input_type has a value which is a string
+input_source has a value which is a string
 embedding_ref has a value which is a string
 embedding has a value which is a reference to a list where each element is a float
 model_name has a value which is a string
@@ -1005,7 +1039,7 @@ embedding_dim has a value which is an int
 
 a reference to a hash where the following keys are defined:
 input_id has a value which is a string
-input_type has a value which is a string
+input_source has a value which is a string
 embedding_ref has a value which is a string
 embedding has a value which is a reference to a list where each element is a float
 model_name has a value which is a string
@@ -1030,7 +1064,8 @@ embedding_dim has a value which is an int
 
 =item Description
 
-Quickly assign a protein embedding to a family by similarity to the medoid.
+Assign a protein embedding to a family using similarity to family centroids.
+Uses binary Hamming distance for fast family assignment.
 
 
 =item Definition
@@ -1119,7 +1154,8 @@ confidence has a value which is a float
 
 =item Description
 
-Find top matches for a given protein embedding.
+Find top matches for a given protein embedding within a family.
+Uses FAISS IVF float index for efficient similarity search.
 
 
 =item Definition
@@ -1213,6 +1249,7 @@ metadata has a value which is a reference to a hash where the key is a string an
 =item Description
 
 Summarize and visualize protein network analysis results.
+Generates comprehensive HTML reports with network visualization.
 
 
 =item Definition
@@ -1295,6 +1332,60 @@ protein_existence_ref has a value which is a string
 matches has a value which is a reference to a list where each element is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
 family_id has a value which is a string
 top_n has a value which is an int
+
+
+=end text
+
+=back
+
+
+
+=head2 ProteinQueryAnalysisResults
+
+=over 4
+
+
+
+=item Description
+
+Unified Protein Query Analysis Pipeline
+
+This method provides a single entry point for comprehensive protein analysis,
+supporting multiple input types and configurable analysis stages.
+
+
+=item Definition
+
+=begin html
+
+<pre>
+a reference to a hash where the following keys are defined:
+report_name has a value which is a string
+report_ref has a value which is a string
+analysis_result_ref has a value which is a string
+summary has a value which is a string
+input_parameters has a value which is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
+start_time has a value which is a float
+html_report_path has a value which is a string
+protein_count has a value which is an int
+stages_completed has a value which is a reference to a list where each element is a string
+
+</pre>
+
+=end html
+
+=begin text
+
+a reference to a hash where the following keys are defined:
+report_name has a value which is a string
+report_ref has a value which is a string
+analysis_result_ref has a value which is a string
+summary has a value which is a string
+input_parameters has a value which is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
+start_time has a value which is a float
+html_report_path has a value which is a string
+protein_count has a value which is an int
+stages_completed has a value which is a reference to a list where each element is a string
 
 
 =end text

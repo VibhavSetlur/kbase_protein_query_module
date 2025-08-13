@@ -33,28 +33,21 @@ class kbase_protein_query_module(object):
             trust_all_ssl_certificates=trust_all_ssl_certificates,
             auth_svc=auth_svc)
 
-    def run_kbase_protein_query_module(self, params, context=None):
-        """
-        This example function accepts any number of parameters and returns results in a KBaseReport
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "ReportResults" -> structure: parameter
-           "report_name" of String, parameter "report_ref" of String
-        """
-        return self._client.call_method('kbase_protein_query_module.run_kbase_protein_query_module',
-                                        [params], self._service_ver, context)
-
     def check_protein_existence(self, params, context=None):
         """
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "CheckProteinExistenceResults" (Check if a
-           protein exists in the storage system and create a workspace object
-           with the result.) -> structure: parameter "report_name" of String,
-           parameter "report_ref" of String, parameter "exists" of Long,
-           parameter "family_id" of String, parameter "metadata" of mapping
-           from String to unspecified object, parameter "input_parameters" of
-           mapping from String to unspecified object, parameter "start_time"
-           of Double, parameter "summary" of String, parameter
-           "protein_existence_result_ref" of String
+           protein exists in the storage system using UniProt ID and create a
+           workspace object with the result. Input: UniProt ID (e.g., P00001,
+           P12345) Output: Existence status, family assignment, metadata,
+           optional embedding) -> structure: parameter "report_name" of
+           String, parameter "report_ref" of String, parameter "exists" of
+           Long, parameter "family_id" of String, parameter "metadata" of
+           mapping from String to unspecified object, parameter
+           "input_parameters" of mapping from String to unspecified object,
+           parameter "start_time" of Double, parameter "summary" of String,
+           parameter "protein_existence_result_ref" of String, parameter
+           "embedding_result_ref" of String
         """
         return self._client.call_method('kbase_protein_query_module.check_protein_existence',
                                         [params], self._service_ver, context)
@@ -63,10 +56,11 @@ class kbase_protein_query_module(object):
         """
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "GenerateProteinEmbeddingResults"
-           (Generate a protein embedding from a sequence or workspace
-           object.) -> structure: parameter "report_name" of String,
-           parameter "report_ref" of String, parameter "embedding_result_ref"
-           of String, parameter "summary" of String, parameter
+           (Generate protein embeddings from direct sequence input. Creates
+           embeddings using ESM-2 model for downstream analysis.) ->
+           structure: parameter "report_name" of String, parameter
+           "report_ref" of String, parameter "embedding_result_ref" of
+           String, parameter "summary" of String, parameter
            "input_parameters" of mapping from String to unspecified object,
            parameter "start_time" of Double, parameter "embedding_norm" of
            Double, parameter "sequence_length" of Long, parameter
@@ -78,12 +72,13 @@ class kbase_protein_query_module(object):
     def assign_family_fast(self, params, context=None):
         """
         :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "AssignFamilyFastResults" (Quickly assign
-           a protein embedding to a family by similarity to the medoid.) ->
-           structure: parameter "family_id" of String, parameter "confidence"
-           of Double, parameter "eigenprotein_id" of String, parameter
-           "input_parameters" of mapping from String to unspecified object,
-           parameter "start_time" of Double, parameter
+        :returns: instance of type "AssignFamilyFastResults" (Assign a
+           protein embedding to a family using similarity to family
+           centroids. Uses binary Hamming distance for fast family
+           assignment.) -> structure: parameter "family_id" of String,
+           parameter "confidence" of Double, parameter "eigenprotein_id" of
+           String, parameter "input_parameters" of mapping from String to
+           unspecified object, parameter "start_time" of Double, parameter
            "family_assignment_result_ref" of String
         """
         return self._client.call_method('kbase_protein_query_module.assign_family_fast',
@@ -93,9 +88,10 @@ class kbase_protein_query_module(object):
         """
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "FindTopMatchesFromEmbeddingResults" (Find
-           top matches for a given protein embedding.) -> structure:
-           parameter "matches" of list of mapping from String to unspecified
-           object, parameter "summary" of String, parameter
+           top matches for a given protein embedding within a family. Uses
+           FAISS IVF float index for efficient similarity search.) ->
+           structure: parameter "matches" of list of mapping from String to
+           unspecified object, parameter "summary" of String, parameter
            "input_parameters" of mapping from String to unspecified object,
            parameter "start_time" of Double, parameter "family_id" of String,
            parameter "top_n" of Long, parameter "similarity_stats" of mapping
@@ -109,8 +105,9 @@ class kbase_protein_query_module(object):
         """
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "SummarizeAndVisualizeResultsResults"
-           (Summarize and visualize protein network analysis results.) ->
-           structure: parameter "report_name" of String, parameter
+           (Summarize and visualize protein network analysis results.
+           Generates comprehensive HTML reports with network visualization.)
+           -> structure: parameter "report_name" of String, parameter
            "report_ref" of String, parameter "input_parameters" of mapping
            from String to unspecified object, parameter "start_time" of
            Double, parameter "output_dir" of String, parameter "summary" of
@@ -118,6 +115,24 @@ class kbase_protein_query_module(object):
            "sequence_analysis_ref" of String
         """
         return self._client.call_method('kbase_protein_query_module.summarize_and_visualize_results',
+                                        [params], self._service_ver, context)
+
+    def run_protein_query_analysis(self, params, context=None):
+        """
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "ProteinQueryAnalysisResults" (Unified
+           Protein Query Analysis Pipeline This method provides a single
+           entry point for comprehensive protein analysis, supporting
+           multiple input types and configurable analysis stages.) ->
+           structure: parameter "report_name" of String, parameter
+           "report_ref" of String, parameter "analysis_result_ref" of String,
+           parameter "summary" of String, parameter "input_parameters" of
+           mapping from String to unspecified object, parameter "start_time"
+           of Double, parameter "html_report_path" of String, parameter
+           "protein_count" of Long, parameter "stages_completed" of list of
+           String
+        """
+        return self._client.call_method('kbase_protein_query_module.run_protein_query_analysis',
                                         [params], self._service_ver, context)
 
     def status(self, context=None):

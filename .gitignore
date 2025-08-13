@@ -1,5 +1,12 @@
+# Test files
+tmp
+backups
+test_outputs
+results
+
 # KBase SDK files
 test_local
+test_local_backup
 sdk.cfg
 
 # Temporary and backup files

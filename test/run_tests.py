@@ -268,7 +268,7 @@ Recommendations:
 
 For more information, see:
 - KBase SDK Documentation: https://kbase.github.io/kb_sdk_docs/
-- Module Documentation: https://github.com/kbaseapps/kbase_protein_network_analysis_toolkit
+- Module Documentation: https://github.com/kbaseapps/kbase_protein_query_module
 """
         
         # Write report to file

@@ -3,12 +3,12 @@ KBase Protein Query Module Test Report
 =====================================
 
 Test Results Summary:
-- Passed: 23
-- Failed: 1
-- Errors: 0
+- Passed: 35
+- Failed: 3
+- Errors: 38
 - Skipped: 1
-- Total: 25
-- Success Rate: 92.0%
+- Total: 77
+- Success Rate: 45.5%
 
 Test Categories:
 1. Unit Tests: Core module functionality
@@ -26,4 +26,4 @@ Note: Integration tests were skipped because biokbase module is not available. R
 
 For more information, see:
 - KBase SDK Documentation: https://kbase.github.io/kb_sdk_docs/
-- Module Documentation: https://github.com/kbaseapps/kbase_protein_network_analysis_toolkit
+- Module Documentation: https://github.com/kbaseapps/kbase_protein_query_module

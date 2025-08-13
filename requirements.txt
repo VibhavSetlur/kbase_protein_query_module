@@ -31,6 +31,9 @@ pyarrow==6.0.0
 # Bioinformatics
 biopython==1.79
 
+# Multiple Sequence Alignment - Removed mafft as it's not available in Docker environment
+# mafft>=7.490
+
 # Other
 joblib==1.1.0
 tqdm==4.62.0

@@ -1,97 +1,154 @@
+
 package us.kbase.kbaseproteinquerymodule;
 
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Generated;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import us.kbase.common.service.UObject;
+
 
 /**
  * <p>Original spec-file type: AssignFamilyFastResults</p>
  * <pre>
- * Quickly assign a protein embedding to a family by similarity to the medoid.
- * AssignFamilyFastResults is a reference to a hash where the following keys are defined:
- * report_name has a value which is a string
- * report_ref has a value which is a string
- * family_id has a value which is a string
- * similarity_score has a value which is a float
- * summary has a value which is a string
- * input_parameters has a value which is a reference to a hash where the key is a string and the value is an UnspecifiedObject, which can hold any non-null object
- * start_time has a value which is a float
- * family_assignment_result_ref has a value which is a string
+ * Assign a protein embedding to a family using similarity to family centroids.
+ * Uses binary Hamming distance for fast family assignment.
  * </pre>
+ * 
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Generated("com.googlecode.jsonschema2pojo")
+@JsonPropertyOrder({
+    "family_id",
+    "confidence",
+    "eigenprotein_id",
+    "input_parameters",
+    "start_time",
+    "family_assignment_result_ref"
+})
 public class AssignFamilyFastResults {
-    private String reportName;
-    private String reportRef;
-    private String familyId;
-    private Double similarityScore;
-    private String summary;
-    private Map<String, Object> inputParameters;
+
+    @JsonProperty("family_id")
+    private java.lang.String familyId;
+    @JsonProperty("confidence")
+    private Double confidence;
+    @JsonProperty("eigenprotein_id")
+    private java.lang.String eigenproteinId;
+    @JsonProperty("input_parameters")
+    private Map<String, UObject> inputParameters;
+    @JsonProperty("start_time")
     private Double startTime;
-    private String familyAssignmentResultRef;
+    @JsonProperty("family_assignment_result_ref")
+    private java.lang.String familyAssignmentResultRef;
+    private Map<java.lang.String, Object> additionalProperties = new HashMap<java.lang.String, Object>();
 
-    public AssignFamilyFastResults() {
-    }
-
-    public String getReportName() {
-        return reportName;
-    }
-
-    public void setReportName(String reportName) {
-        this.reportName = reportName;
-    }
-
-    public String getReportRef() {
-        return reportRef;
-    }
-
-    public void setReportRef(String reportRef) {
-        this.reportRef = reportRef;
-    }
-
-    public String getFamilyId() {
+    @JsonProperty("family_id")
+    public java.lang.String getFamilyId() {
         return familyId;
     }
 
-    public void setFamilyId(String familyId) {
+    @JsonProperty("family_id")
+    public void setFamilyId(java.lang.String familyId) {
         this.familyId = familyId;
     }
 
-    public Double getSimilarityScore() {
-        return similarityScore;
+    public AssignFamilyFastResults withFamilyId(java.lang.String familyId) {
+        this.familyId = familyId;
+        return this;
     }
 
-    public void setSimilarityScore(Double similarityScore) {
-        this.similarityScore = similarityScore;
+    @JsonProperty("confidence")
+    public Double getConfidence() {
+        return confidence;
     }
 
-    public String getSummary() {
-        return summary;
+    @JsonProperty("confidence")
+    public void setConfidence(Double confidence) {
+        this.confidence = confidence;
     }
 
-    public void setSummary(String summary) {
-        this.summary = summary;
+    public AssignFamilyFastResults withConfidence(Double confidence) {
+        this.confidence = confidence;
+        return this;
     }
 
-    public Map<String, Object> getInputParameters() {
+    @JsonProperty("eigenprotein_id")
+    public java.lang.String getEigenproteinId() {
+        return eigenproteinId;
+    }
+
+    @JsonProperty("eigenprotein_id")
+    public void setEigenproteinId(java.lang.String eigenproteinId) {
+        this.eigenproteinId = eigenproteinId;
+    }
+
+    public AssignFamilyFastResults withEigenproteinId(java.lang.String eigenproteinId) {
+        this.eigenproteinId = eigenproteinId;
+        return this;
+    }
+
+    @JsonProperty("input_parameters")
+    public Map<String, UObject> getInputParameters() {
         return inputParameters;
     }
 
-    public void setInputParameters(Map<String, Object> inputParameters) {
+    @JsonProperty("input_parameters")
+    public void setInputParameters(Map<String, UObject> inputParameters) {
         this.inputParameters = inputParameters;
     }
 
+    public AssignFamilyFastResults withInputParameters(Map<String, UObject> inputParameters) {
+        this.inputParameters = inputParameters;
+        return this;
+    }
+
+    @JsonProperty("start_time")
     public Double getStartTime() {
         return startTime;
     }
 
+    @JsonProperty("start_time")
     public void setStartTime(Double startTime) {
         this.startTime = startTime;
     }
 
-    public String getFamilyAssignmentResultRef() {
+    public AssignFamilyFastResults withStartTime(Double startTime) {
+        this.startTime = startTime;
+        return this;
+    }
+
+    @JsonProperty("family_assignment_result_ref")
+    public java.lang.String getFamilyAssignmentResultRef() {
         return familyAssignmentResultRef;
     }
 
-    public void setFamilyAssignmentResultRef(String familyAssignmentResultRef) {
+    @JsonProperty("family_assignment_result_ref")
+    public void setFamilyAssignmentResultRef(java.lang.String familyAssignmentResultRef) {
         this.familyAssignmentResultRef = familyAssignmentResultRef;
     }
-} 
+
+    public AssignFamilyFastResults withFamilyAssignmentResultRef(java.lang.String familyAssignmentResultRef) {
+        this.familyAssignmentResultRef = familyAssignmentResultRef;
+        return this;
+    }
+
+    @JsonAnyGetter
+    public Map<java.lang.String, Object> getAdditionalProperties() {
+        return this.additionalProperties;
+    }
+
+    @JsonAnySetter
+    public void setAdditionalProperties(java.lang.String name, Object value) {
+        this.additionalProperties.put(name, value);
+    }
+
+    @Override
+    public java.lang.String toString() {
+        return ((((((((((((((("AssignFamilyFastResults"+" [familyId=")+ familyId)+", confidence=")+ confidence)+", eigenproteinId=")+ eigenproteinId)+", inputParameters=")+ inputParameters)+", startTime=")+ startTime)+", familyAssignmentResultRef=")+ familyAssignmentResultRef)+", additionalProperties=")+ additionalProperties)+"]");
+    }
+
+}

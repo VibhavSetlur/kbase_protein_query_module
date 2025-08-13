@@ -9,6 +9,7 @@ COMPREHENSIVE ANALYSIS WORKFLOW:
 3. AssignProteinFamily: Assign proteins to families using similarity to centroids
 4. FindTopMatches: Perform similarity search within families
 5. SummarizeAndVisualize: Generate comprehensive HTML reports with network analysis
+6. RunProteinQueryAnalysis: Unified pipeline for comprehensive protein analysis
 
 ADVANCED CAPABILITIES:
 - UniProt ID canonical identifier system (exact match only)
@@ -21,6 +22,8 @@ ADVANCED CAPABILITIES:
 - Bioinformatics integration with protein databases
 - Network analysis and protein relationship mapping
 - Advanced similarity metrics and statistical analysis
+- Modular pipeline architecture with configurable stages
+- Real-time performance monitoring and error handling
 
 Authors: Vibhav Setlur
 Contact: https://kbase.us/contact-us/
@@ -179,4 +182,24 @@ module kbase_protein_query_module {
     } SummarizeVisualizeResult;
     
     funcdef summarize_and_visualize_results(mapping<string, UnspecifiedObject> params) returns (SummarizeAndVisualizeResultsResults output) authentication required;
+
+    /*
+        Unified Protein Query Analysis Pipeline
+        
+        This method provides a single entry point for comprehensive protein analysis,
+        supporting multiple input types and configurable analysis stages.
+    */
+    typedef structure {
+        string report_name;
+        string report_ref;
+        string analysis_result_ref;
+        string summary;
+        mapping<string, UnspecifiedObject> input_parameters;
+        float start_time;
+        string html_report_path;
+        int protein_count;
+        list<string> stages_completed;
+    } ProteinQueryAnalysisResults;
+    
+    funcdef run_protein_query_analysis(mapping<string, UnspecifiedObject> params) returns (ProteinQueryAnalysisResults output) authentication required;
 };

@@ -184,7 +184,7 @@ make create-indexes
 - [KBase SDK Documentation](https://kbase.github.io/kb_sdk_docs/)
 - [KBase Testing Guidelines](https://kbase.github.io/kb_sdk_docs/tutorial/7_implement.html)
 - [Python Testing Best Practices](https://docs.python.org/3/library/unittest.html)
-- [Module Documentation](https://github.com/kbaseapps/kbase_protein_network_analysis_toolkit)
+- [Module Documentation](https://github.com/kbaseapps/kbase_protein_query_module)
 
 ## Support
 

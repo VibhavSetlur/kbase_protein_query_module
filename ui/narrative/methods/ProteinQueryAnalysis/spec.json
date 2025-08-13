@@ -1,0 +1,300 @@
+{
+    "ver": "2.0.0",
+    "authors": [
+        "vibhavsetlur"
+    ],
+    "contact": "https://kbase.us/contact-us/",
+    "categories": [
+        "active",
+        "protein",
+        "analysis",
+        "network",
+        "embedding",
+        "visualization"
+    ],
+    "widgets": {
+        "input": null,
+        "output": null
+    },
+    "parameters": [
+        {
+            "id": "input_type",
+            "optional": false,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["FASTA"],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                    {"value": "FASTA", "display": "FASTA File"},
+                    {"value": "ProteinSequenceSet", "display": "Protein Sequence Set"},
+                    {"value": "Genome", "display": "Genome Object"},
+                    {"value": "FeatureSet", "display": "Feature Set"},
+                    {"value": "GenomeSet", "display": "Genome Set"},
+                    {"value": "SingleProtein", "display": "Single Protein Sequence"}
+                ]
+            }
+        },
+        {
+            "id": "input_data",
+            "optional": false,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": ["KBaseGenomes.Genome", "KBaseSets.GenomeSet", "KBaseSets.FeatureSet", "KBaseProteinSequences.ProteinSequenceSet"],
+                "example": "For FASTA: file path or URL\nFor KBase objects: workspace reference\nFor single protein: amino acid sequence"
+            }
+        },
+        {
+            "id": "input_data_ref",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": [""],
+            "field_type": "workspace_object",
+            "workspace_object_options": {
+                "valid_types": ["KBaseGenomes.Genome", "KBaseSets.GenomeSet", "KBaseSets.FeatureSet", "KBaseProteinSequences.ProteinSequenceSet"],
+                "allow_multiple": false,
+                "can_be_null": true
+            }
+        },
+        {
+            "id": "analysis_stages",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": true,
+            "default_values": ["input_validation", "data_extraction", "embedding_generation", "family_assignment", "similarity_search", "sequence_analysis", "network_analysis", "bioinformatics_analysis", "report_generation", "visualization", "data_export"],
+            "field_type": "checkbox",
+            "checkbox_options": {
+                "checked_value": "true",
+                "unchecked_value": "false",
+                "options": [
+                    {"value": "input_validation", "display": "Input Validation"},
+                    {"value": "data_extraction", "display": "Data Extraction"},
+                    {"value": "embedding_generation", "display": "Generate Protein Embeddings"},
+                    {"value": "family_assignment", "display": "Assign Protein Families"},
+                    {"value": "similarity_search", "display": "Perform Similarity Search"},
+                    {"value": "sequence_analysis", "display": "Sequence Analysis"},
+                    {"value": "network_analysis", "display": "Network Analysis & Visualization"},
+                    {"value": "bioinformatics_analysis", "display": "Bioinformatics Analysis"},
+                    {"value": "report_generation", "display": "Report Generation"},
+                    {"value": "visualization", "display": "Visualization"},
+                    {"value": "data_export", "display": "Data Export"}
+                ]
+            }
+        },
+        {
+            "id": "stop_after_stage",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["data_export"],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                    {"value": "input_validation", "display": "Stop after Input Validation"},
+                    {"value": "data_extraction", "display": "Stop after Data Extraction"},
+                    {"value": "embedding_generation", "display": "Stop after Embedding Generation"},
+                    {"value": "family_assignment", "display": "Stop after Family Assignment"},
+                    {"value": "similarity_search", "display": "Stop after Similarity Search"},
+                    {"value": "sequence_analysis", "display": "Stop after Sequence Analysis"},
+                    {"value": "network_analysis", "display": "Stop after Network Analysis"},
+                    {"value": "bioinformatics_analysis", "display": "Stop after Bioinformatics Analysis"},
+                    {"value": "report_generation", "display": "Stop after Report Generation"},
+                    {"value": "visualization", "display": "Stop after Visualization"},
+                    {"value": "data_export", "display": "Complete Pipeline (Default)"}
+                ]
+            }
+        },
+        {
+            "id": "max_concurrency",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["4"],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Maximum number of proteins to process in parallel (1-8, default: 4)"
+            }
+        },
+        {
+            "id": "similarity_search_k",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["50"],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Number of similar proteins to find (default: 50)"
+            }
+        },
+        {
+            "id": "network_method",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["mutual_knn"],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                    {"value": "mutual_knn", "display": "Mutual K-Nearest Neighbors"},
+                    {"value": "threshold", "display": "Similarity Threshold"},
+                    {"value": "hybrid", "display": "Hybrid Approach"}
+                ]
+            }
+        },
+        {
+            "id": "output_name",
+            "optional": true,
+            "advanced": false,
+            "allow_multiple": false,
+            "default_values": ["protein_query_analysis"],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Name for the output analysis object"
+            }
+        },
+        {
+            "id": "model_name",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["esm2_t6_8M_UR50D"],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                    {"value": "esm2_t6_8M_UR50D", "display": "ESM-2 (6B parameters)"},
+                    {"value": "esm2_t12_35M_UR50D", "display": "ESM-2 (12B parameters)"},
+                    {"value": "esm2_t30_150M_UR50D", "display": "ESM-2 (30B parameters)"}
+                ]
+            }
+        },
+        {
+            "id": "similarity_threshold",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["0.5"],
+            "field_type": "text",
+            "text_options": {
+                "valid_ws_types": [],
+                "example": "Similarity threshold for network construction (0.0-1.0, default: 0.5)"
+            }
+        },
+        {
+            "id": "include_interactive_charts",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": ["true"],
+            "field_type": "checkbox",
+            "checkbox_options": {
+                "checked_value": "true",
+                "unchecked_value": "false",
+                "options": [
+                    {"value": "true", "display": "Include Interactive Charts in Reports"}
+                ]
+            }
+        },
+        {
+            "id": "export_formats",
+            "optional": true,
+            "advanced": true,
+            "allow_multiple": true,
+            "default_values": ["json", "csv"],
+            "field_type": "checkbox",
+            "checkbox_options": {
+                "checked_value": "true",
+                "unchecked_value": "false",
+                "options": [
+                    {"value": "json", "display": "JSON Export"},
+                    {"value": "csv", "display": "CSV Export"},
+                    {"value": "excel", "display": "Excel Export"},
+                    {"value": "fasta", "display": "FASTA Export"}
+                ]
+            }
+        }
+    ],
+    "behavior": {
+        "service-mapping": {
+            "url": "",
+            "name": "kbase_protein_query_module",
+            "method": "run_protein_query_analysis",
+            "input_mapping": [
+                {
+                    "narrative_system_variable": "workspace",
+                    "target_property": "workspace_name"
+                },
+                {
+                    "input_parameter": "input_type",
+                    "target_property": "input_type"
+                },
+                {
+                    "input_parameter": "input_data",
+                    "target_property": "input_data"
+                },
+                {
+                    "input_parameter": "input_data_ref",
+                    "target_property": "input_data_ref"
+                },
+                {
+                    "input_parameter": "analysis_stages",
+                    "target_property": "analysis_stages"
+                },
+                {
+                    "input_parameter": "stop_after_stage",
+                    "target_property": "stop_after_stage"
+                },
+                {
+                    "input_parameter": "max_concurrency",
+                    "target_property": "max_concurrency"
+                },
+                {
+                    "input_parameter": "similarity_search_k",
+                    "target_property": "similarity_search_k"
+                },
+                {
+                    "input_parameter": "network_method",
+                    "target_property": "network_method"
+                },
+                {
+                    "input_parameter": "output_name",
+                    "target_property": "output_name"
+                },
+                {
+                    "input_parameter": "model_name",
+                    "target_property": "model_name"
+                },
+                {
+                    "input_parameter": "similarity_threshold",
+                    "target_property": "similarity_threshold"
+                },
+                {
+                    "input_parameter": "include_interactive_charts",
+                    "target_property": "include_interactive_charts"
+                },
+                {
+                    "input_parameter": "export_formats",
+                    "target_property": "export_formats"
+                }
+            ],
+            "output_mapping": [
+                { "service_method_output_path": [0, "report_name"], "target_property": "report_name" },
+                { "service_method_output_path": [0, "report_ref"], "target_property": "report_ref" },
+                { "service_method_output_path": [0, "analysis_result_ref"], "target_property": "analysis_result_ref" },
+                { "service_method_output_path": [0, "summary"], "target_property": "summary" },
+                { "service_method_output_path": [0, "input_parameters"], "target_property": "input_parameters" },
+                { "service_method_output_path": [0, "start_time"], "target_property": "start_time" },
+                { "service_method_output_path": [0, "html_report_path"], "target_property": "html_report_path" },
+                { "service_method_output_path": [0, "protein_count"], "target_property": "protein_count" },
+                { "service_method_output_path": [0, "stages_completed"], "target_property": "stages_completed" }
+            ]
+        }
+    },
+    "job_id_output_field": "docker"
+}

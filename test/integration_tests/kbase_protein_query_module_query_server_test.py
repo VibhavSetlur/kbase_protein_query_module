@@ -116,21 +116,24 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
                 print(f"Warning: Could not delete workspace: {e}")
 
     # NOTE: According to Python unittest naming rules test method names should start from 'test'. # noqa
-    def test_run_kbase_protein_query_module(self):
+    def test_run_protein_query_analysis(self):
         if not self.wsClient or not self.wsName:
             self.skipTest("Workspace not available")
             
-        params = {'workspace_name': self.wsName, 'parameter_1': 'Hello World!'}
-        ret = self.serviceImpl.run_kbase_protein_query_module(self.ctx, params)
-        self.assertIsInstance(ret, list)
-        self.assertGreaterEqual(len(ret), 1)
-        output = ret[0]
-        self.assertIn('report_name', output)
-        self.assertIn('report_ref', output)
-        self.assertIn('input_parameters', output)
-        self.assertEqual(output['input_parameters'], params)
-        self.assertIn('summary', output)
-        self.assertIn('start_time', output)
+        params = {
+            'workspace_name': self.wsName, 
+            'input_type': 'sequence',
+            'input_data': 'MKTAYIAKQRQISFVKSHFSRQDILDLWIYHTQGYFPQ',
+            'analysis_stages': ['embedding', 'family_assignment'],
+            'stop_after_stage': 'family_assignment'
+        }
+        ret = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIsInstance(ret, dict)
+        self.assertIn('report_name', ret)
+        self.assertIn('report_ref', ret)
+        self.assertIn('input_parameters', ret)
+        self.assertIn('summary', ret)
+        self.assertIn('start_time', ret)
 
     def test_assign_protein_family_with_real_centroids(self):
         """Test protein family assignment using real centroid data and binary FAISS indexing."""

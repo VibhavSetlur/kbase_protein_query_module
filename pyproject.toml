@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kbase_protein_network_analysis_toolkit"
-version = "0.1.0"
-description = "KBase Protein Network Analysis Toolkit"
+name = "kbase_protein_query_module"
+version = "2.0.0"
+description = "KBase Protein Query Module"
 authors = [
     { name = "Your Name", email = "your@email.com" }
 ]

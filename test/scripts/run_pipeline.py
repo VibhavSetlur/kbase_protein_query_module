@@ -3,7 +3,7 @@
 Protein Network Analysis Pipeline Runner
 =======================================
 
-A comprehensive tool for running the KBase Protein Network Analysis Toolkit
+A comprehensive tool for running the KBase Protein Query Module
 without requiring KBase infrastructure. This script provides a modern UI
 for running the entire pipeline using real data.
 
@@ -1022,7 +1022,7 @@ class PipelineRunner:
 <body>
     <div class="header">
         <h1>🧬 Comprehensive Protein Network Analysis Report</h1>
-        <p>Generated on {timestamp} | KBase Protein Network Analysis Toolkit</p>
+        <p>Generated on {timestamp} | KBase Protein Query Module</p>
     </div>
     
     <div class="tab-container">

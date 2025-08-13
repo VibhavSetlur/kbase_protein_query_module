@@ -338,10 +338,6 @@ class Application(object):
         self.serverlog.set_log_level(6)
         self.rpc_service = JSONRPCServiceCustom()
         self.method_authentication = dict()
-        self.rpc_service.add(impl_kbase_protein_query_module.run_kbase_protein_query_module,
-                             name='kbase_protein_query_module.run_kbase_protein_query_module',
-                             types=[dict])
-        self.method_authentication['kbase_protein_query_module.run_kbase_protein_query_module'] = 'required'  # noqa
         self.rpc_service.add(impl_kbase_protein_query_module.check_protein_existence,
                              name='kbase_protein_query_module.check_protein_existence',
                              types=[dict])
@@ -362,6 +358,10 @@ class Application(object):
                              name='kbase_protein_query_module.summarize_and_visualize_results',
                              types=[dict])
         self.method_authentication['kbase_protein_query_module.summarize_and_visualize_results'] = 'required'  # noqa
+        self.rpc_service.add(impl_kbase_protein_query_module.run_protein_query_analysis,
+                             name='kbase_protein_query_module.run_protein_query_analysis',
+                             types=[dict])
+        self.method_authentication['kbase_protein_query_module.run_protein_query_analysis'] = 'required'  # noqa
         self.rpc_service.add(impl_kbase_protein_query_module.status,
                              name='kbase_protein_query_module.status',
                              types=[dict])
@@ -444,7 +444,7 @@ class Application(object):
                     status = '200 OK'
                 except JSONRPCError as jre:
                     err = {'error': {'code': jre.code,
-                                     'name': str(jre),
+                                     'name': jre.message,
                                      'message': jre.data
                                      }
                            }
@@ -599,7 +599,7 @@ def process_async_cli(input_file_path, output_file_path, token):
         resp = {'id': req['id'],
                 'version': req['version'],
                 'error': {'code': jre.code,
-                          'name': str(jre),
+                          'name': jre.message,
                           'message': jre.data,
                           'error': trace}
                 }
