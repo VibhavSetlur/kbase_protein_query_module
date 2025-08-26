@@ -1,0 +1,6 @@
+# Git LFS tracking for essential data files only
+data/indexes/families/*.faiss filter=lfs diff=lfs merge=lfs -text
+data/families/*.h5 filter=lfs diff=lfs merge=lfs -text
+data/indexes/metadata/*.json filter=lfs diff=lfs merge=lfs -text
+data/indexes/protein_ids/*.json filter=lfs diff=lfs merge=lfs -text
+data/metadata/*.parquet filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,318 @@
+{
+  "amino_acids": {
+    "A": {
+      "name": "Alanine",
+      "symbol": "A",
+      "three_letter": "Ala",
+      "molecular_weight": 89.1,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 1.8,
+      "pka": 9.69,
+      "secondary_structure": {
+        "helix": 1.45,
+        "sheet": 0.97,
+        "turn": 0.77
+      }
+    },
+    "R": {
+      "name": "Arginine",
+      "symbol": "R",
+      "three_letter": "Arg",
+      "molecular_weight": 174.2,
+      "charge": 1,
+      "polarity": "polar",
+      "hydrophobicity": -4.5,
+      "pka": 10.76,
+      "secondary_structure": {
+        "helix": 0.98,
+        "sheet": 0.90,
+        "turn": 0.95
+      }
+    },
+    "N": {
+      "name": "Asparagine",
+      "symbol": "N",
+      "three_letter": "Asn",
+      "molecular_weight": 132.1,
+      "charge": 0,
+      "polarity": "polar",
+      "hydrophobicity": -3.5,
+      "pka": 8.33,
+      "secondary_structure": {
+        "helix": 0.67,
+        "sheet": 0.89,
+        "turn": 1.56
+      }
+    },
+    "D": {
+      "name": "Aspartic acid",
+      "symbol": "D",
+      "three_letter": "Asp",
+      "molecular_weight": 133.1,
+      "charge": -1,
+      "polarity": "polar",
+      "hydrophobicity": -3.5,
+      "pka": 3.86,
+      "secondary_structure": {
+        "helix": 1.01,
+        "sheet": 0.39,
+        "turn": 1.46
+      }
+    },
+    "C": {
+      "name": "Cysteine",
+      "symbol": "C",
+      "three_letter": "Cys",
+      "molecular_weight": 121.2,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 2.5,
+      "pka": 8.33,
+      "secondary_structure": {
+        "helix": 0.70,
+        "sheet": 1.19,
+        "turn": 1.77
+      }
+    },
+    "E": {
+      "name": "Glutamic acid",
+      "symbol": "E",
+      "three_letter": "Glu",
+      "molecular_weight": 147.1,
+      "charge": -1,
+      "polarity": "polar",
+      "hydrophobicity": -3.5,
+      "pka": 4.25,
+      "secondary_structure": {
+        "helix": 1.59,
+        "sheet": 0.52,
+        "turn": 0.74
+      }
+    },
+    "Q": {
+      "name": "Glutamine",
+      "symbol": "Q",
+      "three_letter": "Gln",
+      "molecular_weight": 146.2,
+      "charge": 0,
+      "polarity": "polar",
+      "hydrophobicity": -3.5,
+      "pka": 8.33,
+      "secondary_structure": {
+        "helix": 1.10,
+        "sheet": 0.84,
+        "turn": 0.95
+      }
+    },
+    "G": {
+      "name": "Glycine",
+      "symbol": "G",
+      "three_letter": "Gly",
+      "molecular_weight": 75.1,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": -0.4,
+      "pka": 9.60,
+      "secondary_structure": {
+        "helix": 0.57,
+        "sheet": 0.75,
+        "turn": 1.56
+      }
+    },
+    "H": {
+      "name": "Histidine",
+      "symbol": "H",
+      "three_letter": "His",
+      "molecular_weight": 155.2,
+      "charge": 0.1,
+      "polarity": "polar",
+      "hydrophobicity": -3.2,
+      "pka": 6.00,
+      "secondary_structure": {
+        "helix": 1.00,
+        "sheet": 0.87,
+        "turn": 0.95
+      }
+    },
+    "I": {
+      "name": "Isoleucine",
+      "symbol": "I",
+      "three_letter": "Ile",
+      "molecular_weight": 131.2,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 4.5,
+      "pka": 9.68,
+      "secondary_structure": {
+        "helix": 1.09,
+        "sheet": 1.67,
+        "turn": 0.47
+      }
+    },
+    "L": {
+      "name": "Leucine",
+      "symbol": "L",
+      "three_letter": "Leu",
+      "molecular_weight": 131.2,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 3.8,
+      "pka": 9.60,
+      "secondary_structure": {
+        "helix": 1.41,
+        "sheet": 1.22,
+        "turn": 0.59
+      }
+    },
+    "K": {
+      "name": "Lysine",
+      "symbol": "K",
+      "three_letter": "Lys",
+      "molecular_weight": 146.2,
+      "charge": 1,
+      "polarity": "polar",
+      "hydrophobicity": -3.9,
+      "pka": 9.74,
+      "secondary_structure": {
+        "helix": 1.14,
+        "sheet": 0.52,
+        "turn": 0.96
+      }
+    },
+    "M": {
+      "name": "Methionine",
+      "symbol": "M",
+      "three_letter": "Met",
+      "molecular_weight": 149.2,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 1.9,
+      "pka": 9.21,
+      "secondary_structure": {
+        "helix": 1.45,
+        "sheet": 1.05,
+        "turn": 0.60
+      }
+    },
+    "F": {
+      "name": "Phenylalanine",
+      "symbol": "F",
+      "three_letter": "Phe",
+      "molecular_weight": 165.2,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 2.8,
+      "pka": 9.13,
+      "secondary_structure": {
+        "helix": 1.13,
+        "sheet": 1.38,
+        "turn": 0.60
+      }
+    },
+    "P": {
+      "name": "Proline",
+      "symbol": "P",
+      "three_letter": "Pro",
+      "molecular_weight": 115.1,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": -1.6,
+      "pka": 10.64,
+      "secondary_structure": {
+        "helix": 0.57,
+        "sheet": 0.55,
+        "turn": 1.52
+      }
+    },
+    "S": {
+      "name": "Serine",
+      "symbol": "S",
+      "three_letter": "Ser",
+      "molecular_weight": 105.1,
+      "charge": 0,
+      "polarity": "polar",
+      "hydrophobicity": -0.8,
+      "pka": 9.15,
+      "secondary_structure": {
+        "helix": 0.77,
+        "sheet": 0.75,
+        "turn": 1.43
+      }
+    },
+    "T": {
+      "name": "Threonine",
+      "symbol": "T",
+      "three_letter": "Thr",
+      "molecular_weight": 119.1,
+      "charge": 0,
+      "polarity": "polar",
+      "hydrophobicity": -0.7,
+      "pka": 9.12,
+      "secondary_structure": {
+        "helix": 0.83,
+        "sheet": 1.19,
+        "turn": 0.96
+      }
+    },
+    "W": {
+      "name": "Tryptophan",
+      "symbol": "W",
+      "three_letter": "Trp",
+      "molecular_weight": 204.2,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": -0.9,
+      "pka": 9.39,
+      "secondary_structure": {
+        "helix": 1.08,
+        "sheet": 1.37,
+        "turn": 0.65
+      }
+    },
+    "Y": {
+      "name": "Tyrosine",
+      "symbol": "Y",
+      "three_letter": "Tyr",
+      "molecular_weight": 181.2,
+      "charge": 0,
+      "polarity": "polar",
+      "hydrophobicity": -1.3,
+      "pka": 9.11,
+      "secondary_structure": {
+        "helix": 0.69,
+        "sheet": 1.47,
+        "turn": 1.14
+      }
+    },
+    "V": {
+      "name": "Valine",
+      "symbol": "V",
+      "three_letter": "Val",
+      "molecular_weight": 117.1,
+      "charge": 0,
+      "polarity": "nonpolar",
+      "hydrophobicity": 4.2,
+      "pka": 9.62,
+      "secondary_structure": {
+        "helix": 0.91,
+        "sheet": 1.87,
+        "turn": 0.47
+      }
+    }
+  },
+  "amino_acid_groups": {
+    "hydrophobic": ["A", "I", "L", "M", "F", "P", "V", "W"],
+    "hydrophilic": ["R", "N", "D", "E", "Q", "H", "K", "S", "T", "Y"],
+    "charged": ["R", "D", "E", "H", "K"],
+    "polar": ["N", "Q", "S", "T", "Y"],
+    "nonpolar": ["A", "I", "L", "M", "F", "P", "V", "W"],
+    "aromatic": ["F", "W", "Y"],
+    "aliphatic": ["A", "I", "L", "M", "V"],
+    "sulfur_containing": ["C", "M"],
+    "basic": ["R", "H", "K"],
+    "acidic": ["D", "E"],
+    "small": ["A", "G", "S", "T"],
+    "large": ["F", "I", "L", "M", "W", "Y"]
+  }
+}

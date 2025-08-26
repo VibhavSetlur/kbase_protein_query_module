@@ -1,0 +1,633 @@
+{
+  "databases": {
+    "uniprot": {
+      "name": "UniProt",
+      "base_url": "https://www.uniprot.org/uniprot/",
+      "description": "Comprehensive protein sequence and annotation database",
+      "search_type": "protein_id",
+      "category": "sequence_database"
+    },
+    "ncbi_protein": {
+      "name": "NCBI Protein",
+      "base_url": "https://www.ncbi.nlm.nih.gov/protein/",
+      "description": "National Center for Biotechnology Information protein database",
+      "search_type": "protein_id",
+      "category": "sequence_database"
+    },
+    "pdb": {
+      "name": "Protein Data Bank",
+      "base_url": "https://www.rcsb.org/structure/",
+      "description": "3D protein structure database",
+      "search_type": "protein_id",
+      "category": "structure_database"
+    },
+    "alphafold": {
+      "name": "AlphaFold DB",
+      "base_url": "https://alphafold.ebi.ac.uk/entry/",
+      "description": "AI-predicted protein structures",
+      "search_type": "protein_id",
+      "category": "structure_database"
+    },
+    "pfam": {
+      "name": "Pfam",
+      "base_url": "https://pfam.xfam.org/protein/",
+      "description": "Protein family and domain database",
+      "search_type": "protein_id",
+      "category": "domain_database"
+    },
+    "prosite": {
+      "name": "PROSITE",
+      "base_url": "https://prosite.expasy.org/scanprosite/",
+      "description": "Protein domains, families and functional sites",
+      "search_type": "sequence_search",
+      "category": "domain_database"
+    },
+    "interpro": {
+      "name": "InterPro",
+      "base_url": "https://www.ebi.ac.uk/interpro/protein/",
+      "description": "Integrated protein classification database",
+      "search_type": "protein_id",
+      "category": "domain_database"
+    },
+    "smart": {
+      "name": "SMART",
+      "base_url": "https://smart.embl.de/smart/do_annotation.pl?DOMAIN=",
+      "description": "Simple Modular Architecture Research Tool",
+      "search_type": "protein_id",
+      "category": "domain_database"
+    },
+    "kegg": {
+      "name": "KEGG",
+      "base_url": "https://www.genome.jp/dbget-bin/www_bget?",
+      "description": "Kyoto Encyclopedia of Genes and Genomes",
+      "search_type": "protein_id",
+      "category": "pathway_database"
+    },
+    "reactome": {
+      "name": "Reactome",
+      "base_url": "https://reactome.org/content/detail/",
+      "description": "Pathway database",
+      "search_type": "protein_id",
+      "category": "pathway_database"
+    },
+    "string": {
+      "name": "STRING",
+      "base_url": "https://string-db.org/cgi/input.pl?sessionId=",
+      "description": "Protein-protein interaction database",
+      "search_type": "protein_id",
+      "category": "interaction_database"
+    },
+    "intact": {
+      "name": "IntAct",
+      "base_url": "https://www.ebi.ac.uk/intact/interactions/",
+      "description": "Molecular interaction database",
+      "search_type": "protein_id",
+      "category": "interaction_database"
+    },
+    "mint": {
+      "name": "MINT",
+      "base_url": "https://mint.bio.uniroma2.it/",
+      "description": "Molecular INTeraction database",
+      "search_type": "protein_id",
+      "category": "interaction_database"
+    },
+    "go": {
+      "name": "Gene Ontology",
+      "base_url": "http://amigo.geneontology.org/amigo/term/",
+      "description": "Gene Ontology functional annotation",
+      "search_type": "protein_id",
+      "category": "annotation_database"
+    },
+    "enzyme": {
+      "name": "ENZYME",
+      "base_url": "https://enzyme.expasy.org/EC/",
+      "description": "Enzyme nomenclature database",
+      "search_type": "ec_number",
+      "category": "enzyme_database"
+    },
+    "brenda": {
+      "name": "BRENDA",
+      "base_url": "https://www.brenda-enzymes.org/enzyme.php?ecno=",
+      "description": "Enzyme database",
+      "search_type": "ec_number",
+      "category": "enzyme_database"
+    },
+    "metacyc": {
+      "name": "MetaCyc",
+      "base_url": "https://metacyc.org/META/NEW-IMAGE?type=REACTION&object=",
+      "description": "Metabolic pathway database",
+      "search_type": "reaction_id",
+      "category": "pathway_database"
+    },
+    "chebi": {
+      "name": "ChEBI",
+      "base_url": "https://www.ebi.ac.uk/chebi/searchId.do?chebiId=",
+      "description": "Chemical Entities of Biological Interest",
+      "search_type": "chebi_id",
+      "category": "chemical_database"
+    },
+    "pubchem": {
+      "name": "PubChem",
+      "base_url": "https://pubchem.ncbi.nlm.nih.gov/compound/",
+      "description": "Chemical compound database",
+      "search_type": "compound_id",
+      "category": "chemical_database"
+    },
+    "chembl": {
+      "name": "ChEMBL",
+      "base_url": "https://www.ebi.ac.uk/chembl/compound_report_card/",
+      "description": "Bioactive molecule database",
+      "search_type": "compound_id",
+      "category": "chemical_database"
+    },
+    "drugbank": {
+      "name": "DrugBank",
+      "base_url": "https://go.drugbank.com/drugs/",
+      "description": "Drug and drug target database",
+      "search_type": "drug_id",
+      "category": "drug_database"
+    },
+    "bindingdb": {
+      "name": "BindingDB",
+      "base_url": "https://www.bindingdb.org/bind/chemsearch/marvin/MolStructure.jsp?monomerid=",
+      "description": "Binding affinity database",
+      "search_type": "binding_id",
+      "category": "binding_database"
+    },
+    "pdb_ligand": {
+      "name": "PDB Ligand",
+      "base_url": "https://www.rcsb.org/ligand/",
+      "description": "PDB ligand database",
+      "search_type": "ligand_id",
+      "category": "ligand_database"
+    },
+    "proteomicsdb": {
+      "name": "ProteomicsDB",
+      "base_url": "https://www.proteomicsdb.org/proteomicsdb/#protein/proteinDetails/",
+      "description": "Human proteome database",
+      "search_type": "protein_id",
+      "category": "proteomics_database"
+    },
+    "peptideatlas": {
+      "name": "PeptideAtlas",
+      "base_url": "https://db.systemsbiology.net/sbeams/cgi/PeptideAtlas/GetProtein?protein_name=",
+      "description": "Peptide identification database",
+      "search_type": "protein_id",
+      "category": "proteomics_database"
+    },
+    "pride": {
+      "name": "PRIDE",
+      "base_url": "https://www.ebi.ac.uk/pride/archive/projects/",
+      "description": "Proteomics data repository",
+      "search_type": "project_id",
+      "category": "proteomics_database"
+    },
+    "massive": {
+      "name": "MassIVE",
+      "base_url": "https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?task=",
+      "description": "Mass spectrometry data repository",
+      "search_type": "dataset_id",
+      "category": "proteomics_database"
+    },
+    "peptide_db": {
+      "name": "PeptideDB",
+      "base_url": "https://www.peptides.be/",
+      "description": "Peptide database",
+      "search_type": "peptide_id",
+      "category": "peptide_database"
+    },
+    "antibodypedia": {
+      "name": "Antibodypedia",
+      "base_url": "https://antibodypedia.com/gene/",
+      "description": "Antibody database",
+      "search_type": "gene_id",
+      "category": "antibody_database"
+    },
+    "imgt": {
+      "name": "IMGT",
+      "base_url": "https://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.14+",
+      "description": "Immunogenetics database",
+      "search_type": "gene_id",
+      "category": "immunology_database"
+    },
+    "iedb": {
+      "name": "IEDB",
+      "base_url": "https://www.iedb.org/result_v3.php?cookie_id=",
+      "description": "Immune Epitope Database",
+      "search_type": "epitope_id",
+      "category": "immunology_database"
+    },
+    "allergome": {
+      "name": "Allergome",
+      "base_url": "https://www.allergome.org/script/dettaglio.php?id_molecule=",
+      "description": "Allergen database",
+      "search_type": "allergen_id",
+      "category": "allergen_database"
+    },
+    "allergenonline": {
+      "name": "AllergenOnline",
+      "base_url": "https://www.allergenonline.org/databasefasta.shtml",
+      "description": "Allergen sequence database",
+      "search_type": "allergen_id",
+      "category": "allergen_database"
+    },
+    "toxin_pred": {
+      "name": "ToxinPred",
+      "base_url": "http://crdd.osdd.net/raghava/toxinpred/",
+      "description": "Toxin prediction server",
+      "search_type": "sequence_search",
+      "category": "toxin_database"
+    },
+    "venomkb": {
+      "name": "VenomKB",
+      "base_url": "https://venomkb.org/proteins/",
+      "description": "Venom knowledge base",
+      "search_type": "protein_id",
+      "category": "toxin_database"
+    },
+    "t3db": {
+      "name": "T3DB",
+      "base_url": "https://www.t3db.ca/toxins/",
+      "description": "Toxin and toxin target database",
+      "search_type": "toxin_id",
+      "category": "toxin_database"
+    },
+    "phobius": {
+      "name": "Phobius",
+      "base_url": "https://phobius.sbc.su.se/",
+      "description": "Transmembrane topology prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "tmhmm": {
+      "name": "TMHMM",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?TMHMM-2.0",
+      "description": "Transmembrane helix prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "signalp": {
+      "name": "SignalP",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?SignalP-5.0",
+      "description": "Signal peptide prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "targetp": {
+      "name": "TargetP",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?TargetP-2.0",
+      "description": "Subcellular localization prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "wolfpsort": {
+      "name": "WoLF PSORT",
+      "base_url": "https://wolfpsort.hgc.jp/",
+      "description": "Subcellular localization prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "psort": {
+      "name": "PSORT",
+      "base_url": "https://psort.hgc.jp/form.html",
+      "description": "Protein subcellular localization prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netphos": {
+      "name": "NetPhos",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetPhos-3.1",
+      "description": "Phosphorylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netnglyc": {
+      "name": "NetNGlyc",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetNGlyc-1.0",
+      "description": "N-glycosylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netoglyc": {
+      "name": "NetOGlyc",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetOGlyc-4.0",
+      "description": "O-glycosylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netcglyc": {
+      "name": "NetCGlyc",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetCGlyc-1.0",
+      "description": "C-glycosylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netacety": {
+      "name": "NetAcet",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetAcet-1.0",
+      "description": "N-acetylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmethyl": {
+      "name": "NetMethyl",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMethyl-1.0",
+      "description": "Methylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netub": {
+      "name": "NetUbi",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetUbi-1.0",
+      "description": "Ubiquitination site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netsumo": {
+      "name": "NetSUMO",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetSUMO-1.0",
+      "description": "SUMOylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netnit": {
+      "name": "NetNit",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetNit-1.0",
+      "description": "Nitration site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netglu": {
+      "name": "NetGlu",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetGlu-1.0",
+      "description": "Glutarylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmal": {
+      "name": "NetMal",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMal-1.0",
+      "description": "Malonylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netsuc": {
+      "name": "NetSuc",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetSuc-1.0",
+      "description": "Succinylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netcarn": {
+      "name": "NetCarn",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetCarn-1.0",
+      "description": "Carnitination site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmyr": {
+      "name": "NetMyr",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMyr-1.0",
+      "description": "Myristoylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netpal": {
+      "name": "NetPal",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetPal-1.0",
+      "description": "Palmitoylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netpre": {
+      "name": "NetPre",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetPre-1.0",
+      "description": "Prenylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netgly": {
+      "name": "NetGly",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetGly-1.0",
+      "description": "Glycation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netadp": {
+      "name": "NetADP",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetADP-1.0",
+      "description": "ADP-ribosylation site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netchop": {
+      "name": "NetChop",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetChop-3.1",
+      "description": "Proteasomal cleavage site prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netctl": {
+      "name": "NetCTL",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetCTL-1.2",
+      "description": "CTL epitope prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhc": {
+      "name": "NetMHC",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHC-4.0",
+      "description": "MHC binding prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcpan": {
+      "name": "NetMHCpan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCpan-4.1",
+      "description": "MHC binding prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcii": {
+      "name": "NetMHCII",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCII-2.3",
+      "description": "MHC class II binding prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhciipan": {
+      "name": "NetMHCIIpan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCIIpan-4.0",
+      "description": "MHC class II binding prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netctlpan": {
+      "name": "NetCTLpan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetCTLpan-1.1",
+      "description": "CTL epitope prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcstab": {
+      "name": "NetMHCstab",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCstab-1.0",
+      "description": "MHC stability prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcstabpan": {
+      "name": "NetMHCstabpan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCstabpan-1.0",
+      "description": "MHC stability prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhccons": {
+      "name": "NetMHCcons",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCcons-1.1",
+      "description": "MHC binding prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcconspan": {
+      "name": "NetMHCconsPan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCconsPan-1.1",
+      "description": "MHC binding prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcconsstab": {
+      "name": "NetMHCconsStab",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCconsStab-1.0",
+      "description": "MHC stability prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcconsstabpan": {
+      "name": "NetMHCconsStabPan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCconsStabPan-1.0",
+      "description": "MHC stability prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    },
+    "netmhcconsstabpan": {
+      "name": "NetMHCconsStabPan",
+      "base_url": "https://services.healthtech.dtu.dk/service.php?NetMHCconsStabPan-1.0",
+      "description": "MHC stability prediction",
+      "search_type": "sequence_search",
+      "category": "prediction_tool"
+    }
+  },
+  "database_categories": {
+    "sequence_database": [
+      "uniprot",
+      "ncbi_protein"
+    ],
+    "structure_database": [
+      "pdb",
+      "alphafold"
+    ],
+    "domain_database": [
+      "pfam",
+      "prosite",
+      "interpro",
+      "smart"
+    ],
+    "pathway_database": [
+      "kegg",
+      "reactome",
+      "metacyc"
+    ],
+    "interaction_database": [
+      "string",
+      "intact",
+      "mint"
+    ],
+    "annotation_database": [
+      "go"
+    ],
+    "enzyme_database": [
+      "enzyme",
+      "brenda"
+    ],
+    "chemical_database": [
+      "chebi",
+      "pubchem",
+      "chembl"
+    ],
+    "drug_database": [
+      "drugbank"
+    ],
+    "binding_database": [
+      "bindingdb"
+    ],
+    "ligand_database": [
+      "pdb_ligand"
+    ],
+    "proteomics_database": [
+      "proteomicsdb",
+      "peptideatlas",
+      "pride",
+      "massive"
+    ],
+    "peptide_database": [
+      "peptide_db"
+    ],
+    "antibody_database": [
+      "antibodypedia"
+    ],
+    "immunology_database": [
+      "imgt",
+      "iedb"
+    ],
+    "allergen_database": [
+      "allergome",
+      "allergenonline"
+    ],
+    "toxin_database": [
+      "toxin_pred",
+      "venomkb",
+      "t3db"
+    ],
+    "prediction_tool": [
+      "phobius",
+      "tmhmm",
+      "signalp",
+      "targetp",
+      "wolfpsort",
+      "psort",
+      "netphos",
+      "netnglyc",
+      "netoglyc",
+      "netcglyc",
+      "netacety",
+      "netmethyl",
+      "netub",
+      "netsumo",
+      "netnit",
+      "netglu",
+      "netmal",
+      "netsuc",
+      "netcarn",
+      "netmyr",
+      "netpal",
+      "netpre",
+      "netgly",
+      "netadp",
+      "netchop",
+      "netctl",
+      "netmhc",
+      "netmhcpan",
+      "netmhcii",
+      "netmhciipan",
+      "netctlpan",
+      "netmhcstab",
+      "netmhcstabpan",
+      "netmhccons",
+      "netmhcconspan",
+      "netmhcconsstab",
+      "netmhcconsstabpan"
+    ]
+  }
+}

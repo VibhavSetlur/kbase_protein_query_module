@@ -1,0 +1,49 @@
+# KBase SDK
+test_local
+sdk.cfg
+test_output
+backups
+
+# Large data files
+data/indexes/
+data/families/
+data/family_centroids/
+data/metadata/
+data/embeddings/
+data/cache/
+data/streaming/
+data/temp/
+
+# Model files
+*.safetensors
+*.bin
+*.h5
+*.npz
+*.npy
+
+# Large JSON files
+*_index.json
+*_metadata.json
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Python
+__pycache__/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

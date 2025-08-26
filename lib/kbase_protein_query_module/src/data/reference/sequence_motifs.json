@@ -1,0 +1,184 @@
+{
+  "motif_patterns": {
+    "n_glycosylation": {
+      "pattern": "N[^P][ST]",
+      "description": "N-linked glycosylation site",
+      "source": "PROSITE",
+      "biological_significance": "Post-translational modification important for protein folding and function"
+    },
+    "o_glycosylation": {
+      "pattern": "[ST][^P]",
+      "description": "O-linked glycosylation site",
+      "source": "PROSITE",
+      "biological_significance": "Post-translational modification on serine/threonine residues"
+    },
+    "phosphorylation_serine": {
+      "pattern": "[RK][RK][^RK][ST]",
+      "description": "Serine phosphorylation site",
+      "source": "PROSITE",
+      "biological_significance": "Protein kinase phosphorylation motif"
+    },
+    "phosphorylation_threonine": {
+      "pattern": "[RK][RK][^RK]T",
+      "description": "Threonine phosphorylation site",
+      "source": "PROSITE",
+      "biological_significance": "Protein kinase phosphorylation motif"
+    },
+    "phosphorylation_tyrosine": {
+      "pattern": "[RK][RK][^RK]Y",
+      "description": "Tyrosine phosphorylation site",
+      "source": "PROSITE",
+      "biological_significance": "Protein kinase phosphorylation motif"
+    },
+    "disulfide_bond": {
+      "pattern": "C[^C]*C",
+      "description": "Potential disulfide bond formation",
+      "source": "Literature",
+      "biological_significance": "Covalent bond between cysteine residues"
+    },
+    "nuclear_localization": {
+      "pattern": "[RK][RK][RK][RK]",
+      "description": "Nuclear localization signal",
+      "source": "PROSITE",
+      "biological_significance": "Targets proteins to the nucleus"
+    },
+    "signal_peptide": {
+      "pattern": "[ACDEFGHIKLMNPQRSTVWY]{10,30}[ACDEFGHIKLMNPQRSTVWY]{3,7}[ACDEFGHIKLMNPQRSTVWY]{3,7}",
+      "description": "Signal peptide cleavage site",
+      "source": "SignalP",
+      "biological_significance": "Targets proteins for secretion"
+    },
+    "transmembrane": {
+      "pattern": "[ACDEFGHIKLMNPQRSTVWY]{19,23}",
+      "description": "Transmembrane domain",
+      "source": "TMHMM",
+      "biological_significance": "Membrane-spanning protein regions"
+    },
+    "zinc_finger": {
+      "pattern": "C[^C]*C[^C]*C[^C]*C",
+      "description": "Zinc finger motif",
+      "source": "PROSITE",
+      "biological_significance": "DNA/RNA binding domain"
+    },
+    "leucine_zipper": {
+      "pattern": "[ACDEFGHIKLMNPQRSTVWY]*L[ACDEFGHIKLMNPQRSTVWY]{6}L[ACDEFGHIKLMNPQRSTVWY]{6}L",
+      "description": "Leucine zipper motif",
+      "source": "PROSITE",
+      "biological_significance": "Protein dimerization domain"
+    },
+    "helix_turn_helix": {
+      "pattern": "[ACDEFGHIKLMNPQRSTVWY]{20,30}",
+      "description": "Helix-turn-helix motif",
+      "source": "PROSITE",
+      "biological_significance": "DNA binding domain"
+    },
+    "beta_sheet": {
+      "pattern": "[ACDEFGHIKLMNPQRSTVWY]{5,15}",
+      "description": "Beta sheet region",
+      "source": "Secondary structure prediction",
+      "biological_significance": "Secondary structure element"
+    },
+    "proline_rich": {
+      "pattern": "P[^P]*P[^P]*P",
+      "description": "Proline-rich region",
+      "source": "Literature",
+      "biological_significance": "Protein-protein interaction domain"
+    },
+    "glycine_rich": {
+      "pattern": "G[^G]*G[^G]*G",
+      "description": "Glycine-rich region",
+      "source": "Literature",
+      "biological_significance": "Flexible protein regions"
+    },
+    "acidic_cluster": {
+      "pattern": "[DE]{3,}",
+      "description": "Acidic amino acid cluster",
+      "source": "Literature",
+      "biological_significance": "Negatively charged protein regions"
+    },
+    "basic_cluster": {
+      "pattern": "[RK]{3,}",
+      "description": "Basic amino acid cluster",
+      "source": "Literature",
+      "biological_significance": "Positively charged protein regions"
+    },
+    "hydrophobic_cluster": {
+      "pattern": "[ACFILMPVWY]{5,}",
+      "description": "Hydrophobic amino acid cluster",
+      "source": "Literature",
+      "biological_significance": "Protein core or membrane regions"
+    },
+    "polar_cluster": {
+      "pattern": "[DEHKNQRST]{5,}",
+      "description": "Polar amino acid cluster",
+      "source": "Literature",
+      "biological_significance": "Protein surface regions"
+    },
+    "calcium_binding": {
+      "pattern": "[DE][DE][DE][DE]",
+      "description": "Calcium binding motif",
+      "source": "PROSITE",
+      "biological_significance": "Calcium ion coordination"
+    },
+    "atp_binding": {
+      "pattern": "[AG][AG][AG][AG]K[ST]",
+      "description": "ATP binding motif",
+      "source": "PROSITE",
+      "biological_significance": "ATP binding and hydrolysis"
+    },
+    "metal_binding": {
+      "pattern": "[CH][CH][CH][CH]",
+      "description": "Metal binding motif",
+      "source": "PROSITE",
+      "biological_significance": "Metal ion coordination"
+    },
+    "dna_binding": {
+      "pattern": "[RK][RK][RK][RK]",
+      "description": "DNA binding motif",
+      "source": "PROSITE",
+      "biological_significance": "DNA binding domain"
+    },
+    "protein_binding": {
+      "pattern": "[DE][DE][DE][DE]",
+      "description": "Protein binding motif",
+      "source": "Literature",
+      "biological_significance": "Protein-protein interaction"
+    }
+  },
+  "motif_categories": {
+    "post_translational_modification": [
+      "n_glycosylation",
+      "o_glycosylation",
+      "phosphorylation_serine",
+      "phosphorylation_threonine",
+      "phosphorylation_tyrosine"
+    ],
+    "structural": [
+      "disulfide_bond",
+      "helix_turn_helix",
+      "beta_sheet",
+      "transmembrane"
+    ],
+    "functional": [
+      "nuclear_localization",
+      "signal_peptide",
+      "zinc_finger",
+      "leucine_zipper"
+    ],
+    "compositional": [
+      "proline_rich",
+      "glycine_rich",
+      "acidic_cluster",
+      "basic_cluster",
+      "hydrophobic_cluster",
+      "polar_cluster"
+    ],
+    "binding": [
+      "calcium_binding",
+      "atp_binding",
+      "metal_binding",
+      "dna_binding",
+      "protein_binding"
+    ]
+  }
+}

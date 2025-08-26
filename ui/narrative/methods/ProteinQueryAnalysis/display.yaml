@@ -1,0 +1,141 @@
+name: Protein Query Analysis v2.0
+tooltip: Comprehensive protein analysis pipeline with modular architecture and multi-protein support
+
+parameters:
+    input_proteins:
+        ui-name: Input Proteins
+        short-hint: Protein sequences to analyze (FASTA file, workspace object, or direct input)
+        description: |
+            Protein sequences to analyze. Can be provided as a FASTA file, workspace object reference, or direct sequence input.
+
+    analysis_type:
+        ui-name: Analysis Type
+        short-hint: Type of analysis to perform
+        description: |
+            Select the type of analysis to perform on the input proteins:
+            - Comprehensive Analysis: Full pipeline with all stages
+            - Sequence Analysis Only: Just sequence characterization
+            - Similarity Search Only: Find similar proteins
+            - Network Analysis Only: Build protein networks
+
+    enabled_stages:
+        ui-name: Enabled Stages
+        short-hint: Pipeline stages to enable
+        description: |
+            Select which pipeline stages to enable for the analysis:
+            - Input Validation: Validate input data format and content
+            - Data Extraction: Extract protein sequences from various sources
+            - Embedding Generation: Create high-dimensional protein representations
+            - Family Assignment: Group proteins into families
+            - Similarity Search: Find similar proteins
+            - Sequence Analysis: Comprehensive sequence characterization
+            - Network Analysis: Build protein relationship networks
+            - Bioinformatics Analysis: Advanced bioinformatics analysis
+            - Report Generation: Generate comprehensive reports
+            - Visualization: Create interactive visualizations
+            - Data Export: Export results in various formats
+
+    stop_after_stage:
+        ui-name: Stop After Stage
+        short-hint: Stop pipeline after this stage
+        description: |
+            Stop the pipeline execution after the specified stage (for debugging or partial analysis).
+            Stages: Input Validation → Data Extraction → Embedding Generation → Family Assignment → Similarity Search → Sequence Analysis → Network Analysis → Bioinformatics Analysis → Report Generation → Visualization → Data Export
+
+    similarity_threshold:
+        ui-name: Similarity Threshold
+        short-hint: Minimum similarity score for protein matches
+        description: |
+            Minimum similarity score (0.0-1.0) required for proteins to be considered similar.
+            Higher values create more sparse networks with stronger connections.
+
+    max_similar_proteins:
+        ui-name: Max Similar Proteins
+        short-hint: Maximum number of similar proteins to return
+        description: |
+            Maximum number of similar proteins to return for each query protein.
+
+    embedding_model:
+        ui-name: Embedding Model
+        short-hint: Protein language model for embedding generation
+        description: |
+            Select the protein language model to use for generating protein embeddings:
+            - ESM-2 (6B parameters): Fastest, good for most applications
+            - ESM-2 (12B parameters): Balanced performance and accuracy
+            - ESM-2 (30B parameters): Highest accuracy, slower processing
+
+    output_format:
+        ui-name: Output Format
+        short-hint: Format for output files
+        description: |
+            Select the format for output files:
+            - HTML Report: Interactive HTML report
+            - JSON Data: Structured data format
+            - CSV Data: Tabular data format
+            - All Formats: Generate all available formats
+
+    output_report:
+        ui-name: Output Report Name
+        short-hint: Name for the output report object
+        description: |
+            Name for the output report object in the workspace.
+
+    output_data:
+        ui-name: Output Data Name
+        short-hint: Name for the output data object
+        description: |
+            Name for the output data object in the workspace.
+description: |
+    <p><b>Protein Query Analysis v2.0</b> - A unified pipeline for comprehensive protein analysis with modular architecture, including embedding generation, family assignment, similarity search, sequence analysis, and network visualization.</p>
+    
+    <p><b>Key Features:</b></p>
+    <ul>
+        <li><b>Multi-Protein Support:</b> Process single proteins, FASTA files, or KBase objects (Genome, FeatureSet, GenomeSet, ProteinSequenceSet)</li>
+        <li><b>Modular Pipeline Architecture:</b> Choose which analysis stages to run with configurable dependencies</li>
+        <li><b>Parallel Processing:</b> Configurable concurrency for efficient multi-protein analysis</li>
+        <li><b>Interactive Reports:</b> Dashboard view with detailed per-protein analysis</li>
+        <li><b>Early Termination:</b> Stop pipeline at any stage for partial results</li>
+        <li><b>Real-time Monitoring:</b> Performance tracking and error handling throughout the pipeline</li>
+        <li><b>Advanced Storage:</b> Memory-efficient processing with streaming capabilities</li>
+    </ul>
+    
+    <p><b>Input Types:</b></p>
+    <ul>
+        <li><b>FASTA:</b> File path or URL containing protein sequences</li>
+        <li><b>ProteinSequenceSet:</b> KBase object with multiple protein sequences</li>
+        <li><b>Genome:</b> Extract CDS/protein sequences from genome annotation</li>
+        <li><b>FeatureSet:</b> Extract protein sequences from feature set</li>
+        <li><b>GenomeSet:</b> Process multiple genomes simultaneously</li>
+        <li><b>SingleProtein:</b> Direct amino acid sequence input</li>
+    </ul>
+    
+    <p><b>Analysis Stages:</b></p>
+    <ul>
+        <li><b>Input Validation:</b> Validate input data format and content</li>
+        <li><b>Data Extraction:</b> Extract protein sequences from various sources</li>
+        <li><b>Embedding Generation:</b> Create high-dimensional protein representations using ESM-2</li>
+        <li><b>Family Assignment:</b> Assign proteins to families using centroid similarity</li>
+        <li><b>Similarity Search:</b> Find similar proteins within families</li>
+        <li><b>Sequence Analysis:</b> Comprehensive sequence characterization and bioinformatics</li>
+        <li><b>Network Analysis:</b> Build and visualize protein relationship networks</li>
+        <li><b>Bioinformatics Analysis:</b> Advanced bioinformatics analysis and annotation</li>
+        <li><b>Report Generation:</b> Generate comprehensive HTML reports</li>
+        <li><b>Visualization:</b> Create interactive visualizations and charts</li>
+        <li><b>Data Export:</b> Export results in multiple formats (JSON, CSV, Excel, FASTA)</li>
+    </ul>
+    
+    <p><b>Output:</b> Interactive HTML report with dashboard overview and detailed per-protein analysis, plus workspace objects for downstream analysis.</p>
+    
+    <p><b>Performance:</b> Optimized for large-scale analysis with memory-efficient processing and parallel execution.</p>
+
+screenshots:
+    - protein_query_analysis_dashboard.png
+    - protein_query_analysis_detail.png
+
+publications:
+    - doi: 10.1038/s41592-022-01465-8
+      display-text: "ESM-2: Language models of protein sequences"
+    - doi: 10.1093/bioinformatics/btab653
+      display-text: "FAISS: A library for efficient similarity search"
+
+icon: protein-analysis-icon.png

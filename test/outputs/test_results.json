@@ -1,0 +1,13 @@
+{
+  "timestamp": "2025-08-20T10:44:53.707194",
+  "modules": {},
+  "summary": {
+    "total_tests": 0,
+    "passed": 0,
+    "failed": 1,
+    "errors": 2,
+    "skipped": 1
+  },
+  "performance": {},
+  "errors": []
+}

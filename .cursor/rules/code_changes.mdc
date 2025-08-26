@@ -1,0 +1,5 @@
+
+description: Don't change functionality unless specifically requested. Preserve existing working functionality. Example: Don't modify embedding generator to use mock implementations unless explicitly asked.
+globs: ["**/*.py", "**/*.js", "**/*.ts", "**/*.java", "**/*.cpp", "**/*.c", "**/*.h"]
+alwaysApply: true
+---

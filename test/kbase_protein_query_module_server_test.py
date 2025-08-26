@@ -1,0 +1,213 @@
+# -*- coding: utf-8 -*-
+"""
+Streamlined test suite for kbase_protein_query_module focusing on pipeline functionality.
+Tests core methods and ensures proper integration with KBase services.
+"""
+
+import os
+import sys
+import unittest
+import time
+from unittest.mock import Mock, patch
+
+try:
+    from installed_clients.authclient import KBaseAuth as _KBaseAuth
+except ImportError:
+    from installed_clients.KBaseAuth import KBaseAuth as _KBaseAuth
+
+from installed_clients.WorkspaceClient import Workspace
+from installed_clients.KBaseReportClient import KBaseReport
+from installed_clients.DataFileUtilClient import DataFileUtil
+
+from kbase_protein_query_module.kbase_protein_query_moduleImpl import kbase_protein_query_module
+
+
+class kbase_protein_query_moduleTest(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.token = os.environ.get('KB_AUTH_TOKEN', None)
+        if not cls.token:
+            raise ValueError('KB_AUTH_TOKEN environment variable is required')
+        
+        cls.wsURL = os.environ.get('KB_WORKSPACE_URL', 'https://kbase.us/services/ws')
+        cls.callbackURL = os.environ.get('SDK_CALLBACK_URL', 'http://localhost:0')
+        
+        # Create workspace client
+        cls.wsClient = Workspace(cls.wsURL, token=cls.token)
+        cls.wsName = cls.wsClient.create_workspace({'workspace': f'test_kbase_protein_query_module_{int(time.time())}'})[1]
+        
+        # Setup test data
+        cls._setup_test_data()
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, 'wsName') and cls.wsName:
+            cls.wsClient.delete_workspace({'workspace': cls.wsName})
+            print(f'Test workspace {cls.wsName} deleted.')
+
+    @classmethod
+    def _setup_test_data(cls):
+        """Setup simple test data for all tests."""
+        cls.test_protein_ids = ['P00001', 'P00002', 'P00003']
+        cls.test_sequence = 'MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG'
+
+    def setUp(self):
+        self.serviceImpl = kbase_protein_query_module({})
+        self.ctx = {
+            'token': self.token,
+            'provenance': [{'ws_name': self.wsName}]
+        }
+
+    def test_check_protein_existence(self):
+        """Test protein existence check functionality."""
+        params = {
+            'protein_id': 'P00001',
+            'generate_embedding': False
+        }
+        
+        result = self.serviceImpl.check_protein_existence(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('exists', result[0])
+        self.assertIn('family_id', result[0])
+        self.assertIn('report_ref', result[0])
+
+    def test_generate_protein_embedding(self):
+        """Test protein embedding generation."""
+        params = {
+            'input_type': 'sequence',
+            'input_data': self.test_sequence,
+            'model_name': 'esm2_t6_8M_UR50D'
+        }
+        
+        result = self.serviceImpl.generate_protein_embedding(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('embedding_result_ref', result[0])
+        self.assertIn('embedding_norm', result[0])
+
+    def test_assign_family_fast(self):
+        """Test family assignment functionality."""
+        # Use mock data to avoid workspace dependencies
+        params = {
+            'embedding_ref': 'demo_embedding_ref',
+            'protein_id': 'P00001'
+        }
+        
+        result = self.serviceImpl.assign_family_fast(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('family_id', result[0])
+        self.assertIn('confidence', result[0])
+
+    def test_find_top_matches_from_embedding(self):
+        """Test similarity search functionality."""
+        # Use mock data to avoid workspace dependencies
+        params = {
+            'embedding_ref': 'demo_embedding_ref',
+            'protein_id': 'P00001',
+            'max_matches': 5
+        }
+        
+        result = self.serviceImpl.find_top_matches_from_embedding(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('matches', result[0])
+        self.assertIn('family_id', result[0])
+
+    def test_summarize_and_visualize_results(self):
+        """Test result summarization and visualization."""
+        # Create some demo result refs
+        demo_refs = ['demo_ref_1', 'demo_ref_2']
+        
+        params = {
+            'result_refs': demo_refs,
+            'output_name': 'test_analysis'
+        }
+        
+        result = self.serviceImpl.summarize_and_visualize_results(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('report_ref', result[0])
+        self.assertIn('html_report_path', result[0])
+
+    def test_run_protein_query_analysis(self):
+        """Test the main unified analysis pipeline."""
+        params = {
+            'workspace_name': 'test_workspace',
+            'input_proteins': self.test_protein_ids,
+            'analysis_stages': ['embedding_generation']
+        }
+        
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('report_ref', result[0])
+        self.assertIn('analysis_result_ref', result[0])
+        self.assertIn('stages_completed', result[0])
+
+    def test_legacy_method_compatibility(self):
+        """Test backward compatibility with legacy method name."""
+        params = {
+            'workspace_name': 'test_workspace',
+            'input_proteins': ['P00001'],
+            'analysis_stages': ['embedding_generation']
+        }
+        
+        result = self.serviceImpl.run_kbase_protein_query_module(self.ctx, params)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn('report_ref', result[0])
+
+    def test_status(self):
+        """Test the status method."""
+        result = self.serviceImpl.status(self.ctx)
+        
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertEqual(result[0]['state'], 'OK')
+        self.assertIn('version', result[0])
+
+    def test_workspace_connection(self):
+        """Test workspace connectivity."""
+        try:
+            ws_info = self.wsClient.get_workspace_info({'workspace': self.wsName})
+            self.assertIsNotNone(ws_info)
+        except Exception as e:
+            # Fallback to list_workspace_info
+            try:
+                ws_list = self.wsClient.list_workspace_info({'perm': 'a'})
+                self.assertIsNotNone(ws_list)
+            except Exception as e2:
+                self.fail(f"Workspace connection failed: {e2}")
+
+    def test_error_handling(self):
+        """Test error handling for invalid parameters."""
+        # Test with missing required parameter
+        params = {}  # Missing protein_id
+        
+        with self.assertRaises(ValueError):
+            self.serviceImpl.check_protein_existence(self.ctx, params)
+
+    def test_parameter_validation(self):
+        """Test parameter validation."""
+        # Test with invalid input_type
+        params = {
+            'input_type': 'invalid_type',
+            'input_data': self.test_sequence
+        }
+        
+        with self.assertRaises(ValueError):
+            self.serviceImpl.generate_protein_embedding(self.ctx, params)
+
+
+if __name__ == '__main__':
+    unittest.main()
