@@ -8,6 +8,11 @@ and bioinformatics analysis using state-of-the-art machine learning models.
 
 # Core modules
 from .core import BaseStage, StageResult, PipelineConfig
+# Scalability and extensibility modules
+from .core.analysis_registry import BaseAnalysis, AnalysisRegistry, get_registry, register_analysis
+from .core.resource_manager import ResourceManager, ResourceLimits, get_resource_manager
+from .core.parallel_processor import ParallelProcessor
+from .core.performance_monitor import PerformanceProfiler, get_performance_profiler
 
 # Stage modules
 from .stages import (
@@ -28,9 +33,12 @@ from .processing.networks.builder import DynamicNetworkBuilder
 
 # Storage modules
 from .storage import ProteinStorage, ProteinFamilyAssigner, ProteinExistenceChecker
+# Storage extensibility modules
+from .storage.indexing_strategy import IndexingStrategy, IndexingConfig, get_indexing_registry, register_indexing_strategy
 
 # Utility modules
 from .utils import input_parser
+from .utils.documentation_generator import generate_full_documentation
 
 __version__ = "2.0.0"
 __author__ = "KBase Team"
@@ -41,6 +49,24 @@ __all__ = [
     'BaseStage',
     'StageResult', 
     'PipelineConfig',
+    # Extensibility Framework
+    'BaseAnalysis',
+    'AnalysisRegistry', 
+    'get_registry',
+    'register_analysis',
+    'ResourceManager',
+    'ResourceLimits',
+    'get_resource_manager',
+    'ParallelProcessor',
+    'PerformanceProfiler',
+    'get_performance_profiler',
+    # Storage Extensibility
+    'IndexingStrategy',
+    'IndexingConfig',
+    'get_indexing_registry', 
+    'register_indexing_strategy',
+    # Documentation
+    'generate_full_documentation',
     
     # Stages
     'STAGE_REGISTRY',

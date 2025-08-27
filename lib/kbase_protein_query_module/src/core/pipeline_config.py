@@ -1,11 +1,17 @@
 """
 Pipeline Configuration for Protein Query Analysis
 
-This module defines the configuration dataclass for the protein query analysis pipeline.
+This module defines comprehensive configuration classes for scalable protein query 
+analysis pipelines with resource management and performance optimization.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
+import os
+import psutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,9 +68,19 @@ class PipelineConfig:
     storage_config: Dict[str, Any] = field(default_factory=dict)
     similarity_config: Dict[str, Any] = field(default_factory=dict)
     
-    # Performance configuration
+    # Performance and scalability configuration
     max_workers: int = 4
     timeout_seconds: int = 300
+    max_memory_gb: float = 8.0
+    enable_parallel_processing: bool = True
+    batch_size_proteins: int = 1000
+    chunk_size: int = 1000
+    use_streaming: bool = True
+    cache_size_mb: int = 512
+    enable_resource_monitoring: bool = True
+    auto_scale_batch_size: bool = True
+    max_concurrent_tasks: int = 4
+    gc_threshold_mb: float = 512.0
     
     # KBase specific configuration
     workspace_url: Optional[str] = None
@@ -74,15 +90,88 @@ class PipelineConfig:
     custom_config: Dict[str, Any] = field(default_factory=dict)
     
     def __post_init__(self):
-        """Validate configuration after initialization."""
+        """Validate and auto-configure settings after initialization."""
+        # Validate input requirements
         if not self.input_proteins and not self.input_file_path and not self.workspace_object_ref:
             raise ValueError("Must provide either input_proteins, input_file_path, or workspace_object_ref")
         
+        # Validate thresholds
         if self.similarity_threshold < 0 or self.similarity_threshold > 1:
             raise ValueError("similarity_threshold must be between 0 and 1")
         
         if self.max_similar_proteins <= 0:
             raise ValueError("max_similar_proteins must be positive")
+        
+        # Auto-configure scalability parameters based on system resources
+        self._auto_configure_scalability()
+    
+    def _auto_configure_scalability(self):
+        """
+        Auto-configure scalability parameters for KBase DOE server environments.
+        
+        Uses percentage-based limits to ensure respectful resource usage on shared servers.
+        """
+        try:
+            # Get system resources
+            memory = psutil.virtual_memory()
+            cpu_count = psutil.cpu_count()
+            
+            # Server-aware configuration using percentage-based limits
+            total_memory_gb = memory.total / (1024**3)
+            
+            # Use conservative percentages for shared DOE servers
+            max_usable_memory = total_memory_gb * 0.6  # 60% of total memory
+            max_usable_cores = max(1, int(cpu_count * 0.7))  # 70% of CPU cores
+            
+            # Apply server-safe limits
+            self.max_memory_gb = min(self.max_memory_gb, max_usable_memory)
+            self.max_workers = min(self.max_workers, max_usable_cores)
+            self.max_concurrent_tasks = min(self.max_concurrent_tasks, max_usable_cores)
+            
+            # Conservative batch sizing for server environments
+            memory_factor = max_usable_memory / 8.0  # Base factor for 8GB
+            server_batch_factor = 0.5  # Additional 50% reduction for server safety
+            self.batch_size_proteins = int(self.batch_size_proteins * memory_factor * server_batch_factor)
+            self.chunk_size = int(self.chunk_size * memory_factor * server_batch_factor)
+            
+            # Conservative cache sizing
+            cache_factor = min(max_usable_memory / 8.0, 1.5) * 0.8  # 80% of calculated for safety
+            self.cache_size_mb = int(self.cache_size_mb * cache_factor)
+            
+            # Apply absolute minimums for functionality
+            self.batch_size_proteins = max(50, self.batch_size_proteins)
+            self.chunk_size = max(100, self.chunk_size)
+            self.cache_size_mb = max(128, self.cache_size_mb)
+            
+            # Detect KBase server environment and apply extra restrictions
+            if os.environ.get('KBASE_ENDPOINT') or os.environ.get('KB_DEPLOYMENT_CONFIG'):
+                self.batch_size_proteins = min(self.batch_size_proteins, 300)
+                self.max_workers = min(self.max_workers, 2)
+                self.max_concurrent_tasks = min(self.max_concurrent_tasks, 2)
+                logger.info("Detected KBase server environment - applying extra conservative limits")
+            
+            logger.info(f"Server-aware auto-configuration: memory={self.max_memory_gb:.1f}GB "
+                       f"({(self.max_memory_gb/total_memory_gb)*100:.1f}% of total), "
+                       f"workers={self.max_workers} ({(self.max_workers/cpu_count)*100:.1f}% of cores), "
+                       f"batch_size={self.batch_size_proteins}")
+                       
+        except Exception as e:
+            logger.warning(f"Could not auto-configure scalability parameters: {e}")
+            # Fallback to very conservative defaults for server safety
+            self.max_memory_gb = min(self.max_memory_gb, 4.0)
+            self.max_workers = min(self.max_workers, 2)
+            self.batch_size_proteins = min(self.batch_size_proteins, 200)
+    
+    def get_resource_limits(self) -> Dict[str, Any]:
+        """Get resource limits for the resource manager."""
+        return {
+            'max_memory_gb': self.max_memory_gb,
+            'max_cpu_percent': 80.0,
+            'max_disk_usage_gb': 100.0,
+            'batch_size_proteins': self.batch_size_proteins,
+            'max_concurrent_tasks': self.max_concurrent_tasks,
+            'gc_threshold_mb': self.gc_threshold_mb
+        }
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""

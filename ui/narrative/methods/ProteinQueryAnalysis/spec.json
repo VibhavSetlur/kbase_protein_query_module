@@ -175,7 +175,7 @@
       },
       "ui_name": "Output Format",
       "short_hint": "Format for output files",
-      "description": "Select the format for output files (HTML report, JSON data, CSV data, or all formats).",
+      "description": "Select the format for output files: HTML creates individual analysis reports plus summary; JSON provides complete pipeline results; CSV includes top proteins with metadata and input correlations; All generates comprehensive output directory.",
       "allowed_types": ["string"]
     },
     {
@@ -218,6 +218,10 @@
       "method": "run_protein_query_analysis",
       "input_mapping": [
         {
+          "narrative_system_variable": "workspace",
+          "target_property": "workspace_name"
+        },
+        {
           "input_parameter": "input_proteins",
           "target_property": "input_proteins"
         },
@@ -248,6 +252,14 @@
         {
           "input_parameter": "output_format",
           "target_property": "output_format"
+        },
+        {
+          "input_parameter": "output_report",
+          "target_property": "output_report_name"
+        },
+        {
+          "input_parameter": "output_data",
+          "target_property": "output_data_name"
         }
       ],
       "output_mapping": [
@@ -262,6 +274,22 @@
         {
           "service_method_output_path": [0,"analysis_result_ref"],
           "target_property": "analysis_result_ref"
+        },
+        {
+          "service_method_output_path": [0,"output_directory"],
+          "target_property": "output_directory"
+        },
+        {
+          "service_method_output_path": [0,"html_report_files"],
+          "target_property": "html_report_files"
+        },
+        {
+          "service_method_output_path": [0,"exported_files"],
+          "target_property": "exported_files"
+        },
+        {
+          "service_method_output_path": [0,"stages_completed"],
+          "target_property": "stages_completed"
         }
       ]
     }

@@ -49,7 +49,9 @@ class TestPipelineConfig:
         assert config.embedding_model == "esm2_t30_150M_UR50D"
         assert config.max_similar_proteins == 100
         assert config.similarity_threshold == 0.7
-        assert config.max_workers == 8
+        # Server auto-configuration limits workers based on available cores (70% of total)
+        # The actual value depends on system resources and server environment detection
+        assert config.max_workers >= 1 and config.max_workers <= 8
         assert config.generate_html_report == False
 
 class TestPipelineResult:

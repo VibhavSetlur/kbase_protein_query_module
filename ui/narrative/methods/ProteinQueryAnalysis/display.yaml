@@ -69,10 +69,10 @@ parameters:
         short-hint: Format for output files
         description: |
             Select the format for output files:
-            - HTML Report: Interactive HTML report
-            - JSON Data: Structured data format
-            - CSV Data: Tabular data format
-            - All Formats: Generate all available formats
+            - HTML Report: Individual HTML files for each analysis + comprehensive summary
+            - JSON Data: Structured data format with complete pipeline results
+            - CSV Data: Top proteins with metadata and input correlations
+            - All Formats: Generate complete output directory with all formats
 
     output_report:
         ui-name: Output Report Name
@@ -124,7 +124,15 @@ description: |
         <li><b>Data Export:</b> Export results in multiple formats (JSON, CSV, Excel, FASTA)</li>
     </ul>
     
-    <p><b>Output:</b> Interactive HTML report with dashboard overview and detailed per-protein analysis, plus workspace objects for downstream analysis.</p>
+    <p><b>Enhanced Output System:</b></p>
+    <ul>
+        <li><b>Individual HTML Reports:</b> Separate HTML files for each analysis stage (sequence analysis, family assignment, similarity search, network analysis, etc.)</li>
+        <li><b>Summary HTML Report:</b> Comprehensive overview with download links and navigation to individual reports</li>
+        <li><b>Comprehensive CSV Files:</b> Top N proteins with metadata, similarity scores, and input protein correlations</li>
+        <li><b>Complete Data Export:</b> JSON files with detailed pipeline results and execution logs</li>
+        <li><b>Organized Directory Structure:</b> Timestamped output directories with README and file manifest for easy navigation</li>
+        <li><b>KBase Narrative Integration:</b> Downloadable results directory optimized for research workflows</li>
+    </ul>
     
     <p><b>Performance:</b> Optimized for large-scale analysis with memory-efficient processing and parallel execution.</p>
 

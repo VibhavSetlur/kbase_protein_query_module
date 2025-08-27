@@ -27,10 +27,11 @@ class DataExtractionStage(BaseStage):
     - Data format conversion
     """
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any] = None, kb_util=None):
         super().__init__(config)
         self.max_retries = config.get('max_retries', 3) if config else 3
         self.timeout = config.get('timeout', 30) if config else 30
+        self.kb_util = kb_util
         self.batch_size = config.get('batch_size', 100) if config else 100
     
     def get_stage_name(self) -> str:

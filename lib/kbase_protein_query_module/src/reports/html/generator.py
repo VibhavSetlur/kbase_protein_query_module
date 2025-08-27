@@ -37,8 +37,19 @@ class HTMLReportGenerator:
     
     def __init__(self, output_dir: str = None):
         """Initialize the HTML report generator."""
-        # Use consolidated output directory from environment or default
-        self.output_dir = os.environ.get('HTML_REPORTS_DIR', output_dir or "html_reports")
+        # Use proper directory paths - scratch space for KBase, test/outputs for testing
+        if output_dir:
+            self.output_dir = output_dir
+        else:
+            base_dir = os.environ.get('HTML_REPORTS_DIR')
+            if not base_dir:
+                if os.path.exists('test/outputs'):
+                    base_dir = 'test/outputs'
+                else:
+                    # For KBase Narrative, use scratch space
+                    base_dir = os.environ.get('SCRATCH_DIR', '/kb/module/work/tmp')
+            self.output_dir = base_dir
+            
         self.sequence_analyzer = SequenceAnalysisStage()
         self.network_builder = DynamicNetworkBuilder()
         

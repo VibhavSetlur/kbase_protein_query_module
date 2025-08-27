@@ -64,12 +64,13 @@ class ProteinQueryWorkflow:
     - Support for both small and massive datasets
     """
     
-    def __init__(self, config: PipelineConfig = None, config_file: Optional[str] = None):
+    def __init__(self, config: PipelineConfig = None, config_file: Optional[str] = None, kb_util=None):
         """
         Initialize the workflow orchestrator.
         
         Args:
             config: Pipeline configuration
+            kb_util: KBUtilLib client for KBase operations
         """
         if config_file is not None and config is None:
             # Minimal YAML loader to satisfy tests expecting config_file init
@@ -87,6 +88,12 @@ class ProteinQueryWorkflow:
                 self.config = config
         self.run_id = str(uuid.uuid4())
         self.logger = logging.getLogger(f"{__name__}.{self.run_id}")
+        
+        # Store KBUtilLib client for workspace operations
+        self.kb_util = kb_util
+        
+        # Initialize scalability components
+        self._initialize_scalability_components()
         
         # Initialize components
         self._initialize_components()
@@ -129,6 +136,44 @@ class ProteinQueryWorkflow:
         except Exception as e:
             self.logger.error(f"Failed to initialize components: {str(e)}")
             raise
+    
+    def _initialize_scalability_components(self):
+        """Initialize scalability and performance components."""
+        try:
+            from ..core.resource_manager import ResourceManager, ResourceLimits
+            from ..core.parallel_processor import ParallelProcessor
+            from ..core.performance_monitor import PerformanceProfiler
+            
+            # Initialize resource manager with config-based limits
+            resource_limits = ResourceLimits(
+                max_memory_gb=getattr(self.config, 'max_memory_gb', 8.0),
+                max_cpu_percent=80.0,
+                batch_size_proteins=getattr(self.config, 'batch_size_proteins', 1000),
+                max_concurrent_tasks=getattr(self.config, 'max_concurrent_tasks', 4),
+                gc_threshold_mb=getattr(self.config, 'gc_threshold_mb', 512.0)
+            )
+            
+            self.resource_manager = ResourceManager(resource_limits)
+            
+            # Initialize parallel processor
+            self.parallel_processor = ParallelProcessor(
+                max_workers=getattr(self.config, 'max_workers', 4),
+                resource_manager=self.resource_manager,
+                enable_monitoring=getattr(self.config, 'enable_resource_monitoring', True)
+            )
+            
+            # Initialize performance profiler
+            self.performance_profiler = PerformanceProfiler(
+                enable_detailed_profiling=getattr(self.config, 'enable_resource_monitoring', True)
+            )
+            
+            self.logger.info("Scalability components initialized successfully")
+            
+        except Exception as e:
+            self.logger.warning(f"Could not initialize scalability components: {e}")
+            self.resource_manager = None
+            self.parallel_processor = None
+            self.performance_profiler = None
 
     def load_family_subset(self, family_id: str):
         if not hasattr(self, 'storage') or self.storage is None:

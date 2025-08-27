@@ -35,6 +35,9 @@ joblib>=1.1.0
 tqdm>=4.62.0
 pyyaml>=6.0
 
+# System monitoring and scalability
+psutil>=5.8.0
+
 # Testing
 pytest>=6.0.0
 pytest-cov>=3.0.0 
