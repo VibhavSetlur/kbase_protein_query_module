@@ -11,20 +11,6 @@ COMPREHENSIVE ANALYSIS WORKFLOW:
 5. SummarizeAndVisualize: Generate comprehensive HTML reports with network analysis
 6. RunProteinQueryAnalysis: Unified pipeline for comprehensive protein analysis
 
-ADVANCED CAPABILITIES:
-- UniProt ID canonical identifier system (exact match only)
-- ESM-2 protein language model for embedding generation
-- Efficient FAISS-based similarity search and clustering
-- Family assignment using binary centroid similarity
-- Comprehensive metadata storage and retrieval
-- HTML report generation with network visualization
-- Workspace object management for downstream analysis
-- Bioinformatics integration with protein databases
-- Network analysis and protein relationship mapping
-- Advanced similarity metrics and statistical analysis
-- Modular pipeline architecture with configurable stages
-- Real-time performance monitoring and error handling
-
 Authors: Vibhav Setlur
 Contact: https://kbase.us/contact-us/
 */

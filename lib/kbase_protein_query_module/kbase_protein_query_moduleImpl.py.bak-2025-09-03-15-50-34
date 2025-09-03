@@ -39,6 +39,20 @@ COMPREHENSIVE ANALYSIS WORKFLOW:
 5. SummarizeAndVisualize: Generate comprehensive HTML reports with network analysis
 6. RunProteinQueryAnalysis: Unified pipeline for comprehensive protein analysis
 
+ADVANCED CAPABILITIES:
+- UniProt ID canonical identifier system (exact match only)
+- ESM-2 protein language model for embedding generation
+- Efficient FAISS-based similarity search and clustering
+- Family assignment using binary centroid similarity
+- Comprehensive metadata storage and retrieval
+- HTML report generation with network visualization
+- Workspace object management for downstream analysis
+- Bioinformatics integration with protein databases
+- Network analysis and protein relationship mapping
+- Advanced similarity metrics and statistical analysis
+- Modular pipeline architecture with configurable stages
+- Real-time performance monitoring and error handling
+
 Authors: Vibhav Setlur
 Contact: https://kbase.us/contact-us/
     '''
@@ -51,7 +65,7 @@ Contact: https://kbase.us/contact-us/
     ######################################### noqa
     VERSION = "2.0.0"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "57c93732bd8f924db06acd4e82c5a627efe1b6f8"
+    GIT_COMMIT_HASH = "4fa54647b9915c89cf304c5757983c399e4f039b"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -115,15 +129,22 @@ Contact: https://kbase.us/contact-us/
             self.network_builder = None
             self.html_report_generator = None
             self.workflow_orchestrator = None
-        except Exception as e:
-            logger.warning(f"Could not initialize components: {e}")
+        
+        #END_CONSTRUCTOR
+        pass
+        
+        # Initialize components (simplified)
+        try:
+            self.existence_checker = None
+            self.family_assigner = None
             self.embedding_generator = None
             self.hierarchical_index = None
             self.network_builder = None
             self.html_report_generator = None
             self.workflow_orchestrator = None
-        #END_CONSTRUCTOR
-
+        except Exception as e:
+            logger.warning(f"Could not initialize components: {e}")
+        
     def _setup_kbase_output_directory(self, workspace_name=None):
         """Setup KBase output directory for storing results"""
         try:
@@ -211,6 +232,7 @@ Contact: https://kbase.us/contact-us/
         except Exception as e:
             logger.error(f"Failed to parse input: {e}")
             return []
+
 
     def check_protein_existence(self, ctx, params):
         """
@@ -365,8 +387,9 @@ Contact: https://kbase.us/contact-us/
                         embedding_generated = False
                 
                 # Create report
-                report_info = self._create_kbase_report(
-                    result, output_report, workspace_name, output_dir
+                report_info = self._create_existence_report(
+                    protein_id, protein_record, embedding_generated, 
+                    embedding_ref, output_report, workspace_name
                 )
                 
                 output = {
@@ -1168,6 +1191,7 @@ Contact: https://kbase.us/contact-us/
             output = {
                 'report_name': report_info['name'],
                 'report_ref': report_info['ref'],
+                'data_ref': data_ref,
                 'analysis_result_ref': analysis_result_ref_val,  # Ensure string even without saved object
                 'protein_count': len(protein_records),  # Add protein count for tests
                 'html_report_path': output_dir,  # Add html report path for tests
@@ -1176,6 +1200,8 @@ Contact: https://kbase.us/contact-us/
                 'execution_time': execution_time,
                 'summary': (f'Successfully analyzed {len(protein_records)} proteins'
                             if result.success else f'Pipeline execution failed: {result.error_message}'),
+                'output_directory': output_dir,
+                'pipeline_results': result.final_output,
                 'stages_completed': result.stages_completed
             }
             
@@ -1184,14 +1210,17 @@ Contact: https://kbase.us/contact-us/
             output = {
                 'report_name': 'error_report',
                 'report_ref': '',
+                'data_ref': None,
                 'analysis_result_ref': '',
                 'input_parameters': params,
                 'start_time': start_time,
                 'execution_time': time.time() - start_time,
                 'summary': f'Analysis failed: {str(e)}',
-                'html_report_path': '',
+                'output_directory': '',
+                'pipeline_results': {},
+                'stages_completed': [],
                 'protein_count': len(params.get('input_proteins', [])),
-                'stages_completed': []
+                'html_report_path': ''
             }
         #END run_protein_query_analysis
 

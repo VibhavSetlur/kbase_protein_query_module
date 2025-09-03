@@ -115,102 +115,10 @@ Contact: https://kbase.us/contact-us/
             self.network_builder = None
             self.html_report_generator = None
             self.workflow_orchestrator = None
-        except Exception as e:
-            logger.warning(f"Could not initialize components: {e}")
-            self.embedding_generator = None
-            self.hierarchical_index = None
-            self.network_builder = None
-            self.html_report_generator = None
-            self.workflow_orchestrator = None
+        
         #END_CONSTRUCTOR
+        pass
 
-    def _setup_kbase_output_directory(self, workspace_name=None):
-        """Setup KBase output directory for storing results"""
-        try:
-            # Create output directory in scratch space
-            if workspace_name and workspace_name != 'unknown':
-                self.output_dir = os.path.join(self.shared_folder, 'outputs', workspace_name)
-            else:
-                self.output_dir = os.path.join(self.shared_folder, 'outputs')
-            os.makedirs(self.output_dir, exist_ok=True)
-            logger.info(f"KBase output directory initialized: {self.output_dir}")
-            return self.output_dir
-        except Exception as e:
-            logger.warning(f"Could not setup output directory: {e}")
-            self.output_dir = None
-            return None
-            
-    def _create_kbase_report(self, result, output_report, workspace_name, output_dir):
-        """Create a KBase report from pipeline results"""
-        try:
-            if self.kb_util and hasattr(self.kb_util, 'create_report'):
-                report_info = self.kb_util.create_report(workspace_name, {
-                    'message': f'Protein query analysis completed successfully',
-                    'objects_created': [],
-                    'workspace_name': workspace_name,
-                    'report_object_name': output_report or 'protein_analysis_report'
-                })
-            else:
-                # Fallback to direct report client usage
-                from installed_clients.KBaseReportClient import KBaseReport
-                report_client = KBaseReport(self.callback_url)
-                report_info = report_client.create_extended_report({
-                    'message': f'Protein query analysis completed successfully',
-                    'objects_created': [],
-                    'workspace_name': workspace_name,
-                    'report_object_name': output_report or 'protein_analysis_report'
-                })
-            return report_info
-        except Exception as e:
-            logger.error(f"Failed to create KBase report: {e}")
-            return {'name': 'error_report', 'ref': 'error_report_ref'}
-            
-    def _create_output_data_object(self, result, output_data, workspace_name):
-        """Create output data object in workspace"""
-        try:
-            if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                data_ref = self.kb_util.save_workspace_object(
-                    workspace_name, output_data,
-                    'KBaseProteinQueryModule.ProteinAnalysisResults', result.final_output)
-            else:
-                # Fallback to direct workspace client usage
-                from installed_clients.WorkspaceClient import Workspace
-                workspace_client = Workspace(self.callback_url)
-                result_obj = workspace_client.save_objects({
-                    'id': workspace_name,
-                    'objects': [{
-                        'name': output_data,
-                        'type': 'KBaseProteinQueryModule.ProteinAnalysisResults',
-                        'data': result.final_output
-                    }]
-                })
-                data_ref = result_obj[0][6]  # Get the reference
-            return data_ref
-        except Exception as e:
-            logger.error(f"Failed to create output data object: {e}")
-            return None
-            
-    def _parse_input_by_type(self, input_parser, input_type, input_proteins, uniprot_ids, 
-                             fasta_file, workspace_object, direct_sequences):
-        """Parse input based on type and return protein records"""
-        try:
-            if input_type == 'uniprot':
-                return [input_parser.ProteinRecord(pid, 'UniProt') for pid in uniprot_ids]
-            elif input_type == 'fasta':
-                # Parse FASTA file content
-                records = []
-                for seq in direct_sequences:
-                    records.append(input_parser.ProteinRecord(f"seq_{hash(seq) % 10000}", 'FASTA', sequence=seq))
-                return records
-            elif input_type == 'workspace':
-                # Parse workspace object
-                return [input_parser.ProteinRecord(pid, 'Workspace') for pid in input_proteins]
-            else:
-                # Default to direct protein IDs
-                return [input_parser.ProteinRecord(pid, 'Direct') for pid in input_proteins]
-        except Exception as e:
-            logger.error(f"Failed to parse input: {e}")
-            return []
 
     def check_protein_existence(self, ctx, params):
         """
@@ -365,8 +273,9 @@ Contact: https://kbase.us/contact-us/
                         embedding_generated = False
                 
                 # Create report
-                report_info = self._create_kbase_report(
-                    result, output_report, workspace_name, output_dir
+                report_info = self._create_existence_report(
+                    protein_id, protein_record, embedding_generated, 
+                    embedding_ref, output_report, workspace_name
                 )
                 
                 output = {
@@ -1168,6 +1077,7 @@ Contact: https://kbase.us/contact-us/
             output = {
                 'report_name': report_info['name'],
                 'report_ref': report_info['ref'],
+                'data_ref': data_ref,
                 'analysis_result_ref': analysis_result_ref_val,  # Ensure string even without saved object
                 'protein_count': len(protein_records),  # Add protein count for tests
                 'html_report_path': output_dir,  # Add html report path for tests
@@ -1176,6 +1086,8 @@ Contact: https://kbase.us/contact-us/
                 'execution_time': execution_time,
                 'summary': (f'Successfully analyzed {len(protein_records)} proteins'
                             if result.success else f'Pipeline execution failed: {result.error_message}'),
+                'output_directory': output_dir,
+                'pipeline_results': result.final_output,
                 'stages_completed': result.stages_completed
             }
             
@@ -1184,14 +1096,17 @@ Contact: https://kbase.us/contact-us/
             output = {
                 'report_name': 'error_report',
                 'report_ref': '',
+                'data_ref': None,
                 'analysis_result_ref': '',
                 'input_parameters': params,
                 'start_time': start_time,
                 'execution_time': time.time() - start_time,
                 'summary': f'Analysis failed: {str(e)}',
-                'html_report_path': '',
+                'output_directory': '',
+                'pipeline_results': {},
+                'stages_completed': [],
                 'protein_count': len(params.get('input_proteins', [])),
-                'stages_completed': []
+                'html_report_path': ''
             }
         #END run_protein_query_analysis
 
