@@ -65,7 +65,7 @@ Contact: https://kbase.us/contact-us/
     ######################################### noqa
     VERSION = "2.0.0"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "4fa54647b9915c89cf304c5757983c399e4f039b"
+    GIT_COMMIT_HASH = "36203034384319fef4abcbb4d82c8a8e3a07f512"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -132,164 +132,44 @@ Contact: https://kbase.us/contact-us/
         
         #END_CONSTRUCTOR
         pass
-        
-        # Initialize components (simplified)
-        try:
-            self.existence_checker = None
-            self.family_assigner = None
-            self.embedding_generator = None
-            self.hierarchical_index = None
-            self.network_builder = None
-            self.html_report_generator = None
-            self.workflow_orchestrator = None
-        except Exception as e:
-            logger.warning(f"Could not initialize components: {e}")
-        
-    def _setup_kbase_output_directory(self, workspace_name=None):
-        """Setup KBase output directory for storing results"""
-        try:
-            # Create output directory in scratch space
-            if workspace_name and workspace_name != 'unknown':
-                self.output_dir = os.path.join(self.shared_folder, 'outputs', workspace_name)
-            else:
-                self.output_dir = os.path.join(self.shared_folder, 'outputs')
-            os.makedirs(self.output_dir, exist_ok=True)
-            logger.info(f"KBase output directory initialized: {self.output_dir}")
-            return self.output_dir
-        except Exception as e:
-            logger.warning(f"Could not setup output directory: {e}")
-            self.output_dir = None
-            return None
-            
-    def _create_kbase_report(self, result, output_report, workspace_name, output_dir):
-        """Create a KBase report from pipeline results"""
-        try:
-            if self.kb_util and hasattr(self.kb_util, 'create_report'):
-                report_info = self.kb_util.create_report(workspace_name, {
-                    'message': f'Protein query analysis completed successfully',
-                    'objects_created': [],
-                    'workspace_name': workspace_name,
-                    'report_object_name': output_report or 'protein_analysis_report'
-                })
-            else:
-                # Fallback to direct report client usage
-                from installed_clients.KBaseReportClient import KBaseReport
-                report_client = KBaseReport(self.callback_url)
-                report_info = report_client.create_extended_report({
-                    'message': f'Protein query analysis completed successfully',
-                    'objects_created': [],
-                    'workspace_name': workspace_name,
-                    'report_object_name': output_report or 'protein_analysis_report'
-                })
-            return report_info
-        except Exception as e:
-            logger.error(f"Failed to create KBase report: {e}")
-            return {'name': 'error_report', 'ref': 'error_report_ref'}
-            
-    def _create_output_data_object(self, result, output_data, workspace_name):
-        """Create output data object in workspace"""
-        try:
-            if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                data_ref = self.kb_util.save_workspace_object(
-                    workspace_name, output_data,
-                    'KBaseProteinQueryModule.ProteinAnalysisResults', result.final_output)
-            else:
-                # Fallback to direct workspace client usage
-                from installed_clients.WorkspaceClient import Workspace
-                workspace_client = Workspace(self.callback_url)
-                result_obj = workspace_client.save_objects({
-                    'id': workspace_name,
-                    'objects': [{
-                        'name': output_data,
-                        'type': 'KBaseProteinQueryModule.ProteinAnalysisResults',
-                        'data': result.final_output
-                    }]
-                })
-                data_ref = result_obj[0][6]  # Get the reference
-            return data_ref
-        except Exception as e:
-            logger.error(f"Failed to create output data object: {e}")
-            return None
-            
-    def _parse_input_by_type(self, input_parser, input_type, input_proteins, uniprot_ids, 
-                             fasta_file, workspace_object, direct_sequences):
-        """Parse input based on type and return protein records"""
-        try:
-            if input_type == 'uniprot':
-                return [input_parser.ProteinRecord(pid, 'UniProt') for pid in uniprot_ids]
-            elif input_type == 'fasta':
-                # Parse FASTA file content
-                records = []
-                for seq in direct_sequences:
-                    records.append(input_parser.ProteinRecord(f"seq_{hash(seq) % 10000}", 'FASTA', sequence=seq))
-                return records
-            elif input_type == 'workspace':
-                # Parse workspace object
-                return [input_parser.ProteinRecord(pid, 'Workspace') for pid in input_proteins]
-            else:
-                # Default to direct protein IDs
-                return [input_parser.ProteinRecord(pid, 'Direct') for pid in input_proteins]
-        except Exception as e:
-            logger.error(f"Failed to parse input: {e}")
-            return []
 
 
     def check_protein_existence(self, ctx, params):
         """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "CheckProteinExistenceResults" (Check if a
-           protein exists in the storage system using UniProt ID and create a
-           workspace object with the result. Input: UniProt ID (e.g., P00001,
-           P12345) Output: Existence status, family assignment, metadata,
-           optional embedding) -> structure: parameter "report_name" of
-           String, parameter "report_ref" of String, parameter "exists" of
-           Long, parameter "family_id" of String, parameter "metadata" of
-           mapping from String to unspecified object, parameter
-           "input_parameters" of mapping from String to unspecified object,
-           parameter "start_time" of Double, parameter "summary" of String,
-           parameter "protein_existence_result_ref" of String, parameter
-           "embedding_result_ref" of String
+        Check if protein exists in UniProt and optionally generate embedding.
+        
+        This method can be used as a standalone check or as the first step
+        in the full protein analysis pipeline.
         """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN check_protein_existence
-        # Extract and validate parameters before try block
-        protein_id = params.get('protein_id', '')
-        generate_embedding = params.get('generate_embedding', False)
-        embedding_model = params.get('embedding_model', 'esm2_t6_8M_UR50D')
-        output_report = params.get('output_report', '')
-        
-        if not protein_id:
-            raise ValueError("protein_id parameter is required")
-        
-        # Get workspace info
-        workspace_name = params.get('workspace_name')
-        if not workspace_name and ctx.get('provenance') and len(ctx['provenance']) > 0:
-            workspace_name = ctx['provenance'][0].get('ws_name', 'unknown')
-        if not workspace_name:
-            workspace_name = 'unknown'
-        
-        # Workspace name is optional for basic operations
-        if not workspace_name or workspace_name == 'unknown':
-            workspace_name = 'test_workspace'  # Use default for testing
-        
         start_time = time.time()
         
         # Initialize output variable with default error state
         output = {
-            'report_name': 'error_report',
+            'protein_id': 'unknown',
+            'exists': False,
+            'sequence': '',
+            'sequence_length': 0,
+            'message': 'Analysis not completed',
+            'embedding_generated': False,
+            'embedding_ref': '',
+            'report_name': '',
             'report_ref': '',
-            'exists': 0,
-            'family_id': 'error',
-            'metadata': {},
             'input_parameters': params,
-            'start_time': start_time,
-            'summary': 'Analysis not completed',
-            'protein_existence_result_ref': '',
-            'embedding_result_ref': ''
+            'start_time': start_time
         }
         
         try:
+            # Extract parameters
+            protein_id = params.get('protein_id', '')
+            generate_embedding = params.get('generate_embedding', False)
+            embedding_model = params.get('embedding_model', 'esm2_t6_8M_UR50D')
+            output_report = params.get('output_report', '')
+            
+            if not protein_id:
+                raise ValueError("protein_id parameter is required")
+            
+            # Get workspace info
+            workspace_name = ctx['provenance'][0]['ws_name'] if ctx.get('provenance') else 'unknown'
             
             # Initialize input parser
             from kbase_protein_query_module.src.utils.input_parser import InputParser
@@ -305,16 +185,17 @@ Contact: https://kbase.us/contact-us/
             if not sequence:
                 # Protein not found in UniProt
                 output = {
-                    'report_name': f"{protein_id}_existence_check",
+                    'protein_id': protein_id,
+                    'exists': False,
+                    'sequence': '',
+                    'sequence_length': 0,
+                    'message': f'Protein {protein_id} not found in UniProt database',
+                    'embedding_generated': False,
+                    'embedding_ref': '',
+                    'report_name': '',
                     'report_ref': '',
-                    'exists': 0,
-                    'family_id': 'not_found',
-                    'metadata': {'uniprot_id': protein_id, 'status': 'not_found'},
                     'input_parameters': params,
-                    'start_time': start_time,
-                    'summary': f'Protein {protein_id} not found in UniProt database',
-                    'protein_existence_result_ref': '',
-                    'embedding_result_ref': ''
+                    'start_time': start_time
                 }
             else:
                 # Protein exists
@@ -393,40 +274,105 @@ Contact: https://kbase.us/contact-us/
                 )
                 
                 output = {
+                    'protein_id': protein_id,
+                    'exists': True,
+                    'sequence': protein_record.sequence,
+                    'sequence_length': len(protein_record.sequence),
+                    'message': f'Protein {protein_id} found in UniProt database',
+                    'embedding_generated': embedding_generated,
+                    'embedding_ref': embedding_ref,
                     'report_name': report_info['name'],
                     'report_ref': report_info['ref'],
-                    'exists': 1,
-                    'family_id': 'uniprot_family',
-                    'metadata': {'uniprot_id': protein_id, 'sequence_length': len(protein_record.sequence)},
                     'input_parameters': params,
                     'start_time': start_time,
-                    'summary': f'Protein {protein_id} found in UniProt database',
-                    'protein_existence_result_ref': f"{protein_id}_existence_result",
-                    'embedding_result_ref': embedding_ref if embedding_generated else ''
+                    'protein_record': protein_record  # For pipeline integration
                 }
             
         except Exception as e:
             logger.error(f"Protein existence check failed: {e}")
-            output = {
-                'report_name': 'error_report',
-                'report_ref': '',
-                'exists': 0,
-                'family_id': 'error',
-                'metadata': {'error': str(e)},
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': f'Error during protein existence check: {str(e)}',
-                'protein_existence_result_ref': '',
-                'embedding_result_ref': ''
-            }
+            # Ensure output is defined even in case of error
+            if output is None:
+                output = {
+                    'protein_id': protein_id if 'protein_id' in locals() else 'unknown',
+                    'exists': False,
+                    'sequence': '',
+                    'sequence_length': 0,
+                    'message': f'Error during protein existence check: {str(e)}',
+                    'embedding_generated': False,
+                    'embedding_ref': '',
+                    'report_name': '',
+                    'report_ref': '',
+                    'input_parameters': params,
+                    'start_time': start_time
+                }
+            # Return error output instead of raising
+            return [output]
         #END check_protein_existence
 
-        # At some point might do deeper type checking...
+        # Ensure output is defined
+        if 'output' not in locals():
+            output = {
+                'protein_id': 'unknown',
+                'exists': False,
+                'sequence': '',
+                'sequence_length': 0,
+                'message': 'Analysis not completed',
+                'embedding_generated': False,
+                'embedding_ref': '',
+                'report_name': '',
+                'report_ref': '',
+                'input_parameters': params,
+                'start_time': start_time
+            }
+
+        # Type checking and return
         if not isinstance(output, dict):
             raise ValueError('Method check_protein_existence return value ' +
                              'output is not type dict as required.')
         # return the results
         return [output]
+    
+    def _create_existence_report(self, protein_id, protein_record, embedding_generated, 
+                               embedding_ref, output_report, workspace_name):
+        """Create KBase report for protein existence check."""
+        try:
+            report_client = KBaseReport(self.callback_url)
+            
+            # Create report message
+            message = f"""Protein Existence Check Results
+
+Protein ID: {protein_id}
+Status: Found in UniProt database
+Sequence Length: {len(protein_record.sequence)} amino acids
+Embedding Generated: {'Yes' if embedding_generated else 'No'}
+
+Sequence Preview: {protein_record.sequence[:50]}...
+
+This protein can be used as input for the full protein analysis pipeline."""
+
+            # Create objects list
+            objects_created = []
+            if embedding_ref:
+                objects_created.append({
+                    'ref': embedding_ref,
+                    'description': f'Embedding data for {protein_id}'
+                })
+
+            report_info = report_client.create_extended_report({
+                'message': message,
+                'objects_created': objects_created,
+                'workspace_name': workspace_name,
+                'report_object_name': output_report or f"{protein_id}_existence_check"
+            })
+            
+            return report_info
+            
+        except Exception as e:
+            logger.error(f"Failed to create existence report: {e}")
+            return {
+                'name': f"{protein_id}_existence_check",
+                'ref': 'error_report_ref'
+            }
 
     def generate_protein_embedding(self, ctx, params):
         """
@@ -458,19 +404,15 @@ Contact: https://kbase.us/contact-us/
             'embedding_dim': 0
         }
         
-        # Extract and validate parameters before try block
-        input_type = params.get('input_type', 'sequence')
-        input_data = params.get('input_data')
-        model_name = params.get('model_name', 'esm2_t6_8M_UR50D')
-        
-        if not input_data:
-            raise ValueError("input_data parameter is required")
-        
-        if input_type != 'sequence':
-            raise ValueError(f"Unsupported input_type: {input_type}")
-        
         try:
             start_time = time.time()
+            
+            input_type = params.get('input_type', 'sequence')
+            input_data = params.get('input_data')
+            model_name = params.get('model_name', 'esm2_t6_8M_UR50D')
+            
+            if not input_data:
+                raise ValueError("input_data parameter is required")
             
             # Setup workspace client using KBUtilLib
             try:
@@ -492,9 +434,12 @@ Contact: https://kbase.us/contact-us/
                 workspace_name = 'unknown'
             
             # Generate demo embedding
-            sequence_length = len(input_data)
-            demo_embedding = np.random.rand(1280).tolist()  # Demo embedding
-            input_id = f"seq_{hash(input_data) % 10000}"
+            if input_type == 'sequence':
+                sequence_length = len(input_data)
+                demo_embedding = np.random.rand(1280).tolist()  # Demo embedding
+                input_id = f"seq_{hash(input_data) % 10000}"
+            else:
+                raise ValueError(f"Unsupported input_type: {input_type}")
             
             embedding_result = {
                 'embedding': demo_embedding,
@@ -570,18 +515,36 @@ Contact: https://kbase.us/contact-us/
             
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
+            # Ensure output is defined even in case of error
+            if output is None:
+                output = {
+                    'report_name': 'error_report',
+                    'report_ref': '',
+                    'embedding_result_ref': '',
+                    'summary': f'Embedding generation failed: {str(e)}',
+                    'input_parameters': params,
+                    'start_time': start_time,
+                    'embedding_norm': 0.0,
+                    'sequence_length': 0,
+                    'embedding_dim': 0
+                }
+            # Return error output instead of raising
+            return [output]
+        #END generate_protein_embedding
+
+        # Ensure output is defined
+        if 'output' not in locals():
             output = {
                 'report_name': 'error_report',
                 'report_ref': '',
                 'embedding_result_ref': '',
-                'summary': f'Embedding generation failed: {str(e)}',
+                'summary': 'Analysis not completed',
                 'input_parameters': params,
                 'start_time': start_time,
                 'embedding_norm': 0.0,
                 'sequence_length': 0,
                 'embedding_dim': 0
             }
-        #END generate_protein_embedding
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):
@@ -687,15 +650,30 @@ Contact: https://kbase.us/contact-us/
             
         except Exception as e:
             logger.error(f"Family assignment failed: {e}")
+            # Ensure output is defined even in case of error
+            if output is None:
+                output = {
+                    'family_id': 'error',
+                    'confidence': 0.0,
+                    'eigenprotein_id': protein_id if 'protein_id' in locals() else 'unknown',
+                    'input_parameters': params,
+                    'start_time': start_time,
+                    'family_assignment_result_ref': ''
+                }
+            # Return error output instead of raising
+            return [output]
+        #END assign_family_fast
+
+        # Ensure output is defined
+        if 'output' not in locals():
             output = {
                 'family_id': 'error',
                 'confidence': 0.0,
-                'eigenprotein_id': protein_id if 'protein_id' in locals() else 'unknown',
+                'eigenprotein_id': 'unknown',
                 'input_parameters': params,
                 'start_time': start_time,
                 'family_assignment_result_ref': ''
             }
-        #END assign_family_fast
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):
@@ -822,19 +800,34 @@ Contact: https://kbase.us/contact-us/
             
         except Exception as e:
             logger.error(f"Similarity search failed: {e}")
+            # Ensure output is defined even in case of error
+            if output is None:
+                output = {
+                    'matches': [],
+                    'summary': f'Similarity search failed: {str(e)}',
+                    'input_parameters': params,
+                    'start_time': start_time,
+                    'family_id': 'error',
+                    'top_n': 0,
+                    'similarity_stats': {},
+                    'similarity_search_result_ref': ''
+                }
+            # Return error output instead of raising
+            return [output]
+        #END find_top_matches_from_embedding
+
+        # Ensure output is defined
+        if 'output' not in locals():
             output = {
                 'matches': [],
-                'summary': f'Similarity search failed: {str(e)}',
+                'summary': 'Analysis not completed',
                 'input_parameters': params,
                 'start_time': start_time,
                 'family_id': 'error',
                 'top_n': 0,
                 'similarity_stats': {},
-                'similarity_search_result_ref': '',
-                'report_name': 'error_report',
-                'report_ref': ''
+                'similarity_search_result_ref': ''
             }
-        #END find_top_matches_from_embedding
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):
@@ -967,18 +960,34 @@ Contact: https://kbase.us/contact-us/
             
         except Exception as e:
             logger.error(f"Summarization failed: {e}")
+            # Ensure output is defined even in case of error
+            if output is None:
+                output = {
+                    'report_name': 'error_report',
+                    'report_ref': '',
+                    'input_parameters': params,
+                    'start_time': start_time,
+                    'output_dir': '',
+                    'summary': f'Summarization failed: {str(e)}',
+                    'html_report_path': '',
+                    'sequence_analysis_ref': ''
+                }
+            # Return error output instead of raising
+            return [output]
+        #END summarize_and_visualize_results
+
+        # Ensure output is defined
+        if 'output' not in locals():
             output = {
                 'report_name': 'error_report',
                 'report_ref': '',
                 'input_parameters': params,
                 'start_time': start_time,
                 'output_dir': '',
-                'summary': f'Summarization failed: {str(e)}',
+                'summary': 'Analysis not completed',
                 'html_report_path': '',
-                'sequence_analysis_ref': '',
-                'report_ref': ''  # Alias for backward compatibility
+                'sequence_analysis_ref': ''
             }
-        #END summarize_and_visualize_results
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):
@@ -989,22 +998,17 @@ Contact: https://kbase.us/contact-us/
 
     def run_protein_query_analysis(self, ctx, params):
         """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "ProteinQueryAnalysisResults" (Unified
-           Protein Query Analysis Pipeline This method provides a single
-           entry point for comprehensive protein analysis, supporting
-           multiple input types and configurable analysis stages.) ->
-           structure: parameter "report_name" of String, parameter
-           "report_ref" of String, parameter "analysis_result_ref" of String,
-           parameter "summary" of String, parameter "input_parameters" of
-           mapping from String to unspecified object, parameter "start_time"
-           of Double, parameter "html_report_path" of String, parameter
-           "protein_count" of Long, parameter "stages_completed" of list of
-           String
+        Run comprehensive protein query analysis pipeline.
+        
+        Supports multiple input types:
+        - UniProt identifiers (single or multiple)
+        - FASTA files (uploaded or URLs)
+        - Workspace objects (Genome, GenomeSet, ProteinSequenceSet, FeatureSet)
+        - Direct protein sequences
+        - Mixed input types
+        
+        All inputs are standardized and processed through the same pipeline.
         """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN run_protein_query_analysis
         start_time = time.time()
         
         # Initialize output variable with default error state
@@ -1022,51 +1026,13 @@ Contact: https://kbase.us/contact-us/
         }
         
         try:
-            # Enable test mode inside KBase SDK Docker to use lightweight mocks
-            try:
-                import os as _os
-                if _os.environ.get('KB_DEPLOYMENT_CONFIG') and not _os.environ.get('TEST_MODE'):
-                    _os.environ['TEST_MODE'] = 'true'
-                    logger.info("TEST_MODE enabled for SDK test environment")
-            except Exception:
-                pass
-
             # Extract parameters
-            input_type = params.get('input_type', None)
+            input_type = params.get('input_type', 'uniprot')
             input_proteins = params.get('input_proteins', [])
             uniprot_ids = params.get('uniprot_ids', [])
             fasta_file = params.get('fasta_file', '')
             workspace_object = params.get('workspace_object', '')
             direct_sequences = params.get('direct_sequences', [])
-
-            # Determine input type and data consistently for the workflow
-            # Prefer explicit lists/fields provided by the caller
-            if input_proteins:
-                input_type = 'uniprot_identifiers'
-                input_data = input_proteins
-            elif uniprot_ids:
-                input_type = 'uniprot_identifiers'
-                input_data = uniprot_ids
-            elif fasta_file:
-                input_type = 'fasta_file'
-                input_data = fasta_file
-            elif workspace_object:
-                input_type = 'workspace_object'
-                input_data = workspace_object
-            elif direct_sequences:
-                input_type = 'sequence_strings'
-                input_data = direct_sequences
-            else:
-                # Fall back to provided input_type with empty data if set; otherwise error
-                if not input_type:
-                    raise ValueError('Missing required input: input_type or any of input_proteins/uniprot_ids/fasta_file/workspace_object/direct_sequences')
-                input_data = params.get('input_data')
-
-            # Package pipeline input for workflow
-            pipeline_input = {
-                'input_type': input_type,
-                'input_data': input_data
-            }
             
             analysis_type = params.get('analysis_type', 'comprehensive')
             enabled_stages = params.get('enabled_stages', [
@@ -1085,45 +1051,20 @@ Contact: https://kbase.us/contact-us/
             output_data = params.get('output_data', '')
             
             # Get workspace info
-            workspace_name = params.get('workspace_name')
-            if not workspace_name and ctx.get('provenance') and len(ctx['provenance']) > 0:
-                workspace_name = ctx['provenance'][0].get('ws_name', 'unknown')
-            if not workspace_name or workspace_name == 'unknown':
-                workspace_name = 'test_workspace'  # Use default for testing
+            workspace_name = ctx['provenance'][0]['ws_name'] if ctx.get('provenance') else 'unknown'
             
             # Setup KBase-compliant output directory
-            try:
-                output_dir = self._setup_kbase_output_directory(workspace_name)
-            except AttributeError:
-                # Fallback if helper method is not available
-                try:
-                    if workspace_name and workspace_name != 'unknown':
-                        output_dir = os.path.join(self.shared_folder, 'outputs', workspace_name)
-                    else:
-                        output_dir = os.path.join(self.shared_folder, 'outputs')
-                    os.makedirs(output_dir, exist_ok=True)
-                    logger.info(f"KBase output directory initialized: {output_dir}")
-                except Exception as e:
-                    logger.warning(f"Could not setup output directory: {e}")
-                    output_dir = None
+            output_dir = self._setup_kbase_output_directory(workspace_name)
             
             # Initialize input parser with workspace client
             from kbase_protein_query_module.src.utils.input_parser import InputParser
             input_parser = InputParser(workspace_client=self.kb_util.get_workspace_client())
             
             # Parse input based on type
-            try:
-                protein_records = self._parse_input_by_type(
-                    input_parser, input_type, input_proteins, uniprot_ids, 
-                    fasta_file, workspace_object, direct_sequences
-                )
-            except AttributeError:
-                # Fallback if helper method is not available
-                protein_records = []
-                for pid in input_proteins:
-                    # Import ProteinRecord class directly
-                    from kbase_protein_query_module.src.utils.input_parser import ProteinRecord
-                    protein_records.append(ProteinRecord(pid, 'Direct', sequence=''))
+            protein_records = self._parse_input_by_type(
+                input_parser, input_type, input_proteins, uniprot_ids, 
+                fasta_file, workspace_object, direct_sequences
+            )
             
             if not protein_records:
                 raise ValueError("No valid protein records found in input")
@@ -1138,7 +1079,8 @@ Contact: https://kbase.us/contact-us/
                 similarity_threshold=similarity_threshold,
                 max_similar_proteins=max_similar_proteins,
                 embedding_model=embedding_model,
-                output_format=output_format
+                output_format=output_format,
+                output_dir=output_dir
             )
             
             # Initialize and run workflow
@@ -1146,60 +1088,33 @@ Contact: https://kbase.us/contact-us/
             workflow = ProteinQueryWorkflow(config=config, kb_util=self.kb_util)
             
             # Execute pipeline
-            result = workflow.execute(input_data=pipeline_input)
+            result = workflow.execute()
             
-            test_mode_active = False
-            try:
-                import os as _os2
-                test_mode_active = _os2.environ.get('TEST_MODE', 'false').lower() == 'true'
-            except Exception:
-                pass
-
-            # If pipeline reported failure, don't raise in test mode; continue to build a minimal output
-            if not result.success and not test_mode_active:
+            if not result.success:
                 raise RuntimeError(f"Pipeline execution failed: {result.error_message}")
             
             # Create KBase report
-            if test_mode_active:
-                # Skip external report creation in tests
-                report_info = {'name': 'protein_analysis_report', 'ref': 'report_ref'}
-            else:
-                try:
-                    report_info = self._create_kbase_report(
-                        result, output_report, workspace_name, output_dir
-                    )
-                except AttributeError:
-                    # Fallback if helper method is not available
-                    report_info = {'name': 'protein_analysis_report', 'ref': 'report_ref'}
+            report_info = self._create_kbase_report(
+                result, output_report, workspace_name, output_dir
+            )
             
             # Create output data object if requested
             data_ref = None
             if output_data:
-                try:
-                    data_ref = self._create_output_data_object(
-                        result, output_data, workspace_name
-                    )
-                except AttributeError:
-                    # Fallback if helper method is not available
-                    data_ref = 'data_ref'
+                data_ref = self._create_output_data_object(
+                    result, output_data, workspace_name
+                )
             
             execution_time = time.time() - start_time
             
-            # Prefer data_ref when available, otherwise fall back to report ref for tests
-            analysis_result_ref_val = data_ref if data_ref else (report_info.get('ref') or '')
-
             output = {
                 'report_name': report_info['name'],
                 'report_ref': report_info['ref'],
                 'data_ref': data_ref,
-                'analysis_result_ref': analysis_result_ref_val,  # Ensure string even without saved object
-                'protein_count': len(protein_records),  # Add protein count for tests
-                'html_report_path': output_dir,  # Add html report path for tests
                 'input_parameters': params,
                 'start_time': start_time,
                 'execution_time': execution_time,
-                'summary': (f'Successfully analyzed {len(protein_records)} proteins'
-                            if result.success else f'Pipeline execution failed: {result.error_message}'),
+                'summary': f'Successfully analyzed {len(protein_records)} proteins',
                 'output_directory': output_dir,
                 'pipeline_results': result.final_output,
                 'stages_completed': result.stages_completed
@@ -1207,22 +1122,38 @@ Contact: https://kbase.us/contact-us/
             
         except Exception as e:
             logger.error(f"Protein query analysis failed: {e}")
+            # Ensure output is defined even in case of error
+            if output is None:
+                output = {
+                    'report_name': 'error_report',
+                    'report_ref': '',
+                    'data_ref': None,
+                    'input_parameters': params,
+                    'start_time': start_time,
+                    'execution_time': time.time() - start_time,
+                    'summary': f'Analysis failed: {str(e)}',
+                    'output_directory': '',
+                    'pipeline_results': {},
+                    'stages_completed': []
+                }
+            # Return error output instead of raising
+            return [output]
+        #END run_protein_query_analysis
+
+        # Ensure output is defined
+        if 'output' not in locals():
             output = {
                 'report_name': 'error_report',
                 'report_ref': '',
                 'data_ref': None,
-                'analysis_result_ref': '',
                 'input_parameters': params,
                 'start_time': start_time,
                 'execution_time': time.time() - start_time,
-                'summary': f'Analysis failed: {str(e)}',
+                'summary': 'Analysis not completed',
                 'output_directory': '',
                 'pipeline_results': {},
-                'stages_completed': [],
-                'protein_count': len(params.get('input_proteins', [])),
-                'html_report_path': ''
+                'stages_completed': []
             }
-        #END run_protein_query_analysis
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):
@@ -1230,6 +1161,215 @@ Contact: https://kbase.us/contact-us/
                              'output is not type dict as required.')
         # return the results
         return [output]
+    
+    def _setup_kbase_output_directory(self, workspace_name: str) -> str:
+        """
+        Setup KBase-compliant output directory.
+        
+        Uses proper directory creation with os.makedirs and exist_ok=True
+        as recommended for KBase modules.
+        """
+        import os
+        import tempfile
+        
+        # Use KBase scratch directory if available, otherwise use temp
+        base_dir = os.environ.get('SCRATCH_DIR', tempfile.gettempdir())
+        
+        # Create unique output directory
+        import uuid
+        run_id = str(uuid.uuid4())[:8]
+        output_dir = os.path.join(base_dir, f"protein_query_analysis_{workspace_name}_{run_id}")
+        
+        # Create directory with proper error handling
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            logger.info(f"Created output directory: {output_dir}")
+        except Exception as e:
+            logger.error(f"Failed to create output directory {output_dir}: {e}")
+            # Fallback to temp directory
+            output_dir = os.path.join(tempfile.gettempdir(), f"protein_query_analysis_{run_id}")
+            os.makedirs(output_dir, exist_ok=True)
+            logger.info(f"Using fallback output directory: {output_dir}")
+        
+        return output_dir
+    
+    def _parse_input_by_type(self, input_parser, input_type, input_proteins, 
+                            uniprot_ids, fasta_file, workspace_object, direct_sequences):
+        """
+        Parse input based on the specified type.
+        
+        Args:
+            input_parser: InputParser instance
+            input_type: Type of input ('uniprot', 'fasta', 'workspace_object', etc.)
+            input_proteins: General input proteins parameter
+            uniprot_ids: UniProt identifiers
+            fasta_file: FASTA file path
+            workspace_object: Workspace object reference
+            direct_sequences: Direct protein sequences
+            
+        Returns:
+            List of ProteinRecord objects
+        """
+        protein_records = []
+        
+        try:
+            if input_type == 'uniprot':
+                # Handle UniProt IDs
+                if uniprot_ids:
+                    if isinstance(uniprot_ids, str):
+                        uniprot_ids = [id.strip() for id in uniprot_ids.split(',')]
+                    protein_records = input_parser.parse_input('Uniprot', uniprot_ids)
+                elif input_proteins:
+                    # Check if input_proteins contains UniProt IDs
+                    if isinstance(input_proteins, str):
+                        input_proteins = [id.strip() for id in input_proteins.split(',')]
+                    protein_records = input_parser.parse_input('Uniprot', input_proteins)
+            
+            elif input_type == 'fasta':
+                # Handle FASTA file
+                if fasta_file:
+                    protein_records = input_parser.parse_input('FASTA', fasta_file)
+                elif input_proteins and (input_proteins.endswith('.fasta') or input_proteins.endswith('.fa')):
+                    protein_records = input_parser.parse_input('FASTA', input_proteins)
+            
+            elif input_type == 'workspace_object':
+                # Handle workspace object
+                if workspace_object:
+                    protein_records = input_parser.parse_input('WorkspaceObject', workspace_object)
+                elif input_proteins and '/' in input_proteins:
+                    protein_records = input_parser.parse_input('WorkspaceObject', input_proteins)
+            
+            elif input_type == 'direct_sequence':
+                # Handle direct sequences
+                if direct_sequences:
+                    if isinstance(direct_sequences, str):
+                        direct_sequences = [seq.strip() for seq in direct_sequences.split(',')]
+                    protein_records = input_parser.parse_input('SingleProtein', direct_sequences)
+                elif input_proteins:
+                    # Check if input_proteins contains protein sequences
+                    if isinstance(input_proteins, str):
+                        input_proteins = [seq.strip() for seq in input_proteins.split(',')]
+                    protein_records = input_parser.parse_input('SingleProtein', input_proteins)
+            
+            elif input_type == 'mixed':
+                # Handle mixed input types
+                mixed_input = []
+                if uniprot_ids:
+                    mixed_input.extend(uniprot_ids if isinstance(uniprot_ids, list) else [uniprot_ids])
+                if direct_sequences:
+                    mixed_input.extend(direct_sequences if isinstance(direct_sequences, list) else [direct_sequences])
+                if input_proteins:
+                    mixed_input.extend(input_proteins if isinstance(input_proteins, list) else [input_proteins])
+                
+                protein_records = input_parser.parse_input('MixedInput', mixed_input)
+            
+            else:
+                # Auto-detect input type
+                if input_proteins:
+                    detected_type = input_parser.detect_input_type(input_proteins)
+                    protein_records = input_parser.parse_input(detected_type, input_proteins)
+        
+        except Exception as e:
+            logger.error(f"Error parsing input type {input_type}: {e}")
+            raise
+        
+        return protein_records
+    
+    def _create_kbase_report(self, result, output_report, workspace_name, output_dir):
+        """Create KBase report with proper file handling."""
+        try:
+            from kbase_protein_query_module.src.stages.output.file_organizer import FileOrganizer
+            
+            # Organize output files
+            organizer = FileOrganizer(output_dir)
+            
+            # Add all pipeline results to organizer
+            if hasattr(result, 'final_output') and result.final_output:
+                for key, value in result.final_output.items():
+                    if isinstance(value, str) and os.path.exists(value):
+                        if value.endswith('.html'):
+                            organizer.register_visualization(value, 'network')
+                        elif value.endswith(('.csv', '.tsv', '.json', '.h5')):
+                            organizer.register_data_file(value, 'analysis')
+            
+            # Create comprehensive pipeline summary
+            summary_path = organizer.create_comprehensive_pipeline_summary(result)
+            
+            # Create report
+            report_client = KBaseReport(self.callback_url)
+            report_info = report_client.create_extended_report({
+                'message': f'Protein Query Analysis completed successfully. Analyzed {len(result.stages_completed)} pipeline stages.',
+                'objects_created': [],
+                'workspace_name': workspace_name,
+                'report_object_name': output_report,
+                'file_links': [
+                    {
+                        'path': output_dir,
+                        'name': 'protein_analysis_results.zip',
+                        'label': 'Complete Analysis Results',
+                        'description': 'All analysis outputs including raw data, visualizations, and metadata'
+                    }
+                ],
+                'html_links': [
+                    {
+                        'path': summary_path,
+                        'name': 'pipeline_summary.html',
+                        'label': 'Pipeline Summary',
+                        'description': 'Comprehensive analysis summary and file manifest'
+                    }
+                ]
+            })
+            
+            return report_info
+            
+        except Exception as e:
+            logger.error(f"Failed to create KBase report: {e}")
+            # Fallback to simple report
+            report_client = KBaseReport(self.callback_url)
+            return report_client.create_extended_report({
+                'message': f'Protein Query Analysis completed. {result.error_message if hasattr(result, "error_message") else "Analysis successful"}',
+                'workspace_name': workspace_name,
+                'report_object_name': output_report
+            })
+    
+    def _create_output_data_object(self, result, output_data, workspace_name):
+        """Create output data object in workspace."""
+        try:
+            # Create ProteinSequenceSet object with analysis results
+            data_object = {
+                'sequences': [],
+                'analysis_results': result.final_output,
+                'metadata': {
+                    'analysis_type': 'protein_query_analysis',
+                    'stages_completed': result.stages_completed,
+                    'execution_time': getattr(result, 'execution_time', 0)
+                }
+            }
+            
+            # Add protein sequences if available
+            if hasattr(result, 'final_output') and 'protein_records' in result.final_output:
+                for record in result.final_output['protein_records']:
+                    data_object['sequences'].append({
+                        'id': record.protein_id,
+                        'sequence': record.sequence,
+                        'metadata': record.metadata
+                    })
+            
+            # Save to workspace
+            data_ref = self.kb_util.get_workspace_client().save_objects({
+                'workspace': workspace_name,
+                'objects': [{
+                    'type': 'KBaseGenomes.ProteinSequenceSet',
+                    'data': data_object,
+                    'name': output_data
+                }]
+            })[0]
+            
+            return f"{data_ref[6]}/{data_ref[0]}/{data_ref[4]}"
+            
+        except Exception as e:
+            logger.error(f"Failed to create output data object: {e}")
+            return None
 
     def run_kbase_protein_query_module(self, ctx, params):
         """
@@ -1254,6 +1394,20 @@ Contact: https://kbase.us/contact-us/
         # Legacy method - delegate to the main method
         output = self.run_protein_query_analysis(ctx, params)[0]
         #END run_kbase_protein_query_module
+
+        # Ensure output is defined
+        if 'output' not in locals():
+            output = {
+                'report_name': 'error_report',
+                'report_ref': '',
+                'analysis_result_ref': '',
+                'summary': 'Analysis not completed',
+                'input_parameters': params,
+                'start_time': time.time(),
+                'html_report_path': '',
+                'protein_count': 0,
+                'stages_completed': []
+            }
 
         # At some point might do deeper type checking...
         if not isinstance(output, dict):

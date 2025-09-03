@@ -1,0 +1,60 @@
+{
+  "metadata": {
+    "run_id": "2939d6cf-bf05-4d94-9f4e-3df4f0bb41bc",
+    "pipeline_version": "1.0.0",
+    "timestamp": "2025-08-27 17:01:21",
+    "total_execution_time_seconds": 0.0007507801055908203,
+    "success": false,
+    "stages_completed": [],
+    "stages_failed": [
+      "sequence_analysis",
+      "network_analysis"
+    ],
+    "error_message": "Input validation failed"
+  },
+  "input_configuration": {
+    "analysis_stages": [
+      "sequence_analysis",
+      "network_analysis"
+    ],
+    "input_proteins": [
+      "ACDEFGHIKLMNPQRSTVWY"
+    ],
+    "input_file_path": null,
+    "workspace_object_ref": null,
+    "output_dir": "test/outputs",
+    "performance_mode": "standard"
+  },
+  "stage_results": {
+    "sequence_analysis": {
+      "success": false,
+      "execution_time": 7.152557373046875e-06,
+      "error_message": "Input validation failed"
+    }
+  },
+  "output_files": {
+    "csv_files": {},
+    "visualization_files": {},
+    "data_files": {}
+  },
+  "performance_metrics": {
+    "sequence_analysis": {
+      "execution_time": 0.0006237030029296875,
+      "success": false,
+      "output_size": 2
+    }
+  },
+  "protein_statistics": {
+    "total_proteins_analyzed": 0,
+    "successful_analyses": 0,
+    "property_distributions": {}
+  },
+  "analysis_summary": {
+    "pipeline_success": false,
+    "total_stages_run": 0,
+    "total_files_generated": 0,
+    "visualization_files_count": 0,
+    "csv_files_count": 0,
+    "data_files_count": 0
+  }
+}

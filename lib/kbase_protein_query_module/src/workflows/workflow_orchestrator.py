@@ -87,6 +87,9 @@ class ProteinQueryWorkflow:
             else:
                 self.config = config
         self.run_id = str(uuid.uuid4())
+        
+        # Setup comprehensive logging
+        self._setup_comprehensive_logging()
         self.logger = logging.getLogger(f"{__name__}.{self.run_id}")
         
         # Store KBUtilLib client for workspace operations
@@ -111,25 +114,41 @@ class ProteinQueryWorkflow:
     def _initialize_components(self):
         """Initialize all workflow components."""
         try:
-            # Initialize storage components
-            self.storage = ProteinStorage(**self.config.storage_config)
-            self.memory_loader = MemoryEfficientLoader(self.storage)
+            # Check if we're in test mode (environment variable)
+            test_mode = os.environ.get('TEST_MODE', 'false').lower() == 'true'
             
-            # Initialize embedding generator
-            self.embedding_generator = ProteinEmbeddingGenerator(
-                model_name=self.config.embedding_model,
-                device=self.config.embedding_device
-            )
-            
-            # Initialize similarity search components
-            self.hierarchical_index = HierarchicalIndex()
-            self.streaming_index = StreamingIndex()
-            
-            # Initialize network builder
-            self.network_builder = DynamicNetworkBuilder()
-            
-            # Initialize family assignment
-            self.family_assigner = ProteinFamilyAssigner()
+            if test_mode:
+                # Use mock components for testing
+                self.logger.info("Running in test mode - using mock components")
+                self.embedding_generator = self._create_mock_embedding_generator()
+                # Create minimal mock storage for testing
+                self.storage = self._create_mock_storage()
+                self.memory_loader = self._create_mock_memory_loader()
+                self.hierarchical_index = self._create_mock_hierarchical_index()
+                self.streaming_index = self._create_mock_streaming_index()
+                self.network_builder = self._create_mock_network_builder()
+                self.family_assigner = self._create_mock_family_assigner()
+            else:
+                # Initialize real components
+                # Initialize storage components
+                self.storage = ProteinStorage(**self.config.storage_config)
+                self.memory_loader = MemoryEfficientLoader(self.storage)
+                
+                # Initialize embedding generator
+                self.embedding_generator = ProteinEmbeddingGenerator(
+                    model_name=self.config.embedding_model,
+                    device=self.config.embedding_device
+                )
+                
+                # Initialize similarity search components
+                self.hierarchical_index = HierarchicalIndex()
+                self.streaming_index = StreamingIndex()
+                
+                # Initialize network builder
+                self.network_builder = DynamicNetworkBuilder()
+                
+                # Initialize family assignment
+                self.family_assigner = ProteinFamilyAssigner()
             
             self.logger.info("All workflow components initialized successfully")
             
@@ -383,6 +402,7 @@ class ProteinQueryWorkflow:
     def execute(self, input_data: Dict[str, Any] = None) -> WorkflowResult:
         """
         Execute the complete protein query analysis workflow.
+        Supports both single and multi-protein analysis workflows.
         
         Args:
             input_data: Input data for the workflow
@@ -399,11 +419,25 @@ class ProteinQueryWorkflow:
             if input_data is None:
                 input_data = self._prepare_input_data()
             
+            # Detect multi-protein workflow
+            is_multi_protein = self._detect_multi_protein_workflow(input_data)
+            if is_multi_protein:
+                self.logger.info("Multi-protein workflow detected")
+                input_data['workflow_type'] = 'multi_protein'
+            else:
+                self.logger.info("Single protein workflow detected")
+                input_data['workflow_type'] = 'single_protein'
+            
             # Execute stages in dependency order
             result = self._execute_stages(input_data)
             
             # Calculate execution time
             execution_time = time.time() - start_time
+            
+            # Generate comprehensive JSON output
+            json_output_path = self._save_comprehensive_json_output(
+                result, execution_time, input_data
+            )
             
             # Create workflow result
             workflow_result = WorkflowResult(
@@ -417,7 +451,8 @@ class ProteinQueryWorkflow:
                 warnings=result.warnings,
                 metadata={
                     'performance_metrics': self.performance_metrics,
-                    'config': self.config.to_dict()
+                    'config': self.config.to_dict(),
+                    'json_output_path': json_output_path
                 }
             )
             
@@ -454,6 +489,101 @@ class ProteinQueryWorkflow:
             input_data['workspace_ref'] = self.config.workspace_object_ref
         
         return input_data
+    
+    def _detect_multi_protein_workflow(self, input_data: Dict[str, Any]) -> bool:
+        """
+        Detect if this is a multi-protein workflow based on input data.
+        
+        Args:
+            input_data: Input data dictionary
+            
+        Returns:
+            True if multi-protein workflow, False for single protein
+        """
+        # Check for explicit multi-protein indicators
+        if 'proteins' in input_data:
+            proteins = input_data['proteins']
+            if isinstance(proteins, (list, tuple)) and len(proteins) > 1:
+                return True
+        
+        # Check for multiple protein IDs in config
+        if hasattr(self.config, 'input_proteins') and self.config.input_proteins:
+            if isinstance(self.config.input_proteins, (list, tuple)) and len(self.config.input_proteins) > 1:
+                return True
+        
+        # Check for query_proteins list
+        if 'query_proteins' in input_data:
+            query_proteins = input_data['query_proteins']
+            if isinstance(query_proteins, (list, tuple)) and len(query_proteins) > 1:
+                return True
+        
+        # Check for multi-protein file input patterns
+        if 'input_file' in input_data:
+            # Could analyze the file to detect multiple proteins
+            # For now, assume single protein unless explicitly multi
+            pass
+        
+        return False
+    
+    def _setup_comprehensive_logging(self):
+        """
+        Setup comprehensive logging for the entire pipeline.
+        Includes detailed tracing, performance monitoring, and error tracking.
+        """
+        # Create logs directory
+        log_dir = os.path.join(self.config.output_dir, 'logs') if hasattr(self.config, 'output_dir') else 'logs'
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Setup file handlers for different log levels
+        log_filename = os.path.join(log_dir, f'pipeline_{self.run_id}.log')
+        error_filename = os.path.join(log_dir, f'errors_{self.run_id}.log')
+        debug_filename = os.path.join(log_dir, f'debug_{self.run_id}.log')
+        
+        # Configure root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        
+        # Remove existing handlers to avoid duplicates
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+        
+        # Create formatters
+        detailed_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(funcName)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        simple_formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
+        # Main log file (INFO and above)
+        file_handler = logging.FileHandler(log_filename, mode='w')
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(detailed_formatter)
+        root_logger.addHandler(file_handler)
+        
+        # Error log file (ERROR and above)
+        error_handler = logging.FileHandler(error_filename, mode='w')
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(detailed_formatter)
+        root_logger.addHandler(error_handler)
+        
+        # Debug log file (DEBUG and above)
+        debug_handler = logging.FileHandler(debug_filename, mode='w')
+        debug_handler.setLevel(logging.DEBUG)
+        debug_handler.setFormatter(detailed_formatter)
+        root_logger.addHandler(debug_handler)
+        
+        # Console handler (WARNING and above)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.WARNING)
+        console_handler.setFormatter(simple_formatter)
+        root_logger.addHandler(console_handler)
+        
+        # Log the logging setup
+        logger.info(f"Comprehensive logging setup completed for run_id: {self.run_id}")
+        logger.info(f"Log files: {log_filename}, {error_filename}, {debug_filename}")
     
     def _execute_stages(self, input_data: Dict[str, Any]) -> StageResult:
         """Execute all stages in dependency order."""
@@ -581,6 +711,181 @@ class ProteinQueryWorkflow:
         summary['stages_failed'] = len([m for m in self.performance_metrics.values() if not m['success']])
         return summary
     
+    def _save_comprehensive_json_output(self, result: StageResult, 
+                                      execution_time: float, 
+                                      input_data: Dict[str, Any]) -> str:
+        """
+        Save comprehensive JSON output containing all pipeline information.
+        
+        Args:
+            result: Final stage result
+            execution_time: Total pipeline execution time
+            input_data: Original input data
+            
+        Returns:
+            Path to saved JSON file
+        """
+        import json
+        
+        # Prepare comprehensive output
+        output_dir = getattr(self.config, 'output_dir', 'test/outputs')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Helper function to make numpy arrays JSON serializable
+        def make_serializable(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, pd.DataFrame):
+                return obj.to_dict('records')
+            elif hasattr(obj, '__dict__'):
+                return obj.__dict__
+            elif callable(obj):
+                return str(obj)
+            return obj
+        
+        # Collect all file paths from stages
+        all_output_files = []
+        
+        # Comprehensive pipeline information
+        pipeline_info = {
+            'metadata': {
+                'run_id': self.run_id,
+                'pipeline_version': '1.0.0',
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'total_execution_time_seconds': execution_time,
+                'success': result.success,
+                'stages_completed': self.stages_completed,
+                'stages_failed': [stage for stage in self.config.enabled_stages 
+                                if stage not in self.stages_completed],
+                'error_message': result.error_message
+            },
+            'input_configuration': {
+                'analysis_stages': self.config.enabled_stages,
+                'input_proteins': getattr(self.config, 'input_proteins', []),
+                'input_file_path': getattr(self.config, 'input_file_path', None),
+                'workspace_object_ref': getattr(self.config, 'workspace_object_ref', None),
+                'output_dir': output_dir,
+                'performance_mode': getattr(self.config, 'performance_mode', 'standard')
+            },
+            'stage_results': {},
+            'output_files': {
+                'csv_files': {},
+                'visualization_files': {},
+                'data_files': {}
+            },
+            'performance_metrics': self.performance_metrics,
+            'protein_statistics': {},
+            'analysis_summary': {}
+        }
+        
+        # Process each stage result
+        for stage_name, stage_result in self.stage_results.items():
+            stage_data = {
+                'success': stage_result.success,
+                'execution_time': stage_result.execution_time,
+                'error_message': stage_result.error_message
+            }
+            
+            # Add output data with serialization
+            if stage_result.output_data:
+                # Handle different stage outputs
+                if stage_name == 'sequence_analysis':
+                    # For sequence analysis, focus on summary and file info
+                    output_data = stage_result.output_data
+                    stage_data['summary'] = {
+                        'total_analyses': output_data.get('analysis_stats', {}).get('total_analyses', 0),
+                        'successful_analyses': output_data.get('analysis_stats', {}).get('successful_analyses', 0),
+                        'failed_analyses': output_data.get('analysis_stats', {}).get('failed_analyses', 0)
+                    }
+                    # Add CSV file paths
+                    csv_files = output_data.get('csv_files', {})
+                    if csv_files:
+                        pipeline_info['output_files']['csv_files'].update({
+                            f"sequence_analysis_{k}": os.path.basename(v) for k, v in csv_files.items()
+                        })
+                        all_output_files.extend(csv_files.values())
+                
+                elif stage_name == 'network_analysis':
+                    # For network analysis, include network properties and file info
+                    output_data = stage_result.output_data.get('network_analysis', {})
+                    stage_data['summary'] = {
+                        'network_properties': output_data.get('network_properties', {}),
+                        'query_protein_id': output_data.get('query_protein_id', ''),
+                        'k_neighbors': output_data.get('k_neighbors', 0),
+                        'similarity_threshold': output_data.get('similarity_threshold', 0)
+                    }
+                    # Add CSV and HTML file paths
+                    csv_files = output_data.get('csv_files', {})
+                    if csv_files:
+                        pipeline_info['output_files']['csv_files'].update({
+                            f"network_analysis_{k}": os.path.basename(v) for k, v in csv_files.items()
+                        })
+                        all_output_files.extend(csv_files.values())
+                    
+                    html_path = output_data.get('html_path')
+                    if html_path:
+                        pipeline_info['output_files']['visualization_files']['network_visualization'] = os.path.basename(html_path)
+                        all_output_files.append(html_path)
+                
+                elif stage_name == 'embedding_generation':
+                    # For embedding generation, include model info and H5 file
+                    output_data = stage_result.output_data
+                    stage_data['summary'] = {
+                        'embeddings_generated': len(output_data.get('embeddings_dict', {})),
+                        'model_name': output_data.get('model_name', ''),
+                        'embedding_dim': output_data.get('embedding_dim', 0)
+                    }
+                    # Add H5 file if it exists
+                    h5_path = output_data.get('h5_file_path')
+                    if h5_path:
+                        pipeline_info['output_files']['data_files']['embeddings_h5'] = os.path.basename(h5_path)
+                        all_output_files.append(h5_path)
+                
+                else:
+                    # For other stages, try to serialize the output data
+                    try:
+                        stage_data['output_data'] = json.loads(json.dumps(stage_result.output_data, default=make_serializable))
+                    except (TypeError, ValueError):
+                        # If serialization fails, store summary info
+                        stage_data['output_summary'] = str(type(stage_result.output_data))
+            
+            pipeline_info['stage_results'][stage_name] = stage_data
+        
+        # Add protein statistics summary
+        if 'sequence_analysis' in self.stage_results:
+            seq_stats = self.stage_results['sequence_analysis'].output_data.get('analysis_stats', {})
+            pipeline_info['protein_statistics'] = {
+                'total_proteins_analyzed': seq_stats.get('total_analyses', 0),
+                'successful_analyses': seq_stats.get('successful_analyses', 0),
+                'property_distributions': seq_stats.get('property_distributions', {})
+            }
+        
+        # Add analysis summary
+        pipeline_info['analysis_summary'] = {
+            'pipeline_success': result.success,
+            'total_stages_run': len(self.stages_completed),
+            'total_files_generated': len(all_output_files),
+            'visualization_files_count': len(pipeline_info['output_files']['visualization_files']),
+            'csv_files_count': len(pipeline_info['output_files']['csv_files']),
+            'data_files_count': len(pipeline_info['output_files']['data_files'])
+        }
+        
+        # Save JSON file
+        json_filename = f"pipeline_output_{self.run_id}_{int(time.time())}.json"
+        json_path = os.path.join(output_dir, json_filename)
+        
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(pipeline_info, f, indent=2, default=make_serializable)
+        
+        self.logger.info(f"Comprehensive pipeline JSON saved to: {json_path}")
+        self.logger.info(f"Total output files generated: {len(all_output_files)}")
+        
+        return json_path
+    
     def cleanup(self):
         """Clean up resources after workflow execution."""
         try:
@@ -597,3 +902,89 @@ class ProteinQueryWorkflow:
             
         except Exception as e:
             self.logger.warning(f"Cleanup failed: {str(e)}")
+    
+    def _create_mock_embedding_generator(self):
+        """Create a mock embedding generator for testing."""
+        import numpy as np
+        import torch
+        from unittest.mock import MagicMock
+        
+        class MockESMModel:
+            def __init__(self):
+                self.config = type('Config', (), {'hidden_size': 320})()
+            
+            def __call__(self, **kwargs):
+                batch_size = kwargs.get('input_ids', torch.tensor([[0]])).shape[0]
+                return type('Outputs', (), {
+                    'last_hidden_state': torch.randn(batch_size, 10, 320)
+                })()
+            
+            def eval(self):
+                pass
+            
+            def to(self, device):
+                return self
+        
+        class MockTokenizer:
+            def __init__(self):
+                self.vocab_size = 33
+            
+            def __call__(self, text, **kwargs):
+                return {
+                    'input_ids': torch.tensor([[1, 2, 3, 4, 5]]),
+                    'attention_mask': torch.tensor([[1, 1, 1, 1, 1]])
+                }
+        
+        mock_gen = MagicMock()
+        mock_gen.model = MockESMModel()
+        mock_gen.tokenizer = MockTokenizer()
+        mock_gen.device = 'cpu'
+        mock_gen.embedding_dim = 320
+        mock_gen.generate_embedding = lambda seq, protein_id=None: np.random.randn(320).astype(np.float32)
+        mock_gen.generate_embeddings_batch = lambda seqs, ids, batch_size=8: {id_: np.random.randn(320).astype(np.float32) for id_ in ids}
+        
+        return mock_gen
+    
+    def _create_mock_storage(self):
+        """Create a mock storage for testing."""
+        from unittest.mock import MagicMock
+        mock_storage = MagicMock()
+        
+        def mock_load_family_embeddings(family_id, check_memory=False):
+            if family_id == "test_family":
+                raise FileNotFoundError(f"Family data not found for {family_id}")
+            return (np.random.randn(100, 320), ['protein1', 'protein2'])
+        
+        def mock_load_metadata(family_id):
+            if family_id == "test_family":
+                raise FileNotFoundError(f"Family data not found for {family_id}")
+            return pd.DataFrame({'id': ['protein1', 'protein2']})
+        
+        mock_storage.load_family_embeddings = mock_load_family_embeddings
+        mock_storage.load_metadata = mock_load_metadata
+        return mock_storage
+    
+    def _create_mock_memory_loader(self):
+        """Create a mock memory loader for testing."""
+        from unittest.mock import MagicMock
+        return MagicMock()
+    
+    def _create_mock_hierarchical_index(self):
+        """Create a mock hierarchical index for testing."""
+        from unittest.mock import MagicMock
+        return MagicMock()
+    
+    def _create_mock_streaming_index(self):
+        """Create a mock streaming index for testing."""
+        from unittest.mock import MagicMock
+        return MagicMock()
+    
+    def _create_mock_network_builder(self):
+        """Create a mock network builder for testing."""
+        from unittest.mock import MagicMock
+        return MagicMock()
+    
+    def _create_mock_family_assigner(self):
+        """Create a mock family assigner for testing."""
+        from unittest.mock import MagicMock
+        return MagicMock()

@@ -1,11 +1,12 @@
 """
 Reports Module for KBase Protein Query Module
 
-This module contains interactive HTML report generation capabilities.
+This module contains file organization utilities for raw data outputs.
 """
 
-from .html.generator import HTMLReportGenerator
+from .file_organizer import FileOrganizer, create_simple_file_list
 
 __all__ = [
-    'HTMLReportGenerator'
+    'FileOrganizer',
+    'create_simple_file_list'
 ]

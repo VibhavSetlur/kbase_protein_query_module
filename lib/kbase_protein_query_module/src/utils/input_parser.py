@@ -1,13 +1,15 @@
 """
-Input Parser for KBase Protein Query Module
+Enhanced Input Parser for KBase Protein Query Module
 
-This module handles parsing various input formats for protein analysis,
-including FASTA files, UniProt identifiers, and KBase workspace objects.
+This module handles parsing and standardizing various input formats for protein analysis,
+including FASTA files, UniProt identifiers, KBase workspace objects, genome sets, and more.
+All inputs are standardized to ProteinRecord format for consistent pipeline processing.
 """
 
 import os
 import requests
 import tempfile
+import re
 from typing import List, Dict, Any, Union, Optional
 from dataclasses import dataclass
 import logging
@@ -17,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProteinRecord:
-    """Data class representing a protein record."""
+    """Standardized data class representing a protein record for pipeline processing."""
     protein_id: str
     source: str
     sequence: str
@@ -28,18 +30,41 @@ class ProteinRecord:
             self.metadata = {}
         # Calculate sequence length
         self.metadata['length'] = str(len(self.sequence))
+        # Ensure protein_id is standardized
+        if not self.protein_id:
+            self.protein_id = f"protein_{len(self.sequence)}"
+        # Clean sequence (remove whitespace, validate amino acids)
+        self.sequence = self._clean_sequence(self.sequence)
+    
+    def _clean_sequence(self, sequence: str) -> str:
+        """Clean and validate protein sequence."""
+        # Remove whitespace and convert to uppercase
+        cleaned = ''.join(sequence.split()).upper()
+        
+        # Validate amino acid characters
+        valid_aa = set('ACDEFGHIKLMNPQRSTVWY')
+        if not all(c in valid_aa for c in cleaned):
+            logger.warning(f"Invalid amino acid characters found in sequence for {self.protein_id}")
+            # Remove invalid characters
+            cleaned = ''.join(c for c in cleaned if c in valid_aa)
+        
+        return cleaned
 
 
 class InputParser:
     """
-    Parser for various protein input formats.
+    Enhanced parser for various protein input formats with standardization.
     
     Supports:
     - FASTA files (local and remote)
-    - UniProt identifiers
+    - UniProt identifiers (single or multiple)
     - ProteinSequenceSet objects
-    - Genome references
+    - Genome references (single or genome sets)
+    - FeatureSet objects
     - Single protein sequences
+    - Workspace object references
+    
+    All inputs are standardized to ProteinRecord format for consistent pipeline processing.
     """
     
     def __init__(self, workspace_client=None):
@@ -47,39 +72,144 @@ class InputParser:
         self.workspace_client = workspace_client
         self.supported_formats = {
             'FASTA', 'Uniprot', 'ProteinSequenceSet', 
-            'Genome', 'FeatureSet', 'GenomeSet', 'SingleProtein'
+            'Genome', 'FeatureSet', 'GenomeSet', 'SingleProtein',
+            'WorkspaceObject', 'MixedInput'
         }
+        
+        # UniProt ID patterns for validation
+        self.uniprot_patterns = [
+            r'^[A-Z][0-9A-Z]{5}$',  # UniProtKB/Swiss-Prot format (P12345)
+            r'^[A-Z][0-9A-Z]{9}$',  # UniProtKB/TrEMBL format (A0A0A0A0A0)
+            r'^[A-Z][0-9A-Z]{4}$',  # Short format (P1234)
+        ]
     
-    def parse_input(self, input_type: str, input_data: Union[str, List[str]]) -> List[ProteinRecord]:
+    def parse_input(self, input_type: str, input_data: Union[str, List[str], Dict[str, Any]]) -> List[ProteinRecord]:
         """
-        Parse input data based on the specified type.
+        Parse and standardize input data based on the specified type.
         
         Args:
-            input_type: Type of input ('FASTA', 'Uniprot', etc.)
-            input_data: Input data (file path, URL, identifier, etc.)
+            input_type: Type of input ('FASTA', 'Uniprot', 'Genome', etc.)
+            input_data: Input data (file path, URL, identifier, workspace ref, etc.)
             
         Returns:
-            List of ProteinRecord objects
+            List of standardized ProteinRecord objects
         """
         if input_type not in self.supported_formats:
             raise ValueError(f"Unsupported input type: {input_type}")
         
-        if input_type == 'FASTA':
-            return self._parse_fasta(input_data)
-        elif input_type == 'Uniprot':
-            return self._parse_uniprot_identifiers(input_data)
-        elif input_type == 'ProteinSequenceSet':
-            return self._parse_protein_sequence_set(input_data)
-        elif input_type == 'Genome':
-            return self._parse_genome_reference(input_data)
-        elif input_type == 'FeatureSet':
-            return self._parse_feature_set(input_data)
-        elif input_type == 'GenomeSet':
-            return self._parse_genome_set(input_data)
-        elif input_type == 'SingleProtein':
-            return self._parse_single_protein(input_data)
-        else:
-            raise ValueError(f"Input type {input_type} not implemented")
+        logger.info(f"Parsing input type: {input_type}")
+        
+        try:
+            if input_type == 'FASTA':
+                return self._parse_fasta(input_data)
+            elif input_type == 'Uniprot':
+                return self._parse_uniprot_identifiers(input_data)
+            elif input_type == 'ProteinSequenceSet':
+                return self._parse_protein_sequence_set(input_data)
+            elif input_type == 'Genome':
+                return self._parse_genome_reference(input_data)
+            elif input_type == 'FeatureSet':
+                return self._parse_feature_set(input_data)
+            elif input_type == 'GenomeSet':
+                return self._parse_genome_set(input_data)
+            elif input_type == 'SingleProtein':
+                return self._parse_single_protein(input_data)
+            elif input_type == 'WorkspaceObject':
+                return self._parse_workspace_object(input_data)
+            elif input_type == 'MixedInput':
+                return self._parse_mixed_input(input_data)
+            else:
+                raise ValueError(f"Input type {input_type} not implemented")
+        except Exception as e:
+            logger.error(f"Error parsing input type {input_type}: {e}")
+            raise
+    
+    def detect_input_type(self, input_data: Union[str, List[str], Dict[str, Any]]) -> str:
+        """
+        Automatically detect the input type based on the data format.
+        
+        Args:
+            input_data: Input data to analyze
+            
+        Returns:
+            Detected input type string
+        """
+        if isinstance(input_data, str):
+            # Check if it's a file path
+            if os.path.exists(input_data) or input_data.startswith(('http://', 'https://')):
+                if input_data.endswith('.fasta') or input_data.endswith('.fa'):
+                    return 'FASTA'
+            
+            # Check if it's a UniProt ID
+            if self._is_uniprot_id(input_data):
+                return 'Uniprot'
+            
+            # Check if it's a workspace reference
+            if '/' in input_data and self._is_workspace_ref(input_data):
+                return 'WorkspaceObject'
+            
+            # Check if it's a protein sequence
+            if self._is_protein_sequence(input_data):
+                return 'SingleProtein'
+        
+        elif isinstance(input_data, list):
+            # Check if all items are UniProt IDs
+            if all(self._is_uniprot_id(item) for item in input_data):
+                return 'Uniprot'
+            # Check if all items are protein sequences
+            elif all(self._is_protein_sequence(item) for item in input_data):
+                return 'SingleProtein'
+            # Mixed input
+            else:
+                return 'MixedInput'
+        
+        elif isinstance(input_data, dict):
+            # Check for workspace object indicators
+            if 'ref' in input_data or 'workspace_ref' in input_data:
+                return 'WorkspaceObject'
+        
+        # Default to mixed input for complex cases
+        return 'MixedInput'
+    
+    def _is_uniprot_id(self, identifier: str) -> bool:
+        """Check if identifier is a valid UniProt ID."""
+        if not identifier or len(identifier) < 3:
+            return False
+        
+        for pattern in self.uniprot_patterns:
+            if re.match(pattern, identifier):
+                return True
+        
+        return False
+    
+    def _is_workspace_ref(self, ref: str) -> bool:
+        """Check if reference is a valid workspace reference."""
+        if not ref or '/' not in ref:
+            return False
+        
+        parts = ref.split('/')
+        if len(parts) != 2:
+            return False
+        
+        try:
+            int(parts[0])  # Workspace ID should be numeric
+            int(parts[1])  # Object ID should be numeric
+            return True
+        except ValueError:
+            return False
+    
+    def _is_protein_sequence(self, sequence: str) -> bool:
+        """Check if string is a valid protein sequence."""
+        if not sequence or len(sequence) < 10:  # Minimum reasonable protein length
+            return False
+        
+        # Check if it contains mostly amino acid characters
+        valid_aa = set('ACDEFGHIKLMNPQRSTVWY')
+        sequence_upper = sequence.upper()
+        aa_count = sum(1 for c in sequence_upper if c in valid_aa)
+        aa_ratio = aa_count / len(sequence_upper)
+        
+        return aa_ratio > 0.8  # At least 80% should be valid amino acids
     
     def _parse_fasta(self, fasta_input: str) -> List[ProteinRecord]:
         """Parse FASTA input (file path or URL)."""
@@ -107,13 +237,14 @@ class InputParser:
                             records.append(ProteinRecord(
                                 protein_id=current_id,
                                 source='FASTA',
-                                sequence=sequence
+                                sequence=sequence,
+                                metadata={'file_path': file_path}
                             ))
                         
                         # Start new record
                         current_id = line[1:].split()[0]  # Take first word after >
                         current_sequence = []
-                    elif line and current_id:
+                    else:
                         current_sequence.append(line)
                 
                 # Save last record
@@ -122,100 +253,126 @@ class InputParser:
                     records.append(ProteinRecord(
                         protein_id=current_id,
                         source='FASTA',
-                        sequence=sequence
+                        sequence=sequence,
+                        metadata={'file_path': file_path}
                     ))
+            
+            logger.info(f"Parsed {len(records)} proteins from FASTA file: {file_path}")
+            return records
+            
         except Exception as e:
             logger.error(f"Error parsing FASTA file {file_path}: {e}")
             raise
-        
-        return records
     
     def _parse_fasta_url(self, url: str) -> List[ProteinRecord]:
-        """Parse FASTA from URL."""
+        """Parse a remote FASTA file."""
         try:
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             
-            # Create temporary file and parse
+            # Create temporary file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as f:
                 f.write(response.text)
                 temp_path = f.name
             
             try:
                 records = self._parse_fasta_file(temp_path)
+                # Update source to indicate URL
+                for record in records:
+                    record.source = 'FASTA_URL'
+                    record.metadata['url'] = url
                 return records
             finally:
                 os.unlink(temp_path)
+                
         except Exception as e:
-            logger.error(f"Error fetching FASTA from URL {url}: {e}")
+            logger.error(f"Error parsing FASTA URL {url}: {e}")
             raise
     
-    def _parse_uniprot_identifiers(self, identifiers: str) -> List[ProteinRecord]:
-        """Parse UniProt identifiers."""
-        if not self.workspace_client:
-            raise ValueError("Workspace client required for UniProt parsing")
+    def _parse_uniprot_identifiers(self, identifiers: Union[str, List[str]]) -> List[ProteinRecord]:
+        """Parse UniProt identifiers and fetch sequences."""
+        if isinstance(identifiers, str):
+            # Handle comma-separated string
+            if ',' in identifiers:
+                identifiers = [id.strip() for id in identifiers.split(',')]
+            else:
+                identifiers = [identifiers]
         
-        id_list = [id.strip() for id in identifiers.split(',')]
         records = []
-        
-        for uniprot_id in id_list:
-            try:
-                # Fetch from UniProt API
-                url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.fasta"
-                response = requests.get(url, timeout=30)
-                response.raise_for_status()
-                
-                # Parse the single FASTA entry
-                lines = response.text.strip().split('\n')
-                if len(lines) >= 2:
-                    header = lines[0]
-                    sequence = ''.join(lines[1:])
-                    
-                    # Extract protein ID from header
-                    protein_id = header.split('|')[1] if '|' in header else uniprot_id
-                    
-                    records.append(ProteinRecord(
-                        protein_id=protein_id,
-                        source='Uniprot',
-                        sequence=sequence
-                    ))
-            except Exception as e:
-                logger.warning(f"Failed to fetch UniProt ID {uniprot_id}: {e}")
+        for uniprot_id in identifiers:
+            if not self._is_uniprot_id(uniprot_id):
+                logger.warning(f"Invalid UniProt ID format: {uniprot_id}")
                 continue
+            
+            try:
+                # Fetch sequence from UniProt
+                sequence = self._fetch_uniprot_sequence(uniprot_id)
+                if sequence:
+                    records.append(ProteinRecord(
+                        protein_id=uniprot_id,
+                        source='UniProt',
+                        sequence=sequence,
+                        metadata={'uniprot_id': uniprot_id}
+                    ))
+                else:
+                    logger.warning(f"Could not fetch sequence for UniProt ID: {uniprot_id}")
+            except Exception as e:
+                logger.error(f"Error fetching UniProt ID {uniprot_id}: {e}")
         
+        logger.info(f"Successfully parsed {len(records)} UniProt identifiers")
         return records
     
+    def _fetch_uniprot_sequence(self, uniprot_id: str) -> Optional[str]:
+        """Fetch protein sequence from UniProt."""
+        try:
+            # Use UniProt REST API
+            url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.fasta"
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            
+            # Parse FASTA response
+            lines = response.text.strip().split('\n')
+            if len(lines) < 2:
+                return None
+            
+            # Extract sequence (all lines except header)
+            sequence = ''.join(lines[1:])
+            return sequence
+            
+        except Exception as e:
+            logger.error(f"Error fetching UniProt sequence for {uniprot_id}: {e}")
+            return None
+    
     def _parse_protein_sequence_set(self, ws_ref: str) -> List[ProteinRecord]:
-        """Parse ProteinSequenceSet from workspace."""
+        """Parse ProteinSequenceSet workspace object."""
         if not self.workspace_client:
             raise ValueError("Workspace client required for ProteinSequenceSet parsing")
         
         try:
-            # Get object info
-            obj_info = self.workspace_client.get_object_info3({
-                'objects': [{'ref': ws_ref}]
-            })
-            
             # Get object data
             obj_data = self.workspace_client.get_objects2({
                 'objects': [{'ref': ws_ref}]
             })
             
-            records = []
-            proteins = obj_data['data'][0]['data'].get('proteins', [])
+            data = obj_data['data'][0]['data']
+            # Handle both 'sequences' and 'proteins' fields for compatibility
+            sequences = data.get('sequences', data.get('proteins', []))
             
-            for protein in proteins:
+            records = []
+            for seq_data in sequences:
                 records.append(ProteinRecord(
-                    protein_id=protein.get('id', 'unknown'),
+                    protein_id=seq_data.get('id', 'unknown'),
                     source='ProteinSequenceSet',
-                    sequence=protein.get('sequence', ''),
+                    sequence=seq_data.get('sequence', ''),
                     metadata={
-                        'description': protein.get('description', ''),
-                        'length': str(len(protein.get('sequence', '')))
+                        'workspace_ref': ws_ref,
+                        'object_type': 'ProteinSequenceSet'
                     }
                 ))
             
+            logger.info(f"Parsed {len(records)} proteins from ProteinSequenceSet: {ws_ref}")
             return records
+            
         except Exception as e:
             logger.error(f"Error parsing ProteinSequenceSet {ws_ref}: {e}")
             raise
@@ -226,11 +383,6 @@ class InputParser:
             raise ValueError("Workspace client required for genome parsing")
         
         try:
-            # Get object info
-            obj_info = self.workspace_client.get_object_info3({
-                'objects': [{'ref': ws_ref}]
-            })
-            
             # Get object data
             obj_data = self.workspace_client.get_objects2({
                 'objects': [{'ref': ws_ref}]
@@ -253,32 +405,25 @@ class InputParser:
                             source='Genome',
                             sequence=protein_translation,
                             metadata={
+                                'workspace_ref': ws_ref,
+                                'object_type': 'Genome',
                                 'feature_type': feature.get('type', ''),
                                 'location': feature.get('location', []),
-                                'function': feature.get('function', ''),
-                                'length': str(len(protein_translation))
+                                'function': feature.get('function', '')
                             }
                         ))
             
-            logger.info(f"Extracted {len(records)} protein sequences from genome")
+            logger.info(f"Extracted {len(records)} protein sequences from genome: {ws_ref}")
             return records
             
         except Exception as e:
             logger.error(f"Error parsing genome {ws_ref}: {e}")
             raise
     
-    def _parse_single_protein(self, sequence: str) -> List[ProteinRecord]:
-        """Parse a single protein sequence."""
-        return [ProteinRecord(
-            protein_id='single_protein',
-            source='SingleProtein',
-            sequence=sequence
-        )]
-    
-    def _parse_feature_set(self, ws_ref: str) -> List[ProteinRecord]:
-        """Parse feature set to extract proteins."""
+    def _parse_genome_set(self, ws_ref: str) -> List[ProteinRecord]:
+        """Parse GenomeSet workspace object."""
         if not self.workspace_client:
-            raise ValueError("Workspace client required for feature set parsing")
+            raise ValueError("Workspace client required for GenomeSet parsing")
         
         try:
             # Get object data
@@ -286,37 +431,25 @@ class InputParser:
                 'objects': [{'ref': ws_ref}]
             })
             
-            feature_set_data = obj_data['data'][0]['data']
-            features = feature_set_data.get('elements', [])
+            data = obj_data['data'][0]['data']
+            genome_refs = data.get('genome_refs', [])
             
             records = []
-            for feature in features:
-                # Extract protein sequences from features
-                protein_translation = feature.get('protein_translation', '')
-                if protein_translation:
-                    protein_id = feature.get('id', 'unknown')
-                    records.append(ProteinRecord(
-                        protein_id=protein_id,
-                        source='FeatureSet',
-                        sequence=protein_translation,
-                        metadata={
-                            'feature_type': feature.get('type', ''),
-                            'function': feature.get('function', ''),
-                            'length': str(len(protein_translation))
-                        }
-                    ))
+            for genome_ref in genome_refs:
+                genome_records = self._parse_genome_reference(genome_ref)
+                records.extend(genome_records)
             
-            logger.info(f"Extracted {len(records)} protein sequences from feature set")
+            logger.info(f"Extracted {len(records)} protein sequences from GenomeSet: {ws_ref}")
             return records
             
         except Exception as e:
-            logger.error(f"Error parsing feature set {ws_ref}: {e}")
+            logger.error(f"Error parsing GenomeSet {ws_ref}: {e}")
             raise
     
-    def _parse_genome_set(self, ws_ref: str) -> List[ProteinRecord]:
-        """Parse genome set to extract proteins from multiple genomes."""
+    def _parse_feature_set(self, ws_ref: str) -> List[ProteinRecord]:
+        """Parse FeatureSet workspace object."""
         if not self.workspace_client:
-            raise ValueError("Workspace client required for genome set parsing")
+            raise ValueError("Workspace client required for FeatureSet parsing")
         
         try:
             # Get object data
@@ -324,102 +457,171 @@ class InputParser:
                 'objects': [{'ref': ws_ref}]
             })
             
-            genome_set_data = obj_data['data'][0]['data']
-            genome_refs = genome_set_data.get('elements', [])
+            data = obj_data['data'][0]['data']
+            features = data.get('features', [])
             
-            all_records = []
-            for genome_ref in genome_refs:
-                try:
-                    # Parse each genome in the set
-                    genome_records = self._parse_genome_reference(genome_ref)
-                    all_records.extend(genome_records)
-                except Exception as e:
-                    logger.warning(f"Failed to parse genome {genome_ref}: {e}")
-                    continue
+            records = []
+            for feature in features:
+                if feature.get('type') == 'CDS':
+                    protein_id = feature.get('id', 'unknown')
+                    protein_translation = feature.get('protein_translation', '')
+                    
+                    if protein_translation:
+                        records.append(ProteinRecord(
+                            protein_id=protein_id,
+                            source='FeatureSet',
+                            sequence=protein_translation,
+                            metadata={
+                                'workspace_ref': ws_ref,
+                                'object_type': 'FeatureSet',
+                                'feature_type': feature.get('type', '')
+                            }
+                        ))
             
-            logger.info(f"Extracted {len(all_records)} protein sequences from genome set")
-            return all_records
+            logger.info(f"Extracted {len(records)} protein sequences from FeatureSet: {ws_ref}")
+            return records
             
         except Exception as e:
-            logger.error(f"Error parsing genome set {ws_ref}: {e}")
+            logger.error(f"Error parsing FeatureSet {ws_ref}: {e}")
             raise
+    
+    def _parse_single_protein(self, sequence: str) -> List[ProteinRecord]:
+        """Parse a single protein sequence."""
+        if not self._is_protein_sequence(sequence):
+            raise ValueError(f"Invalid protein sequence: {sequence[:50]}...")
+        
+        record = ProteinRecord(
+            protein_id='single_protein',
+            source='SingleProtein',
+            sequence=sequence,
+            metadata={'input_type': 'direct_sequence'}
+        )
+        
+        logger.info(f"Parsed single protein sequence (length: {len(sequence)})")
+        return [record]
+    
+    def _parse_workspace_object(self, ws_ref: str) -> List[ProteinRecord]:
+        """Parse workspace object by detecting its type."""
+        if not self.workspace_client:
+            raise ValueError("Workspace client required for workspace object parsing")
+        
+        try:
+            # Get object info to determine type
+            obj_info = self.workspace_client.get_object_info3({
+                'objects': [{'ref': ws_ref}]
+            })
+            
+            object_type = obj_info['infos'][0][2]  # Type name
+            
+            # Route to appropriate parser based on type
+            if 'ProteinSequenceSet' in object_type:
+                return self._parse_protein_sequence_set(ws_ref)
+            elif 'Genome' in object_type:
+                return self._parse_genome_reference(ws_ref)
+            elif 'GenomeSet' in object_type:
+                return self._parse_genome_set(ws_ref)
+            elif 'FeatureSet' in object_type:
+                return self._parse_feature_set(ws_ref)
+            else:
+                logger.warning(f"Unknown workspace object type: {object_type}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error parsing workspace object {ws_ref}: {e}")
+            raise
+    
+    def _parse_mixed_input(self, input_data: Union[List[str], Dict[str, Any]]) -> List[ProteinRecord]:
+        """Parse mixed input types."""
+        records = []
+        
+        if isinstance(input_data, list):
+            for item in input_data:
+                if self._is_uniprot_id(item):
+                    uniprot_records = self._parse_uniprot_identifiers([item])
+                    records.extend(uniprot_records)
+                elif self._is_protein_sequence(item):
+                    seq_records = self._parse_single_protein(item)
+                    records.extend(seq_records)
+                elif self._is_workspace_ref(item):
+                    ws_records = self._parse_workspace_object(item)
+                    records.extend(ws_records)
+                else:
+                    logger.warning(f"Unknown input item type: {item}")
+        
+        elif isinstance(input_data, dict):
+            # Handle dictionary input
+            if 'proteins' in input_data:
+                for protein in input_data['proteins']:
+                    if isinstance(protein, str):
+                        if self._is_uniprot_id(protein):
+                            uniprot_records = self._parse_uniprot_identifiers([protein])
+                            records.extend(uniprot_records)
+                        elif self._is_protein_sequence(protein):
+                            seq_records = self._parse_single_protein(protein)
+                            records.extend(seq_records)
+                    elif isinstance(protein, dict):
+                        # Handle protein dictionary
+                        protein_id = protein.get('id', 'unknown')
+                        sequence = protein.get('sequence', '')
+                        if sequence:
+                            records.append(ProteinRecord(
+                                protein_id=protein_id,
+                                source='MixedInput',
+                                sequence=sequence,
+                                metadata=protein.get('metadata', {})
+                            ))
+        
+        logger.info(f"Parsed {len(records)} proteins from mixed input")
+        return records
     
     def validate_records(self, records: List[ProteinRecord]) -> Dict[str, Any]:
         """
-        Validate protein records.
+        Validate a list of protein records.
         
+        Args:
+            records: List of ProteinRecord objects
+            
         Returns:
-            Dictionary with validation results
+            Validation summary dictionary
         """
         validation_results = {
             'total_records': len(records),
             'valid_records': 0,
             'invalid_records': 0,
-            'errors': []
+            'errors': [],
+            'warnings': []
         }
         
         for record in records:
-            if self._is_valid_sequence(record.sequence):
+            try:
+                # Check sequence length
+                if len(record.sequence) < 10:
+                    validation_results['warnings'].append(
+                        f"Short sequence for {record.protein_id}: {len(record.sequence)} aa"
+                    )
+                
+                # Check for invalid characters
+                valid_aa = set('ACDEFGHIKLMNPQRSTVWY')
+                invalid_chars = set(record.sequence) - valid_aa
+                if invalid_chars:
+                    validation_results['warnings'].append(
+                        f"Invalid characters in {record.protein_id}: {invalid_chars}"
+                    )
+                
+                # Check protein ID
+                if not record.protein_id or record.protein_id.strip() == '':
+                    validation_results['errors'].append(
+                        f"Empty protein ID for sequence: {record.sequence[:20]}..."
+                    )
+                    validation_results['invalid_records'] += 1
+                    continue
+                
                 validation_results['valid_records'] += 1
-            else:
+                
+            except Exception as e:
+                validation_results['errors'].append(
+                    f"Error validating record {record.protein_id}: {e}"
+                )
                 validation_results['invalid_records'] += 1
-                validation_results['errors'].append({
-                    'protein_id': record.protein_id,
-                    'error': 'Invalid sequence'
-                })
         
         return validation_results
-    
-    def _is_valid_sequence(self, sequence: str) -> bool:
-        """Check if a protein sequence is valid."""
-        if not sequence:
-            return False
-        
-        # Check for valid amino acid characters
-        valid_chars = set('ACDEFGHIKLMNPQRSTVWY')
-        sequence_chars = set(sequence.upper())
-        
-        if not sequence_chars.issubset(valid_chars):
-            return False
-        
-        # Check reasonable length (1-50000 amino acids)
-        if len(sequence) < 1 or len(sequence) > 50000:
-            return False
-        
-        return True
-
-
-# --- Module-level helper functions expected by some stages/tests ---
-def parse_fasta_string(fasta_text: str) -> List[ProteinRecord]:
-    """Parse FASTA content provided as a string into ProteinRecord list."""
-    records: List[ProteinRecord] = []
-    current_id: Optional[str] = None
-    current_sequence: List[str] = []
-    for raw_line in (fasta_text or '').splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith('>'):
-            if current_id and current_sequence:
-                records.append(ProteinRecord(protein_id=current_id, source='FASTA', sequence=''.join(current_sequence)))
-            current_id = line[1:].split()[0]
-            current_sequence = []
-        else:
-            if current_id is None:
-                # If sequence appears before a header, create a default ID
-                current_id = f"seq_{len(records)}"
-            current_sequence.append(line)
-    if current_id and current_sequence:
-        records.append(ProteinRecord(protein_id=current_id, source='FASTA', sequence=''.join(current_sequence)))
-    return records
-
-
-def parse_fasta_file(file_path: str) -> List[ProteinRecord]:
-    """Parse FASTA file path into ProteinRecord list."""
-    try:
-        with open(file_path, 'r') as fh:
-            content = fh.read()
-        return parse_fasta_string(content)
-    except Exception as exc:
-        logger.error(f"Failed parsing FASTA file {file_path}: {exc}")
-        raise

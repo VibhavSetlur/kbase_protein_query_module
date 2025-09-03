@@ -2,11 +2,53 @@ name: Protein Query Analysis v2.0
 tooltip: Comprehensive protein analysis pipeline with modular architecture and multi-protein support
 
 parameters:
+    input_type:
+        ui-name: Input Type
+        short-hint: Type of protein input to analyze
+        description: |
+            Select the type of protein input you want to analyze:
+            - UniProt Identifiers: Enter UniProt IDs (e.g., P12345, Q67890) - sequences fetched automatically
+            - FASTA File: Upload a FASTA file containing protein sequences
+            - Workspace Object: Select from your workspace (Genome, GenomeSet, ProteinSequenceSet, FeatureSet)
+            - Direct Protein Sequence: Paste protein sequences directly
+            - Mixed Input Types: Combine different input sources
+
     input_proteins:
         ui-name: Input Proteins
-        short-hint: Protein sequences to analyze (FASTA file, workspace object, or direct input)
+        short-hint: Protein sequences to analyze (UniProt IDs, FASTA file, workspace object, or direct sequence)
         description: |
-            Protein sequences to analyze. Can be provided as a FASTA file, workspace object reference, or direct sequence input.
+            Protein sequences to analyze. For UniProt IDs: enter one or more UniProt identifiers (e.g., P12345, Q67890). 
+            For FASTA: upload a FASTA file. For workspace objects: select from your workspace. 
+            For direct sequences: paste protein sequences.
+
+    uniprot_ids:
+        ui-name: UniProt Identifiers
+        short-hint: One or more UniProt protein identifiers (e.g., P12345, Q67890)
+        description: |
+            Enter UniProt protein identifiers separated by commas or newlines. Examples: P12345, Q67890, R11111. 
+            The sequences will be automatically fetched from UniProt database.
+
+    fasta_file:
+        ui-name: FASTA File
+        short-hint: Upload a FASTA file containing protein sequences
+        description: |
+            Upload a FASTA file containing protein sequences. The file should have protein sequences 
+            in standard FASTA format with headers starting with '>'.
+
+    workspace_object:
+        ui-name: Workspace Object
+        short-hint: Select a workspace object containing protein data
+        description: |
+            Select a workspace object from your workspace. Supported types: Genome (extracts CDS features), 
+            GenomeSet (extracts from multiple genomes), ProteinSequenceSet (direct protein sequences), 
+            FeatureSet (extracts CDS features).
+
+    direct_sequences:
+        ui-name: Direct Protein Sequences
+        short-hint: Enter protein sequences directly (one per line or separated by commas)
+        description: |
+            Enter protein sequences directly. You can provide multiple sequences separated by commas or newlines. 
+            Each sequence should contain only valid amino acid characters (ACDEFGHIKLMNPQRSTVWY).
 
     analysis_type:
         ui-name: Analysis Type
@@ -17,6 +59,7 @@ parameters:
             - Sequence Analysis Only: Just sequence characterization
             - Similarity Search Only: Find similar proteins
             - Network Analysis Only: Build protein networks
+            - Check Protein Existence: Verify protein exists using UniProt ID, optionally generate embedding
 
     enabled_stages:
         ui-name: Enabled Stages
@@ -54,6 +97,7 @@ parameters:
         short-hint: Maximum number of similar proteins to return
         description: |
             Maximum number of similar proteins to return for each query protein.
+            Higher values provide more comprehensive similarity analysis but may increase processing time.
 
     embedding_model:
         ui-name: Embedding Model
@@ -69,72 +113,51 @@ parameters:
         short-hint: Format for output files
         description: |
             Select the format for output files:
-            - HTML Report: Individual HTML files for each analysis + comprehensive summary
+            - All Formats (Recommended): Comprehensive output including raw data, visualizations, and metadata
+            - Raw Data Only: CSV/TSV files for downstream analysis
+            - Visualizations Only: Interactive HTML plots
             - JSON Data: Structured data format with complete pipeline results
             - CSV Data: Top proteins with metadata and input correlations
-            - All Formats: Generate complete output directory with all formats
 
     output_report:
         ui-name: Output Report Name
         short-hint: Name for the output report object
         description: |
-            Name for the output report object in the workspace.
+            Name for the output report object in the workspace. This report will contain links to all 
+            generated data files and visualizations.
 
     output_data:
-        ui-name: Output Data Name
+        ui-name: Output Data Object Name
         short-hint: Name for the output data object
         description: |
-            Name for the output data object in the workspace.
+            Name for the output data object containing processed protein data and analysis results.
+
 description: |
     <p><b>Protein Query Analysis v2.0</b> - A unified pipeline for comprehensive protein analysis with modular architecture, including embedding generation, family assignment, similarity search, sequence analysis, and network visualization.</p>
     
     <p><b>Key Features:</b></p>
     <ul>
-        <li><b>Multi-Protein Support:</b> Process single proteins, FASTA files, or KBase objects (Genome, FeatureSet, GenomeSet, ProteinSequenceSet)</li>
+        <li><b>Multi-Input Type Support:</b> UniProt IDs (auto-fetched), FASTA files, workspace objects (Genome, FeatureSet, GenomeSet, ProteinSequenceSet), direct protein sequences, and mixed input types</li>
+        <li><b>Automatic Input Detection:</b> Smart detection of input type with validation and standardization</li>
         <li><b>Modular Pipeline Architecture:</b> Choose which analysis stages to run with configurable dependencies</li>
-        <li><b>Parallel Processing:</b> Configurable concurrency for efficient multi-protein analysis</li>
-        <li><b>Interactive Reports:</b> Dashboard view with detailed per-protein analysis</li>
-        <li><b>Early Termination:</b> Stop pipeline at any stage for partial results</li>
+        <li><b>Multi-Protein Support:</b> Process single proteins, multiple proteins, or entire genomes with unified workflow</li>
+        <li><b>Enhanced Sequence Analysis:</b> 6 comprehensive CSV outputs including secondary structure propensities, advanced physicochemical properties, and bioinformatics database links</li>
+        <li><b>Interactive Network Visualization:</b> Multi-protein networks with distinct colors and comprehensive CSV data</li>
+        <li><b>Raw Data Outputs:</b> CSV/TSV files, HDF5 embeddings, and standalone HTML visualizations ready for downstream analysis</li>
+        <li><b>KBase Integration:</b> Proper workspace object handling, KBase-compliant output directories, and comprehensive reporting</li>
         <li><b>Real-time Monitoring:</b> Performance tracking and error handling throughout the pipeline</li>
-        <li><b>Advanced Storage:</b> Memory-efficient processing with streaming capabilities</li>
+        <li><b>Future-Ready:</b> Extensible architecture for additional analysis types (MSA trees, structural analysis, etc.)</li>
     </ul>
     
-    <p><b>Input Types:</b></p>
+    <p><b>What Researchers Get:</b></p>
     <ul>
-        <li><b>FASTA:</b> File path or URL containing protein sequences</li>
-        <li><b>ProteinSequenceSet:</b> KBase object with multiple protein sequences</li>
-        <li><b>Genome:</b> Extract CDS/protein sequences from genome annotation</li>
-        <li><b>FeatureSet:</b> Extract protein sequences from feature set</li>
-        <li><b>GenomeSet:</b> Process multiple genomes simultaneously</li>
-        <li><b>SingleProtein:</b> Direct amino acid sequence input</li>
+        <li><b>Raw Data Files:</b> Load CSV/TSV directly into R, Python, Excel for statistical analysis</li>
+        <li><b>Interactive Visualizations:</b> Explore protein networks in any browser with zoom, pan, and hover details</li>
+        <li><b>HDF5 Embeddings:</b> Ready for machine learning workflows with original sequences</li>
+        <li><b>Comprehensive Metadata:</b> Reproducible research with complete pipeline information</li>
+        <li><b>Multi-Protein Support:</b> Comparative studies with all proteins on single network visualizations</li>
+        <li><b>KBase Integration:</b> Seamless workflow within KBase Narrative environment</li>
     </ul>
-    
-    <p><b>Analysis Stages:</b></p>
-    <ul>
-        <li><b>Input Validation:</b> Validate input data format and content</li>
-        <li><b>Data Extraction:</b> Extract protein sequences from various sources</li>
-        <li><b>Embedding Generation:</b> Create high-dimensional protein representations using ESM-2</li>
-        <li><b>Family Assignment:</b> Assign proteins to families using centroid similarity</li>
-        <li><b>Similarity Search:</b> Find similar proteins within families</li>
-        <li><b>Sequence Analysis:</b> Comprehensive sequence characterization and bioinformatics</li>
-        <li><b>Network Analysis:</b> Build and visualize protein relationship networks</li>
-        <li><b>Bioinformatics Analysis:</b> Advanced bioinformatics analysis and annotation</li>
-        <li><b>Report Generation:</b> Generate comprehensive HTML reports</li>
-        <li><b>Visualization:</b> Create interactive visualizations and charts</li>
-        <li><b>Data Export:</b> Export results in multiple formats (JSON, CSV, Excel, FASTA)</li>
-    </ul>
-    
-    <p><b>Enhanced Output System:</b></p>
-    <ul>
-        <li><b>Individual HTML Reports:</b> Separate HTML files for each analysis stage (sequence analysis, family assignment, similarity search, network analysis, etc.)</li>
-        <li><b>Summary HTML Report:</b> Comprehensive overview with download links and navigation to individual reports</li>
-        <li><b>Comprehensive CSV Files:</b> Top N proteins with metadata, similarity scores, and input protein correlations</li>
-        <li><b>Complete Data Export:</b> JSON files with detailed pipeline results and execution logs</li>
-        <li><b>Organized Directory Structure:</b> Timestamped output directories with README and file manifest for easy navigation</li>
-        <li><b>KBase Narrative Integration:</b> Downloadable results directory optimized for research workflows</li>
-    </ul>
-    
-    <p><b>Performance:</b> Optimized for large-scale analysis with memory-efficient processing and parallel execution.</p>
 
 screenshots:
     - protein_query_analysis_dashboard.png

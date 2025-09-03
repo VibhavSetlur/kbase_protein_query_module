@@ -1,11 +1,10 @@
 """
-HTML Reports Module for KBase Protein Query Module
+HTML Report Generation Package
 
-This module contains HTML report generation components.
+This package provides HTML report generation capabilities for the protein analysis pipeline.
 """
 
 from .generator import HTMLReportGenerator
+from .visualization_generator import VisualizationGenerator
 
-__all__ = [
-    'HTMLReportGenerator'
-]
+__all__ = ['HTMLReportGenerator', 'VisualizationGenerator']

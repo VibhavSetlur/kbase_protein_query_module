@@ -1,0 +1,63 @@
+{
+  "pipeline_metadata": {
+    "execution_timestamp": "2025-09-03 09:24:41",
+    "input_parameters": {
+      "pipeline_results": {
+        "embeddings": {
+          "protein_ids": [
+            "TEST1"
+          ]
+        },
+        "family_assignments": [
+          {
+            "family_id": "FAM0"
+          }
+        ],
+        "similarity_results": {
+          "TEST1": {
+            "similar_proteins": []
+          }
+        }
+      }
+    },
+    "stages_executed": [
+      "embeddings",
+      "family_assignments",
+      "similarity_results"
+    ],
+    "pipeline_version": "1.0.0"
+  },
+  "stage_details": {
+    "embeddings": {
+      "success": false,
+      "execution_time": 0,
+      "metadata": {},
+      "output_data": {},
+      "error_message": null
+    },
+    "similarity_results": {
+      "success": false,
+      "execution_time": 0,
+      "metadata": {},
+      "output_data": {},
+      "error_message": null
+    }
+  },
+  "raw_results": {
+    "embeddings": {
+      "protein_ids": [
+        "TEST1"
+      ]
+    },
+    "family_assignments": [
+      {
+        "family_id": "FAM0"
+      }
+    ],
+    "similarity_results": {
+      "TEST1": {
+        "similar_proteins": []
+      }
+    }
+  }
+}

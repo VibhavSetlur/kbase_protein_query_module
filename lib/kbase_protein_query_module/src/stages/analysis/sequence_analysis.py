@@ -23,6 +23,8 @@ import re
 import requests
 from urllib.parse import quote
 import json
+import os
+import time
 
 from ..base_stage import BaseStage, StageResult
 from ...data import ReferenceDataLoader
@@ -145,6 +147,10 @@ class SequenceAnalysisStage(BaseStage):
             else:
                 property_distributions[k] = {}
 
+        # Generate CSV outputs
+        output_dir = input_data.get('output_dir', 'test/outputs')
+        csv_files = self._save_sequence_analysis_csv(results, output_dir)
+
         return StageResult(
             success=success > 0,
             output_data={
@@ -155,7 +161,8 @@ class SequenceAnalysisStage(BaseStage):
                     'failed_analyses': failed,
                     'property_distributions': property_distributions,
                     'motif_statistics': motif_statistics
-                }
+                },
+                'csv_files': csv_files
             },
             metadata={
                 'include_bioinformatics': self.include_bioinformatics,
@@ -567,5 +574,240 @@ class SequenceAnalysisStage(BaseStage):
                 report.append(f"  {motif_type.replace('_', ' ').title()}: {len(motif_list)} found")
         
         return "\n".join(report)
+
+    def _save_sequence_analysis_csv(self, results: Dict[str, Any], output_dir: str) -> Dict[str, str]:
+        """Save sequence analysis results as CSV files."""
+        csv_files = {}
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 1. Main sequence analysis summary CSV
+        summary_data = []
+        detailed_data = []
+        
+        for protein_id, analysis in results.items():
+            if analysis.get('status') == 'error':
+                continue
+                
+            # Main summary data
+            props = analysis.get('physicochemical_properties', {})
+            aa_comp = analysis.get('amino_acid_composition', {})
+            groups = aa_comp.get('groups', {})
+            stats = analysis.get('statistics', {})
+            motifs = analysis.get('sequence_motifs', {})
+            
+            summary_data.append({
+                'protein_id': protein_id,
+                'sequence_length': analysis.get('length', 0),
+                'molecular_weight': props.get('molecular_weight', 0),
+                'isoelectric_point': props.get('isoelectric_point', 0),
+                'instability_index': props.get('instability_index', 0),
+                'aliphatic_index': props.get('aliphatic_index', 0),
+                'extinction_coefficient_280nm': props.get('extinction_coefficient_280nm', 0),
+                'hydrophobic_percentage': groups.get('hydrophobic', {}).get('percentage', 0),
+                'hydrophilic_percentage': groups.get('hydrophilic', {}).get('percentage', 0),
+                'charged_percentage': groups.get('charged', {}).get('percentage', 0),
+                'polar_percentage': groups.get('polar', {}).get('percentage', 0),
+                'aromatic_percentage': groups.get('aromatic', {}).get('percentage', 0),
+                'num_motifs_found': sum(len(motif_list) for motif_list in motifs.values() if motif_list),
+                'transmembrane_domains': len(motifs.get('transmembrane_domains', [])),
+                'signal_peptides': len(motifs.get('signal_peptides', [])),
+                'coiled_coils': len(motifs.get('coiled_coils', [])),
+                'disulfide_bonds': len(motifs.get('disulfide_bonds', [])),
+                'n_terminal_disorder': stats.get('disorder_regions', {}).get('n_terminal', 0),
+                'c_terminal_disorder': stats.get('disorder_regions', {}).get('c_terminal', 0),
+                'gc_content': stats.get('gc_content', 0)
+            })
+            
+            # Detailed amino acid composition data
+            individual_aa = aa_comp.get('individual', {})
+            for aa_code, aa_data in individual_aa.items():
+                detailed_data.append({
+                    'protein_id': protein_id,
+                    'amino_acid_code': aa_code,
+                    'amino_acid_name': aa_data.get('name', ''),
+                    'three_letter_code': aa_data.get('three_letter', ''),
+                    'count': aa_data.get('count', 0),
+                    'percentage': aa_data.get('percentage', 0)
+                })
+        
+        # Save main summary CSV
+        if summary_data:
+            summary_df = pd.DataFrame(summary_data)
+            summary_path = os.path.join(output_dir, f"sequence_analysis_summary_{int(time.time())}.csv")
+            summary_df.to_csv(summary_path, index=False)
+            csv_files['sequence_analysis_summary'] = summary_path
+            
+            # Save detailed amino acid composition CSV
+            detailed_df = pd.DataFrame(detailed_data)
+            detailed_path = os.path.join(output_dir, f"amino_acid_composition_{int(time.time())}.csv")
+            detailed_df.to_csv(detailed_path, index=False)
+            csv_files['amino_acid_composition'] = detailed_path
+        
+        # 2. Motifs CSV (separate file with one row per motif)
+        motifs_data = []
+        for protein_id, analysis in results.items():
+            if analysis.get('status') == 'error':
+                continue
+                
+            motifs = analysis.get('sequence_motifs', {})
+            for motif_type, motif_list in motifs.items():
+                if motif_list:
+                    for i, motif in enumerate(motif_list):
+                        motifs_data.append({
+                            'protein_id': protein_id,
+                            'motif_type': motif_type,
+                            'motif_index': i + 1,
+                            'motif_data': str(motif)  # Convert to string for CSV
+                        })
+        
+        if motifs_data:
+            motifs_df = pd.DataFrame(motifs_data)
+            motifs_path = os.path.join(output_dir, f"sequence_motifs_{int(time.time())}.csv")
+            motifs_df.to_csv(motifs_path, index=False)
+            csv_files['sequence_motifs'] = motifs_path
+        
+        # 3. Physicochemical properties detailed CSV
+        properties_data = []
+        for protein_id, analysis in results.items():
+            if analysis.get('status') == 'error':
+                continue
+                
+            props = analysis.get('physicochemical_properties', {})
+            properties_data.append({
+                'protein_id': protein_id,
+                'sequence': analysis.get('sequence', ''),
+                'sequence_length': analysis.get('length', 0),
+                'molecular_weight': props.get('molecular_weight', 0),
+                'isoelectric_point': props.get('isoelectric_point', 0),
+                'instability_index': props.get('instability_index', 0),
+                'aliphatic_index': props.get('aliphatic_index', 0),
+                'extinction_coefficient_280nm': props.get('extinction_coefficient_280nm', 0),
+                'extinction_coefficient_280nm_reduced': props.get('extinction_coefficient_280nm_reduced', 0),
+                'half_life_mammalian': props.get('half_life_mammalian', 0),
+                'half_life_yeast': props.get('half_life_yeast', 0),
+                'half_life_ecoli': props.get('half_life_ecoli', 0)
+            })
+        
+        if properties_data:
+            properties_df = pd.DataFrame(properties_data)
+            properties_path = os.path.join(output_dir, f"physicochemical_properties_{int(time.time())}.csv")
+            properties_df.to_csv(properties_path, index=False)
+            csv_files['physicochemical_properties'] = properties_path
+        
+        logger.info(f"Saved sequence analysis CSV files: {list(csv_files.keys())}")
+        # 4. Enhanced secondary structure propensity analysis
+        secondary_structure_data = []
+        for protein_id, analysis in results.items():
+            if analysis.get('status') == 'error':
+                continue
+            
+            aa_comp = analysis.get('amino_acid_composition', {}).get('individual', {})
+            # Calculate weighted secondary structure propensities
+            total_helix_prop = 0
+            total_sheet_prop = 0  
+            total_turn_prop = 0
+            total_residues = sum(aa_data.get('count', 0) for aa_data in aa_comp.values())
+            
+            for aa_code, aa_data in aa_comp.items():
+                count = aa_data.get('count', 0)
+                if count > 0 and aa_code in self.data_loader.amino_acids:
+                    aa_props = self.data_loader.amino_acids[aa_code]
+                    ss_props = aa_props.get('secondary_structure', {})
+                    weight = count / total_residues
+                    
+                    total_helix_prop += ss_props.get('helix', 0) * weight
+                    total_sheet_prop += ss_props.get('sheet', 0) * weight  
+                    total_turn_prop += ss_props.get('turn', 0) * weight
+            
+            secondary_structure_data.append({
+                'protein_id': protein_id,
+                'helix_propensity': round(total_helix_prop, 3),
+                'sheet_propensity': round(total_sheet_prop, 3),
+                'turn_propensity': round(total_turn_prop, 3),
+                'structural_flexibility': round(total_turn_prop / (total_helix_prop + total_sheet_prop + 0.001), 3)
+            })
+        
+        if secondary_structure_data:
+            ss_df = pd.DataFrame(secondary_structure_data)
+            ss_path = os.path.join(output_dir, f"secondary_structure_propensities_{int(time.time())}.csv")
+            ss_df.to_csv(ss_path, index=False)
+            csv_files['secondary_structure_propensities'] = ss_path
+        
+        # 5. Advanced physicochemical analysis
+        advanced_props_data = []
+        for protein_id, analysis in results.items():
+            if analysis.get('status') == 'error':
+                continue
+            
+            aa_comp = analysis.get('amino_acid_composition', {}).get('individual', {})
+            total_residues = sum(aa_data.get('count', 0) for aa_data in aa_comp.values())
+            
+            # Calculate weighted averages of advanced properties
+            avg_hydrophobicity = 0
+            avg_pka = 0
+            avg_molecular_weight = 0
+            charge_distribution = {'positive': 0, 'negative': 0, 'neutral': 0}
+            
+            for aa_code, aa_data in aa_comp.items():
+                count = aa_data.get('count', 0)
+                if count > 0 and aa_code in self.data_loader.amino_acids:
+                    aa_props = self.data_loader.amino_acids[aa_code]
+                    weight = count / total_residues
+                    
+                    avg_hydrophobicity += aa_props.get('hydrophobicity', 0) * weight
+                    avg_pka += aa_props.get('pka', 0) * weight
+                    avg_molecular_weight += aa_props.get('molecular_weight', 0) * weight
+                    
+                    charge = aa_props.get('charge', 0)
+                    if charge > 0:
+                        charge_distribution['positive'] += weight
+                    elif charge < 0:
+                        charge_distribution['negative'] += weight
+                    else:
+                        charge_distribution['neutral'] += weight
+            
+            advanced_props_data.append({
+                'protein_id': protein_id,
+                'avg_hydrophobicity': round(avg_hydrophobicity, 3),
+                'avg_pka': round(avg_pka, 3),
+                'avg_residue_weight': round(avg_molecular_weight, 3),
+                'positive_charge_fraction': round(charge_distribution['positive'], 3),
+                'negative_charge_fraction': round(charge_distribution['negative'], 3),
+                'neutral_fraction': round(charge_distribution['neutral'], 3),
+                'net_charge_bias': round(charge_distribution['positive'] - charge_distribution['negative'], 3)
+            })
+        
+        if advanced_props_data:
+            adv_df = pd.DataFrame(advanced_props_data)
+            adv_path = os.path.join(output_dir, f"advanced_physicochemical_{int(time.time())}.csv")
+            adv_df.to_csv(adv_path, index=False)
+            csv_files['advanced_physicochemical'] = adv_path
+        
+        # 6. Bioinformatics database links
+        database_links_data = []
+        for protein_id, analysis in results.items():
+            if analysis.get('status') == 'error':
+                continue
+            
+            # Generate links to major bioinformatics databases
+            db_links = analysis.get('bioinformatics_links', {})
+            for db_name, db_info in self.data_loader.bioinformatics_databases.get('databases', {}).items():
+                if db_info.get('search_type') == 'protein_id':
+                    link_url = db_info.get('base_url', '') + protein_id
+                    database_links_data.append({
+                        'protein_id': protein_id,
+                        'database_name': db_info.get('name', db_name),
+                        'database_category': db_info.get('category', 'unknown'),
+                        'search_url': link_url,
+                        'description': db_info.get('description', '')
+                    })
+        
+        if database_links_data:
+            links_df = pd.DataFrame(database_links_data)
+            links_path = os.path.join(output_dir, f"database_links_{int(time.time())}.csv")
+            links_df.to_csv(links_path, index=False)
+            csv_files['database_links'] = links_path
+        
+        return csv_files
 
 
