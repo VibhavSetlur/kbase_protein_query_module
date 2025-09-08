@@ -1,2 +1,38 @@
+# Exclude large local data and non-runtime assets from Docker build context
+
+# VCS
+.git
+.git/**
+
+# Python caches
+**/__pycache__/**
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs and logs
+logs/**
+outputs/**
+backup/**
+
+# Tests and local-only materials
+test/**
+test_local/**
+
+
+# Notebooks and misc
+*.ipynb
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.swp
+
+# Node (if any)
+node_modules/**
+
+# Docker ignores
+.dockerignore
+
 test_local
 sdk.cfg

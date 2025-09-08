@@ -140,10 +140,31 @@ Contact: https://kbase.us/contact-us/
             self.output_dir = None
             return None
             
-    def _create_kbase_report(self, result, output_report, workspace_name, output_dir):
-        """Create a KBase report from pipeline results"""
+    def _create_kbase_report(self, result, output_report, workspace_name, output_dir, file_links=None):
+        """Create a KBase report from pipeline results with optional file links"""
         try:
-            if self.kb_util and hasattr(self.kb_util, 'create_report'):
+            if self.kb_util and hasattr(self.kb_util, 'create_extended_report'):
+                # Create comprehensive report with KBUtilLib
+                report_info = self.kb_util.create_extended_report(
+                    workspace_name=workspace_name,
+                    report_name=output_report or 'protein_analysis_report',
+                    report_object_name=output_report or 'protein_analysis_report',
+                    objects_created=[
+                        {
+                            'ref': result.get('data_ref', ''),
+                            'description': 'Protein analysis pipeline results'
+                        }
+                    ] if result.get('data_ref') else [],
+                    message=f'Comprehensive protein analysis completed successfully',
+                    html_links=[{
+                        'name': 'Analysis Summary',
+                        'url': f'{self.callback_url}/files/{output_dir}/pipeline_summary.html'
+                    }] if output_dir else [],
+                    file_links=file_links if file_links else [],
+                    direct_html='<h2>Protein Analysis Complete</h2><p>Results available in output directory with comprehensive data files and visualizations.</p>'
+                )
+            elif self.kb_util and hasattr(self.kb_util, 'create_report'):
+                # Fallback to basic KBUtilLib report
                 report_info = self.kb_util.create_report(workspace_name, {
                     'message': f'Protein query analysis completed successfully',
                     'objects_created': [],
@@ -154,37 +175,56 @@ Contact: https://kbase.us/contact-us/
                 # Fallback to direct report client usage
                 from installed_clients.KBaseReportClient import KBaseReport
                 report_client = KBaseReport(self.callback_url)
+                
+                # Create comprehensive report data
+                report_data = {
+                    'objects_created': [
+                        {
+                            'ref': result.get('data_ref', ''),
+                            'description': 'Protein analysis pipeline results'
+                        }
+                    ] if result.get('data_ref') else [],
+                    'text_message': f'Comprehensive protein analysis completed successfully. Results include network analysis, sequence characterization, and similarity search data.',
+                    'html_links': [{
+                        'name': 'Analysis Summary',
+                        'url': f'{self.callback_url}/files/{output_dir}/pipeline_summary.html'
+                    }] if output_dir else [],
+                    'file_links': file_links if file_links else []
+                }
+                
                 report_info = report_client.create_extended_report({
-                    'message': f'Protein query analysis completed successfully',
-                    'objects_created': [],
-                    'workspace_name': workspace_name,
-                    'report_object_name': output_report or 'protein_analysis_report'
+                    'report': report_data,
+                    'workspace_name': workspace_name
                 })
+            
             return report_info
         except Exception as e:
             logger.error(f"Failed to create KBase report: {e}")
             return {'name': 'error_report', 'ref': 'error_report_ref'}
             
     def _create_output_data_object(self, result, output_data, workspace_name):
-        """Create output data object in workspace"""
+        """Create output data object in workspace using enhanced KBUtilLib features"""
         try:
-            if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                data_ref = self.kb_util.save_workspace_object(
-                    workspace_name, output_data,
-                    'KBaseProteinQueryModule.ProteinAnalysisResults', result.final_output)
-            else:
-                # Fallback to direct workspace client usage
-                from installed_clients.WorkspaceClient import Workspace
-                workspace_client = Workspace(self.callback_url)
-                result_obj = workspace_client.save_objects({
-                    'id': workspace_name,
-                    'objects': [{
-                        'name': output_data,
-                        'type': 'KBaseProteinQueryModule.ProteinAnalysisResults',
-                        'data': result.final_output
-                    }]
-                })
-                data_ref = result_obj[0][6]  # Get the reference
+            # Use enhanced object saving with metadata
+            metadata = {
+                'description': 'Comprehensive protein analysis pipeline results',
+                'protein_count': result.get('protein_count', 0),
+                'analysis_type': result.get('analysis_type', 'comprehensive'),
+                'pipeline_version': '2.0.0',
+                'stages_completed': result.get('stages_completed', []),
+                'execution_time': result.get('execution_time', 0.0),
+                'created_by': 'kbase_protein_query_module',
+                'creation_date': time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            data_ref = self._save_object_with_metadata(
+                workspace_name=workspace_name,
+                object_name=output_data,
+                object_type='KBaseProteinQueryModule.ProteinAnalysisResults',
+                data=result.final_output,
+                metadata=metadata
+            )
+            
             return data_ref
         except Exception as e:
             logger.error(f"Failed to create output data object: {e}")
@@ -1068,6 +1108,15 @@ Contact: https://kbase.us/contact-us/
             if not workspace_name or workspace_name == 'unknown':
                 workspace_name = 'test_workspace'  # Use default for testing
             
+            # Log pipeline start with enhanced logging
+            self._log_with_kbutillib('INFO', 'Starting protein query analysis pipeline', {
+                'workspace': workspace_name,
+                'analysis_type': analysis_type,
+                'input_type': input_type,
+                'protein_count': len(input_proteins) if input_proteins else 0,
+                'timestamp': start_time
+            })
+            
             # Setup KBase-compliant output directory
             try:
                 output_dir = self._setup_kbase_output_directory(workspace_name)
@@ -1107,6 +1156,14 @@ Contact: https://kbase.us/contact-us/
             
             logger.info(f"Successfully parsed {len(protein_records)} protein records")
             
+            # Log successful parsing with enhanced logging
+            self._log_with_kbutillib('INFO', 'Successfully parsed protein input data', {
+                'workspace': workspace_name,
+                'input_type': input_type,
+                'protein_count': len(protein_records),
+                'parsing_method': 'input_parser'
+            })
+            
             # Create pipeline configuration
             from kbase_protein_query_module.src.core.pipeline_config import PipelineConfig
             config = PipelineConfig(
@@ -1125,6 +1182,19 @@ Contact: https://kbase.us/contact-us/
             # Execute pipeline
             result = workflow.execute(input_data=pipeline_input)
             
+            # Log workflow execution results with enhanced logging
+            self._log_with_kbutillib(
+                'INFO' if result.success else 'WARNING',
+                f'Workflow execution {"completed successfully" if result.success else "failed"}',
+                {
+                    'workspace': workspace_name,
+                    'workflow_success': result.success,
+                    'stages_completed': result.stages_completed,
+                    'execution_time': result.execution_time if hasattr(result, 'execution_time') else 0.0,
+                    'error_message': result.error_message if not result.success else None
+                }
+            )
+            
             test_mode_active = False
             try:
                 import os as _os2
@@ -1136,14 +1206,25 @@ Contact: https://kbase.us/contact-us/
             if not result.success and not test_mode_active:
                 raise RuntimeError(f"Pipeline execution failed: {result.error_message}")
             
-            # Create KBase report
+            # Upload analysis files to KBase file storage first
+            if not test_mode_active:
+                try:
+                    file_links = self._upload_analysis_files(output_dir, workspace_name)
+                except Exception as e:
+                    logger.warning(f"Failed to upload analysis files: {e}")
+                    file_links = []
+            else:
+                file_links = []
+            
+            # Create KBase report with file links
             if test_mode_active:
                 # Skip external report creation in tests
                 report_info = {'name': 'protein_analysis_report', 'ref': 'report_ref'}
             else:
                 try:
+                    # Pass file links to report creation
                     report_info = self._create_kbase_report(
-                        result, output_report, workspace_name, output_dir
+                        result, output_report, workspace_name, output_dir, file_links
                     )
                 except AttributeError:
                     # Fallback if helper method is not available
@@ -1179,8 +1260,30 @@ Contact: https://kbase.us/contact-us/
                 'stages_completed': result.stages_completed
             }
             
+            # Log successful pipeline completion with enhanced logging
+            self._log_with_kbutillib('INFO', 'Protein query analysis pipeline completed successfully', {
+                'workspace': workspace_name,
+                'protein_count': len(protein_records),
+                'execution_time': execution_time,
+                'stages_completed': result.stages_completed,
+                'report_ref': report_info['ref'],
+                'output_directory': output_dir
+            })
+            
         except Exception as e:
             logger.error(f"Protein query analysis failed: {e}")
+            
+            # Log error with enhanced context
+            self._log_with_kbutillib('ERROR', 'Protein query analysis pipeline failed', {
+                'error': str(e),
+                'workspace': workspace_name,
+                'input_type': input_type,
+                'protein_count': len(params.get('input_proteins', [])),
+                'execution_time': time.time() - start_time,
+                'timestamp': start_time,
+                'traceback': str(e.__traceback__) if hasattr(e, '__traceback__') else None
+            })
+            
             output = {
                 'report_name': 'error_report',
                 'report_ref': '',
@@ -1232,6 +1335,324 @@ Contact: https://kbase.us/contact-us/
                              'output is not type dict as required.')
         # return the results
         return [output]
+
+    def _log_with_kbutillib(self, level, message, context=None):
+        """Enhanced logging using KBUtilLib if available"""
+        try:
+            if self.kb_util and hasattr(self.kb_util, 'log_message'):
+                self.kb_util.log_message(
+                    level=level,
+                    message=message,
+                    context=context or {}
+                )
+            else:
+                # Fallback to standard logging
+                if level == 'ERROR':
+                    logger.error(f"{message} - Context: {context}")
+                elif level == 'WARNING':
+                    logger.warning(f"{message} - Context: {context}")
+                else:
+                    logger.info(f"{message} - Context: {context}")
+        except Exception as e:
+            # Fallback to standard logging if KBUtilLib logging fails
+            logger.info(f"{message} - Context: {context} - KBUtilLib logging failed: {e}")
+
+    def _save_object_with_metadata(self, workspace_name, object_name, object_type, data, metadata=None):
+        """Save workspace object with enhanced metadata using KBUtilLib"""
+        try:
+            if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
+                # Use KBUtilLib's enhanced object saving with metadata
+                data_ref = self.kb_util.save_workspace_object(
+                    workspace_name=workspace_name,
+                    object_name=object_name,
+                    object_type=object_type,
+                    data=data,
+                    metadata=metadata or {}
+                )
+                
+                # Log successful object creation
+                self._log_with_kbutillib('INFO', f'Successfully saved workspace object: {object_name}', {
+                    'workspace': workspace_name,
+                    'object_name': object_name,
+                    'object_type': object_type,
+                    'metadata_keys': list(metadata.keys()) if metadata else []
+                })
+                
+                return data_ref
+            else:
+                # Fallback to direct workspace client usage
+                workspace_client = self.kb_util.get_workspace_client() if self.kb_util else None
+                if workspace_client:
+                    result_obj = workspace_client.save_objects({
+                        'id': workspace_name,
+                        'objects': [{
+                            'name': object_name,
+                            'type': object_type,
+                            'data': data,
+                            'meta': metadata or {}
+                        }]
+                    })
+                    data_ref = result_obj[0][6]  # Get the reference
+                    return data_ref
+                else:
+                    # Final fallback
+                    from installed_clients.WorkspaceClient import Workspace
+                    workspace_client = Workspace(self.callback_url)
+                    result_obj = workspace_client.save_objects({
+                        'id': workspace_name,
+                        'objects': [{
+                            'name': object_name,
+                            'type': object_type,
+                            'data': data,
+                            'meta': metadata or {}
+                        }]
+                    })
+                    data_ref = result_obj[0][6]  # Get the reference
+                    return data_ref
+        except Exception as e:
+            # Log error with enhanced context
+            self._log_with_kbutillib('ERROR', 'Failed to save workspace object', {
+                'error': str(e),
+                'workspace': workspace_name,
+                'object_name': object_name,
+                'object_type': object_type
+            })
+            return None
+
+    def _upload_analysis_files(self, output_dir, workspace_name):
+        """Upload analysis files to KBase file storage using KBUtilLib"""
+        try:
+            if not self.kb_util or not hasattr(self.kb_util, 'upload_file'):
+                return []
+            
+            file_links = []
+            
+            # Upload network analysis files
+            network_dir = os.path.join(output_dir, 'raw_data', 'network')
+            if os.path.exists(network_dir):
+                for file_name in os.listdir(network_dir):
+                    if file_name.endswith(('.csv', '.html', '.json')):
+                        file_path = os.path.join(network_dir, file_name)
+                        try:
+                            file_ref = self.kb_util.upload_file(
+                                file_path=file_path,
+                                description=f'Network analysis data: {file_name}'
+                            )
+                            file_links.append({
+                                'name': f'Network {file_name}',
+                                'ref': file_ref,
+                                'type': 'network_data'
+                            })
+                        except Exception as e:
+                            logger.warning(f"Failed to upload network file {file_name}: {e}")
+            
+            # Upload sequence analysis files
+            sequence_dir = os.path.join(output_dir, 'raw_data', 'sequence')
+            if os.path.exists(sequence_dir):
+                for file_name in os.listdir(sequence_dir):
+                    if file_name.endswith(('.tsv', '.csv', '.json')):
+                        file_path = os.path.join(sequence_dir, file_name)
+                        try:
+                            file_ref = self.kb_util.upload_file(
+                                file_path=file_path,
+                                description=f'Sequence analysis data: {file_name}'
+                            )
+                            file_links.append({
+                                'name': f'Sequence {file_name}',
+                                'ref': file_ref,
+                                'type': 'sequence_data'
+                            })
+                        except Exception as e:
+                            logger.warning(f"Failed to upload sequence file {file_name}: {e}")
+            
+            # Upload visualization files
+            viz_dir = os.path.join(output_dir, 'visualizations', 'network')
+            if os.path.exists(viz_dir):
+                for file_name in os.listdir(viz_dir):
+                    if file_name.endswith('.html'):
+                        file_path = os.path.join(viz_dir, file_name)
+                        try:
+                            file_ref = self.kb_util.upload_file(
+                                file_path=file_path,
+                                description=f'Interactive network visualization: {file_name}'
+                            )
+                            file_links.append({
+                                'name': f'Visualization {file_name}',
+                                'ref': file_ref,
+                                'type': 'visualization'
+                            })
+                        except Exception as e:
+                            logger.warning(f"Failed to upload visualization file {file_name}: {e}")
+            
+            # Log successful file uploads
+            if file_links:
+                self._log_with_kbutillib('INFO', f'Successfully uploaded {len(file_links)} analysis files', {
+                    'workspace': workspace_name,
+                    'file_count': len(file_links),
+                    'file_types': list(set(link['type'] for link in file_links))
+                })
+            
+            return file_links
+            
+        except Exception as e:
+            logger.error(f"Failed to upload analysis files: {e}")
+            return []
+
+    def _get_workspace_info(self, workspace_name):
+        """Get comprehensive workspace information using KBUtilLib"""
+        try:
+            if self.kb_util and hasattr(self.kb_util, 'get_workspace_info'):
+                return self.kb_util.get_workspace_info(workspace_name)
+            else:
+                # Fallback to direct workspace client
+                workspace_client = self.kb_util.get_workspace_client() if self.kb_util else None
+                if workspace_client:
+                    return workspace_client.get_workspace_info({'id': workspace_name})
+                return None
+        except Exception as e:
+            logger.warning(f"Could not get workspace info: {e}")
+            return None
+
+    def _validate_workspace_objects(self, workspace_name, object_names, expected_types):
+        """Validate workspace objects using KBUtilLib"""
+        try:
+            if self.kb_util and hasattr(self.kb_util, 'validate_workspace_objects'):
+                return self.kb_util.validate_workspace_objects(
+                    workspace_name=workspace_name,
+                    object_names=object_names,
+                    expected_types=expected_types
+                )
+            else:
+                # Fallback validation
+                workspace_client = self.kb_util.get_workspace_client() if self.kb_util else None
+                if workspace_client:
+                    objects_info = workspace_client.get_object_info3({
+                        'objects': [{'ref': f'{workspace_name}/{name}' for name in object_names}]
+                    })
+                    validated = []
+                    for obj_info in objects_info['infos']:
+                        obj_type = obj_info[2]
+                        if any(expected_type in obj_type for expected_type in expected_types):
+                            validated.append({
+                                'name': obj_info[1],
+                                'type': obj_type,
+                                'valid': True
+                            })
+                        else:
+                            validated.append({
+                                'name': obj_info[1],
+                                'type': obj_type,
+                                'valid': False,
+                                'error': f'Expected one of {expected_types}, got {obj_type}'
+                            })
+                    return validated
+                return []
+        except Exception as e:
+            logger.warning(f"Could not validate workspace objects: {e}")
+            return []
+
+    def _batch_save_analysis_objects(self, workspace_name, analysis_results):
+        """Batch save multiple analysis objects using KBUtilLib"""
+        try:
+            if self.kb_util and hasattr(self.kb_util, 'batch_save_workspace_objects'):
+                # Use KBUtilLib's batch save functionality
+                batch_results = self.kb_util.batch_save_workspace_objects(
+                    workspace_name=workspace_name,
+                    objects=analysis_results
+                )
+                
+                # Log successful batch save
+                if hasattr(self.kb_util, 'log_message'):
+                    self.kb_util.log_message(
+                        level='INFO',
+                        message=f'Successfully batch saved {len(analysis_results)} analysis objects',
+                        context={
+                            'workspace': workspace_name,
+                            'object_count': len(analysis_results),
+                            'object_types': list(set(obj['type'] for obj in analysis_results))
+                        }
+                    )
+                
+                return batch_results
+            else:
+                # Fallback to individual saves
+                saved_refs = []
+                workspace_client = self.kb_util.get_workspace_client() if self.kb_util else None
+                if workspace_client:
+                    for obj_data in analysis_results:
+                        try:
+                            result_obj = workspace_client.save_objects({
+                                'id': workspace_name,
+                                'objects': [{
+                                    'name': obj_data['name'],
+                                    'type': obj_data['type'],
+                                    'data': obj_data['data'],
+                                    'meta': obj_data.get('metadata', {})
+                                }]
+                            })
+                            saved_refs.append({
+                                'name': obj_data['name'],
+                                'ref': result_obj[0][6],
+                                'type': obj_data['type']
+                            })
+                        except Exception as e:
+                            logger.warning(f"Failed to save object {obj_data['name']}: {e}")
+                            saved_refs.append({
+                                'name': obj_data['name'],
+                                'ref': None,
+                                'type': obj_data['type'],
+                                'error': str(e)
+                            })
+                return saved_refs
+        except Exception as e:
+            logger.error(f"Failed to batch save analysis objects: {e}")
+            return []
+
+    def _create_enhanced_report(self, workspace_name, report_name, analysis_summary, file_links, data_objects):
+        """Create an enhanced report with comprehensive KBUtilLib features"""
+        try:
+            if self.kb_util and hasattr(self.kb_util, 'create_extended_report'):
+                # Create comprehensive report with all available data
+                report_info = self.kb_util.create_extended_report(
+                    workspace_name=workspace_name,
+                    report_name=report_name,
+                    report_object_name=report_name,
+                    objects_created=data_objects,
+                    message=analysis_summary.get('message', 'Analysis completed successfully'),
+                    html_links=analysis_summary.get('html_links', []),
+                    file_links=file_links,
+                    direct_html=analysis_summary.get('direct_html', ''),
+                    metadata={
+                        'analysis_type': analysis_summary.get('analysis_type', 'protein_analysis'),
+                        'pipeline_version': '2.0.0',
+                        'created_by': 'kbase_protein_query_module',
+                        'creation_timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                )
+                
+                # Log report creation
+                if hasattr(self.kb_util, 'log_message'):
+                    self.kb_util.log_message(
+                        level='INFO',
+                        message=f'Enhanced report created successfully: {report_name}',
+                        context={
+                            'workspace': workspace_name,
+                            'report_name': report_name,
+                            'file_count': len(file_links),
+                            'object_count': len(data_objects)
+                        }
+                    )
+                
+                return report_info
+            else:
+                # Fallback to basic report creation
+                return self._create_kbase_report(
+                    {'data_ref': None}, report_name, workspace_name, '', file_links
+                )
+        except Exception as e:
+            logger.error(f"Failed to create enhanced report: {e}")
+            return {'name': 'error_report', 'ref': 'error_report_ref'}
+
     def status(self, ctx):
         #BEGIN_STATUS
         returnVal = {'state': "OK",

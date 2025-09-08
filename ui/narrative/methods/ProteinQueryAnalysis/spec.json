@@ -11,7 +11,7 @@
   "contact": "help@kbase.us",
   "widgets": {
     "input": null,
-    "output": null
+    "output": "no-display"
   },
   "parameters": [
     {
@@ -19,15 +19,14 @@
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": ["uniprot"],
+      "default_values": ["uniprot_identifiers"],
       "field_type": "dropdown",
       "dropdown_options": {
         "options": [
-          {"value": "uniprot", "display": "UniProt Identifiers"},
-          {"value": "fasta", "display": "FASTA File"},
+          {"value": "uniprot_identifiers", "display": "UniProt Identifiers"},
+          {"value": "fasta_file", "display": "FASTA File"},
           {"value": "workspace_object", "display": "Workspace Object"},
-          {"value": "direct_sequence", "display": "Direct Protein Sequence"},
-          {"value": "mixed", "display": "Mixed Input Types"}
+          {"value": "sequence_strings", "display": "Direct Protein Sequences"}
         ]
       },
       "ui_name": "Input Type",
@@ -297,11 +296,25 @@
       "short_hint": "Name for the output data object",
       "description": "Name for the output data object containing processed protein data and analysis results.",
       "allowed_types": ["string"]
+    },
+    {
+      "id": "input_data",
+      "optional": true,
+      "advanced": true,
+      "allow_multiple": false,
+      "default_values": [],
+      "field_type": "text",
+      "text_options": {
+        "is_output_name": false
+      },
+      "ui_name": "Generic Input Data",
+      "short_hint": "Optional generic input payload (advanced)",
+      "description": "Optional generic input payload used by the backend to accept flexible inputs. Leave blank unless directed.",
+      "allowed_types": ["string"]
     }
   ],
   "behavior": {
     "service-mapping": {
-      "url": "",
       "name": "kbase_protein_query_module",
       "method": "run_protein_query_analysis",
       "input_mapping": [
@@ -310,8 +323,28 @@
           "target_property": "workspace_name"
         },
         {
+          "input_parameter": "input_type",
+          "target_property": "input_type"
+        },
+        {
           "input_parameter": "input_proteins",
           "target_property": "input_proteins"
+        },
+        {
+          "input_parameter": "uniprot_ids",
+          "target_property": "uniprot_ids"
+        },
+        {
+          "input_parameter": "fasta_file",
+          "target_property": "fasta_file"
+        },
+        {
+          "input_parameter": "workspace_object",
+          "target_property": "workspace_object"
+        },
+        {
+          "input_parameter": "direct_sequences",
+          "target_property": "direct_sequences"
         },
         {
           "input_parameter": "analysis_type",
@@ -343,44 +376,35 @@
         },
         {
           "input_parameter": "output_report",
-          "target_property": "output_report_name"
+          "target_property": "output_report"
         },
         {
           "input_parameter": "output_data",
-          "target_property": "output_data_name"
+          "target_property": "output_data"
+        },
+        {
+          "input_parameter": "input_data",
+          "target_property": "input_data"
         }
       ],
       "output_mapping": [
         {
-          "service_method_output_path": [0,"report_name"],
+          "service_method_output_path": [0, "report_name"],
           "target_property": "report_name"
         },
         {
-          "service_method_output_path": [0,"report_ref"],
+          "service_method_output_path": [0, "report_ref"],
           "target_property": "report_ref"
         },
         {
-          "service_method_output_path": [0,"analysis_result_ref"],
+          "service_method_output_path": [0, "analysis_result_ref"],
           "target_property": "analysis_result_ref"
         },
         {
-          "service_method_output_path": [0,"output_directory"],
-          "target_property": "output_directory"
-        },
-        {
-          "service_method_output_path": [0,"html_report_files"],
-          "target_property": "html_report_files"
-        },
-        {
-          "service_method_output_path": [0,"exported_files"],
-          "target_property": "exported_files"
-        },
-        {
-          "service_method_output_path": [0,"stages_completed"],
-          "target_property": "stages_completed"
+          "narrative_system_variable": "workspace",
+          "target_property": "workspace_name"
         }
       ]
     }
-  },
-  "job_id_output_field": "docker"
+  }
 }

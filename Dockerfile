@@ -6,7 +6,7 @@ MAINTAINER KBase Developer
 # -----------------------------------------
 
 # Install required system dependencies for scientific computing
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gfortran \
     libopenblas-dev \
@@ -23,9 +23,9 @@ RUN chmod -R a+rw /kb/module
 
 WORKDIR /kb/module
 
-# Install Python dependencies
-RUN pip install --upgrade pip setuptools wheel
-RUN pip install -r requirements.txt
+# Install Python dependencies (no cache to keep layers small)
+RUN pip install --upgrade --no-cache-dir pip setuptools wheel \
+ && pip install --no-cache-dir -r requirements.txt
 
 RUN make all
 
