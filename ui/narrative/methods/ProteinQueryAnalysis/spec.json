@@ -259,7 +259,7 @@
     "service-mapping": {
       "name": "kbase_protein_query_module",
       "method": "run_protein_query_analysis",
-      "url": "https://appdev.kbase.us/services/kbase_protein_query_module",
+      "url": "",
       "input_mapping": [
         {
           "narrative_system_variable": "workspace",
