@@ -85,39 +85,19 @@ parameters:
             Stop the pipeline execution after the specified stage (for debugging or partial analysis).
             Stages: Input Validation → Data Extraction → Embedding Generation → Family Assignment → Similarity Search → Sequence Analysis → Network Analysis → Bioinformatics Analysis → Report Generation → Visualization → Data Export
 
-    similarity_threshold:
-        ui-name: Similarity Threshold
-        short-hint: Minimum similarity score for protein matches
+    input_data:
+        ui-name: Generic Input Data
+        short-hint: Optional generic input payload (advanced)
         description: |
-            Minimum similarity score (0.0-1.0) required for proteins to be considered similar.
-            Higher values create more sparse networks with stronger connections.
+            Optional generic input payload used by the backend to accept flexible inputs. 
+            Leave blank unless directed.
 
-    max_similar_proteins:
-        ui-name: Max Similar Proteins
-        short-hint: Maximum number of similar proteins to return
+    output_directory:
+        ui-name: Output Directory Name
+        short-hint: Name for the output directory in the Narrative
         description: |
-            Maximum number of similar proteins to return for each query protein.
-            Higher values provide more comprehensive similarity analysis but may increase processing time.
-
-    embedding_model:
-        ui-name: Embedding Model
-        short-hint: Protein language model for embedding generation
-        description: |
-            Select the protein language model to use for generating protein embeddings:
-            - ESM-2 (6B parameters): Fastest, good for most applications
-            - ESM-2 (12B parameters): Balanced performance and accuracy
-            - ESM-2 (30B parameters): Highest accuracy, slower processing
-
-    output_format:
-        ui-name: Output Format
-        short-hint: Format for output files
-        description: |
-            Select the format for output files:
-            - All Formats (Recommended): Comprehensive output including raw data, visualizations, and metadata
-            - Raw Data Only: CSV/TSV files for downstream analysis
-            - Visualizations Only: Interactive HTML plots
-            - JSON Data: Structured data format with complete pipeline results
-            - CSV Data: Top proteins with metadata and input correlations
+            Name for the output directory that will contain all generated files (CSV, HTML reports, visualizations).
+            This directory will be available for download in the KBase Narrative.
 
     output_report:
         ui-name: Output Report Name
@@ -137,13 +117,13 @@ description: |
     
     <p><b>Key Features:</b></p>
     <ul>
-        <li><b>Multi-Input Type Support:</b> UniProt IDs (auto-fetched), FASTA files, workspace objects (Genome, FeatureSet, GenomeSet, ProteinSequenceSet), direct protein sequences, and mixed input types</li>
-        <li><b>Automatic Input Detection:</b> Smart detection of input type with validation and standardization</li>
+        <li><b>Multi-Input Type Support:</b> UniProt IDs (auto-fetched), FASTA files, workspace objects (Genome, FeatureSet, GenomeSet, ProteinSequenceSet), direct protein sequences</li>
+        <li><b>Local ESM Model:</b> Uses optimized local ESM-2 model for consistent, fast embedding generation</li>
         <li><b>Modular Pipeline Architecture:</b> Choose which analysis stages to run with configurable dependencies</li>
         <li><b>Multi-Protein Support:</b> Process single proteins, multiple proteins, or entire genomes with unified workflow</li>
-        <li><b>Enhanced Sequence Analysis:</b> 6 comprehensive CSV outputs including secondary structure propensities, advanced physicochemical properties, and bioinformatics database links</li>
+        <li><b>Enhanced Sequence Analysis:</b> Comprehensive CSV outputs including secondary structure propensities, advanced physicochemical properties, and bioinformatics database links</li>
         <li><b>Interactive Network Visualization:</b> Multi-protein networks with distinct colors and comprehensive CSV data</li>
-        <li><b>Raw Data Outputs:</b> CSV/TSV files, HDF5 embeddings, and standalone HTML visualizations ready for downstream analysis</li>
+        <li><b>Organized Output Directory:</b> All results organized in a single downloadable directory with CSV/TSV files, HTML reports, and network visualizations</li>
         <li><b>KBase Integration:</b> Proper workspace object handling, KBase-compliant output directories, and comprehensive reporting</li>
         <li><b>Real-time Monitoring:</b> Performance tracking and error handling throughout the pipeline</li>
         <li><b>Future-Ready:</b> Extensible architecture for additional analysis types (MSA trees, structural analysis, etc.)</li>
@@ -151,9 +131,9 @@ description: |
     
     <p><b>What Researchers Get:</b></p>
     <ul>
-        <li><b>Raw Data Files:</b> Load CSV/TSV directly into R, Python, Excel for statistical analysis</li>
+        <li><b>Organized Output Directory:</b> All results in one downloadable directory with CSV/TSV files, HTML reports, and network visualizations</li>
         <li><b>Interactive Visualizations:</b> Explore protein networks in any browser with zoom, pan, and hover details</li>
-        <li><b>HDF5 Embeddings:</b> Ready for machine learning workflows with original sequences</li>
+        <li><b>Raw Data Files:</b> Load CSV/TSV directly into R, Python, Excel for statistical analysis</li>
         <li><b>Comprehensive Metadata:</b> Reproducible research with complete pipeline information</li>
         <li><b>Multi-Protein Support:</b> Comparative studies with all proteins on single network visualizations</li>
         <li><b>KBase Integration:</b> Seamless workflow within KBase Narrative environment</li>
