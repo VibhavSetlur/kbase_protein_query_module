@@ -8,6 +8,7 @@ ProteinQueryAnalysis app.
 module kbase_protein_query_module {
     
     typedef structure {
+        string job_id;
         string report_name;
         string report_ref;
         string analysis_result_ref;

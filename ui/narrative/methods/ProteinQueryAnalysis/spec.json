@@ -254,6 +254,7 @@
       "allowed_types": ["string"]
     }
   ],
+  "job_id_output_field": "docker",
   "behavior": {
     "service-mapping": {
       "name": "kbase_protein_query_module",
@@ -328,6 +329,10 @@
         {
           "service_method_output_path": [0, "analysis_result_ref"],
           "target_property": "analysis_result_ref"
+        },
+        {
+          "service_method_output_path": [0, "job_id"],
+          "target_property": "job_id"
         },
         {
           "narrative_system_variable": "workspace",
