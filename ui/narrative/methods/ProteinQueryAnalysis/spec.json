@@ -192,77 +192,18 @@
       "allowed_types": ["string"]
     },
     {
-      "id": "similarity_threshold",
+      "id": "output_directory",
       "optional": true,
-      "advanced": true,
+      "advanced": false,
       "allow_multiple": false,
-      "default_values": [0.8],
-      "field_type": "float",
+      "default_values": [],
+      "field_type": "text",
       "text_options": {
-        "min_float": 0.0,
-        "max_float": 1.0,
-        "validate_as": "float"
+        "is_output_name": false
       },
-      "ui_name": "Similarity Threshold",
-      "short_hint": "Minimum similarity score for protein matches",
-      "description": "Minimum similarity score (0.0-1.0) required for proteins to be considered similar. Higher values result in more stringent similarity requirements.",
-      "allowed_types": ["float"]
-    },
-    {
-      "id": "max_similar_proteins",
-      "optional": true,
-      "advanced": true,
-      "allow_multiple": false,
-      "default_values": [100],
-      "field_type": "int",
-      "text_options": {
-        "min_int": 1,
-        "max_int": 1000,
-        "validate_as": "int"
-      },
-      "ui_name": "Max Similar Proteins",
-      "short_hint": "Maximum number of similar proteins to return",
-      "description": "Maximum number of similar proteins to return for each query protein. Higher values provide more comprehensive similarity analysis but may increase processing time.",
-      "allowed_types": ["int"]
-    },
-    {
-      "id": "embedding_model",
-      "optional": true,
-      "advanced": true,
-      "allow_multiple": false,
-      "default_values": ["esm2_t6_8M_UR50D"],
-      "field_type": "dropdown",
-      "dropdown_options": {
-        "options": [
-          {"value": "esm2_t6_8M_UR50D", "display": "ESM-2 (6B parameters)"},
-          {"value": "esm2_t12_35M_UR50D", "display": "ESM-2 (12B parameters)"},
-          {"value": "esm2_t30_150M_UR50D", "display": "ESM-2 (30B parameters)"}
-        ]
-      },
-      "ui_name": "Embedding Model",
-      "short_hint": "Protein language model for embedding generation",
-      "description": "Select the protein language model to use for generating protein embeddings. Larger models may provide better embeddings but require more computational resources.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "output_format",
-      "optional": true,
-      "advanced": true,
-      "allow_multiple": false,
-      "default_values": ["all"],
-      "field_type": "dropdown",
-      "dropdown_options": {
-        "options": [
-          {"value": "all", "display": "All Formats (Recommended)"},
-          {"value": "raw_data", "display": "Raw Data Only"},
-          {"value": "visualizations", "display": "Visualizations Only"},
-          {"value": "json", "display": "JSON Data"},
-          {"value": "csv", "display": "CSV Data"}
-        ]
-      },
-      "ui_name": "Output Format",
-      "short_hint": "Format for output files",
-      "description": "Select the format for output files. All Formats provides comprehensive output including raw data, visualizations, and metadata. Raw Data provides CSV/TSV files for downstream analysis. Visualizations provides interactive HTML plots.",
+      "ui_name": "Output Directory",
+      "short_hint": "Directory name to organize exported files (created under workspace staging)",
+      "description": "Optional: Where to organize exported outputs (CSV/TSV, HTML, network files). If not set, a timestamped directory is created.",
       "allowed_types": ["string"]
     },
     {
@@ -359,20 +300,8 @@
           "target_property": "stop_after_stage"
         },
         {
-          "input_parameter": "similarity_threshold",
-          "target_property": "similarity_threshold"
-        },
-        {
-          "input_parameter": "max_similar_proteins",
-          "target_property": "max_similar_proteins"
-        },
-        {
-          "input_parameter": "embedding_model",
-          "target_property": "embedding_model"
-        },
-        {
-          "input_parameter": "output_format",
-          "target_property": "output_format"
+          "input_parameter": "output_directory",
+          "target_property": "output_directory"
         },
         {
           "input_parameter": "output_report",
