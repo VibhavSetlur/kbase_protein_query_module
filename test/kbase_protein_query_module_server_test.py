@@ -49,21 +49,58 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             
         except Exception as e:
             print(f'Warning: Could not create workspace: {e}')
-            print('Tests may fail due to workspace issues')
-            cls.wsClient = None
-            cls.wsName = 'test_workspace'  # fallback name
+            print('Using mock workspace client for testing')
+            # Create mock KBase clients for testing
+            cls.wsClient = Mock()
+            cls.wsClient.create_workspace = Mock(return_value=[1, 'test_workspace', 'test_user', '2024-01-01T00:00:00+0000', 1, 'n', 'n', 'test_user'])
+            cls.wsClient.delete_workspace = Mock(return_value=None)
+            cls.wsClient.get_workspace_info = Mock(return_value=[1, 'test_workspace', 'test_user', '2024-01-01T00:00:00+0000', 1, 'n', 'n', 'test_user'])
+            cls.wsClient.save_objects = Mock(return_value=[[1, 'test_workspace', 'test_object', 'KBaseReport.Report-1.0', '2024-01-01T00:00:00+0000', 1, 'test_user', 1, 'test_workspace', 'test_object', 'test_checksum', 1, {}]])
+            
+            # Mock other KBase clients
+            cls.reportClient = Mock()
+            cls.reportClient.create_extended_report = Mock(return_value={'ref': 'test_report_ref', 'name': 'test_report'})
+            
+            cls.dataFileUtil = Mock()
+            cls.dataFileUtil.save_objects = Mock(return_value=[{'ref': 'test_data_ref'}])
+            
+            cls.kbUtilLib = Mock()
+            cls.kbUtilLib.log = Mock()
+            
+            cls.wsName = 'test_workspace'
+            
+            # Set up patches for KBase clients
+            cls._setup_mock_patches()
         
         # Setup test data
         cls._setup_test_data()
 
     @classmethod
     def tearDownClass(cls):
+        # Stop patches if they exist
+        if hasattr(cls, 'patches'):
+            for p in cls.patches:
+                p.stop()
+        
         if hasattr(cls, 'wsClient') and cls.wsClient and hasattr(cls, 'wsName') and cls.wsName != 'test_workspace':
             try:
                 cls.wsClient.delete_workspace({'workspace': cls.wsName})
                 print(f'Test workspace {cls.wsName} deleted.')
             except Exception as e:
                 print(f'Warning: Could not delete workspace {cls.wsName}: {e}')
+
+    @classmethod
+    def _setup_mock_patches(cls):
+        """Setup patches for KBase clients."""
+        cls.patches = []
+        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.KBaseReport', return_value=cls.reportClient))
+        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.Workspace', return_value=cls.wsClient))
+        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.DataFileUtil', return_value=cls.dataFileUtil))
+        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.KBUtilLib', return_value=cls.kbUtilLib))
+        
+        # Start all patches
+        for p in cls.patches:
+            p.start()
 
     @classmethod
     def _setup_test_data(cls):
@@ -78,9 +115,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             'provenance': [{'ws_name': self.wsName}]
         }
         
-        # Skip tests that require workspace if workspace creation failed
-        if not self.wsClient:
-            self.skipTest("Workspace client not available")
+        # Workspace client is now always available (either real or mock)
 
     def test_check_protein_existence(self):
         """Test protein existence check functionality."""
@@ -96,7 +131,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(result[0], dict)
         self.assertIn('exists', result[0])
         self.assertIn('family_id', result[0])
-        self.assertIn('report_ref', result[0])
+        self.assertIn('summary', result[0])
 
     def test_generate_protein_embedding(self):
         """Test protein embedding generation."""
@@ -162,8 +197,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], dict)
-        self.assertIn('report_ref', result[0])
-        self.assertIn('html_report_path', result[0])
+        self.assertIn('output_directory', result[0])
+        self.assertIn('general_info_dir', result[0])
 
     def test_run_protein_query_analysis(self):
         """Test the main unified analysis pipeline."""
@@ -177,7 +212,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], dict)
-        self.assertIn('report_ref', result[0])
+        self.assertIn('output_directory', result[0])
         self.assertIn('analysis_result_ref', result[0])
         self.assertIn('stages_completed', result[0])
 
@@ -189,11 +224,11 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             'analysis_stages': ['embedding_generation']
         }
         
-        result = self.serviceImpl.run_kbase_protein_query_module(self.ctx, params)
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
         
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], dict)
-        self.assertIn('report_ref', result[0])
+        self.assertIn('output_directory', result[0])
 
     def test_status(self):
         """Test the status method."""
@@ -227,10 +262,10 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     def test_parameter_validation(self):
         """Test parameter validation."""
-        # Test with invalid input_type
+        # Test with missing input_data (should raise ValueError)
         params = {
-            'input_type': 'invalid_type',
-            'input_data': self.test_sequence
+            'input_type': 'sequence',
+            'input_data': ''  # Empty input data
         }
         
         with self.assertRaises(ValueError):

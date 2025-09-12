@@ -1,0 +1,81 @@
+{
+  "metadata": {
+    "run_id": "7f808a5e-62a7-4335-9ad7-8b23872ec7d6",
+    "pipeline_version": "1.0.0",
+    "timestamp": "2025-09-12 05:50:50",
+    "total_execution_time_seconds": 0.00083160400390625,
+    "success": false,
+    "stages_completed": [],
+    "stages_failed": [
+      "input_validation",
+      "data_extraction",
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "multi_protein_analysis",
+      "network_analysis",
+      "report_generation"
+    ],
+    "error_message": "Input validation failed"
+  },
+  "input_configuration": {
+    "analysis_stages": [
+      "input_validation",
+      "data_extraction",
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "multi_protein_analysis",
+      "network_analysis",
+      "report_generation"
+    ],
+    "input_proteins": [
+      {
+        "protein_id": "protein_1",
+        "sequence": "MKVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ"
+      },
+      {
+        "protein_id": "protein_2",
+        "sequence": "MATLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ"
+      },
+      {
+        "protein_id": "protein_3",
+        "sequence": "MRVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ"
+      }
+    ],
+    "input_file_path": null,
+    "workspace_object_ref": null,
+    "output_dir": "test/outputs",
+    "performance_mode": "standard"
+  },
+  "stage_results": {
+    "input_validation": {
+      "success": false,
+      "execution_time": 0.0002887248992919922,
+      "error_message": "Input validation failed"
+    }
+  },
+  "output_files": {
+    "csv_files": {},
+    "visualization_files": {},
+    "data_files": {}
+  },
+  "performance_metrics": {
+    "input_validation": {
+      "execution_time": 0.00030875205993652344,
+      "success": false,
+      "output_size": 2
+    }
+  },
+  "protein_statistics": {},
+  "analysis_summary": {
+    "pipeline_success": false,
+    "total_stages_run": 0,
+    "total_files_generated": 0,
+    "visualization_files_count": 0,
+    "csv_files_count": 0,
+    "data_files_count": 0
+  }
+}

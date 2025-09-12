@@ -137,7 +137,7 @@ class ProteinEmbeddingGenerator:
             # Handle HeaderTooLarge error by trying different loading strategies
             model_loaded = False
             
-            # Load local model only - no fallbacks
+            # Try to load local model first, fallback to online model
             try:
                 logger.info("Loading local ESM model...")
                 # Use AutoModel to load the local model
@@ -149,8 +149,20 @@ class ProteinEmbeddingGenerator:
                 model_loaded = True
                 logger.info("Local model loaded successfully")
             except Exception as e:
-                logger.error(f"Failed to load local model: {e}")
-                raise RuntimeError(f"Could not load local model from {model_path}: {e}")
+                logger.warning(f"Failed to load local model: {e}")
+                logger.info("Falling back to online model...")
+                try:
+                    # Fallback to online model with correct name
+                    model_name = f"facebook/{self.model_name}" if not self.model_name.startswith("facebook/") else self.model_name
+                    self.model = AutoModel.from_pretrained(
+                        model_name,
+                        torch_dtype=model_dtype
+                    )
+                    model_loaded = True
+                    logger.info("Online model loaded successfully")
+                except Exception as e2:
+                    logger.error(f"Failed to load online model: {e2}")
+                    raise RuntimeError(f"Could not load model {self.model_name}: {e2}")
 
             if not model_loaded or self.model is None:
                 raise RuntimeError("Model loading failed - model is None")

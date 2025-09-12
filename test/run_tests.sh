@@ -7,4 +7,9 @@ rm -rf /kb/module/work/tmp/*
 echo "...done removing temp files."
 export PYTHONPATH=$script_dir/../lib:$PATH:$PYTHONPATH
 cd $script_dir/../test
+echo "Current directory: $(pwd)"
+echo "Python path: $PYTHONPATH"
+echo "Test files found:"
+find . -name "test_*.py" | head -10
+echo "Running pytest..."
 python -m pytest --tb=short --cov=kbase_protein_query_module --cov-report=html:/kb/module/work/test_coverage --cov-report=term-missing -v .

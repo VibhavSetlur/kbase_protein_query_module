@@ -99,12 +99,12 @@ parameters:
             Name for the output directory that will contain all generated files (CSV, HTML reports, visualizations).
             This directory will be available for download in the KBase Narrative.
 
-    output_report:
-        ui-name: Output Report Name
-        short-hint: Name for the output report object
+    output_analysis_name:
+        ui-name: Output Analysis Name
+        short-hint: Name for the output analysis object
         description: |
-            Name for the output report object in the workspace. This report will contain links to all 
-            generated data files and visualizations.
+            Name for the output analysis object in the workspace. This will contain references to all 
+            generated data files and analysis results.
 
     output_data:
         ui-name: Output Data Object Name

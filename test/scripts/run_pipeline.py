@@ -28,7 +28,9 @@ import numpy as np
 import pandas as pd
 
 # Add the lib directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+lib_dir = os.path.join(script_dir, '..', '..', 'lib')
+sys.path.insert(0, os.path.abspath(lib_dir))
 
 # Import the toolkit components
 from kbase_protein_query_module.src.storage.protein_existence_checker import ProteinExistenceChecker

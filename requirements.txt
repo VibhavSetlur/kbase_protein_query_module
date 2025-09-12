@@ -11,6 +11,7 @@ scikit-learn>=1.0.2
 
 # Graphs & Networks
 networkx>=2.6.0
+igraph>=0.10.0
 
 # Embedding Indexes
 faiss-cpu>=1.7.0
@@ -20,15 +21,21 @@ matplotlib>=3.5.0
 seaborn>=0.11.0
 plotly>=5.0.0
 kaleido>=0.2.1
+bokeh>=2.4.0
 
 # Data Storage & Formats
 h5py>=3.6.0
 
 # Bioinformatics
 biopython>=1.79
+weblogo>=3.7.0
 
-# Multiple Sequence Alignment - Removed mafft as it's not available in Docker environment
-# mafft>=7.490
+# Statistical Analysis
+statsmodels>=0.13.0
+
+# Web & HTML Generation
+jinja2>=3.0.0
+beautifulsoup4>=4.10.0
 
 # Other
 joblib>=1.1.0

@@ -54,6 +54,11 @@ build-test-script:
 	echo 'echo "...done removing temp files."' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 	echo 'export PYTHONPATH=$$script_dir/../$(LIB_DIR):$$PATH:$$PYTHONPATH' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 	echo 'cd $$script_dir/../$(TEST_DIR)' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+	echo 'echo "Current directory: $$(pwd)"' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+	echo 'echo "Python path: $$PYTHONPATH"' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+	echo 'echo "Test files found:"' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+	echo 'find . -name "test_*.py" | head -10' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
+	echo 'echo "Running pytest..."' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 	echo 'python -m pytest --tb=short --cov=$(SERVICE_CAPS) --cov-report=html:/kb/module/work/test_coverage --cov-report=term-missing -v .' >> $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 	chmod +x $(TEST_DIR)/$(TEST_SCRIPT_NAME)
 

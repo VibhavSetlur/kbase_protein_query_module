@@ -207,19 +207,18 @@
       "allowed_types": ["string"]
     },
     {
-      "id": "output_report",
+      "id": "output_analysis_name",
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
       "default_values": [],
       "field_type": "text",
       "text_options": {
-        "valid_ws_types": ["KBaseReport.Report"],
         "is_output_name": true
       },
-      "ui_name": "Output Report Name",
-      "short_hint": "Name for the output report object",
-      "description": "Name for the output report object in the workspace. This report will contain links to all generated data files and visualizations.",
+      "ui_name": "Output Analysis Name",
+      "short_hint": "Name for the output analysis object",
+      "description": "Name for the output analysis object in the workspace. This will contain references to all generated data files and analysis results.",
       "allowed_types": ["string"]
     },
     {
@@ -306,8 +305,8 @@
           "target_property": "output_directory"
         },
         {
-          "input_parameter": "output_report",
-          "target_property": "output_report"
+          "input_parameter": "output_analysis_name",
+          "target_property": "output_analysis_name"
         },
         {
           "input_parameter": "output_data",
@@ -320,20 +319,36 @@
       ],
       "output_mapping": [
         {
-          "service_method_output_path": [0, "report_name"],
-          "target_property": "report_name"
-        },
-        {
-          "service_method_output_path": [0, "report_ref"],
-          "target_property": "report_ref"
-        },
-        {
           "service_method_output_path": [0, "analysis_result_ref"],
           "target_property": "analysis_result_ref"
         },
         {
           "service_method_output_path": [0, "job_id"],
           "target_property": "job_id"
+        },
+        {
+          "service_method_output_path": [0, "output_directory"],
+          "target_property": "output_directory"
+        },
+        {
+          "service_method_output_path": [0, "general_info_dir"],
+          "target_property": "general_info_dir"
+        },
+        {
+          "service_method_output_path": [0, "network_analysis_dir"],
+          "target_property": "network_analysis_dir"
+        },
+        {
+          "service_method_output_path": [0, "sequence_analysis_dir"],
+          "target_property": "sequence_analysis_dir"
+        },
+        {
+          "service_method_output_path": [0, "embeddings_file_path"],
+          "target_property": "embeddings_file_path"
+        },
+        {
+          "service_method_output_path": [0, "top_proteins_csv_path"],
+          "target_property": "top_proteins_csv_path"
         },
         {
           "narrative_system_variable": "workspace",

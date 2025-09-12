@@ -37,6 +37,7 @@ try:
     PLOTLY_AVAILABLE = True
 except ImportError:
     PLOTLY_AVAILABLE = False
+    go = None
     logger.warning("Plotly not available. Install with: pip install plotly")
 
 

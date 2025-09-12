@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "run_id": "e0571f42-873a-4cd8-8662-35aa26a420f1",
+    "pipeline_version": "1.0.0",
+    "timestamp": "2025-09-12 05:47:37",
+    "total_execution_time_seconds": 0.1380763053894043,
+    "success": false,
+    "stages_completed": [
+      "input_validation",
+      "data_extraction"
+    ],
+    "stages_failed": [
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "network_analysis",
+      "bioinformatics_analysis",
+      "report_generation",
+      "visualization",
+      "data_export"
+    ],
+    "error_message": "Input validation failed"
+  },
+  "input_configuration": {
+    "analysis_stages": [
+      "input_validation",
+      "data_extraction",
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "network_analysis",
+      "bioinformatics_analysis",
+      "report_generation",
+      "visualization",
+      "data_export"
+    ],
+    "input_proteins": [
+      {
+        "protein_id": "MKVLLTLLCVVVLVLPGCELASTKPVKNAEVLHIQTAKNSVSGVQTPTDVVVSSDAGVTFYQYKPFVVDVTAKLVDCNKFGPDPVKAVDKTDVVFHVDVDVNVNVDVDVNVNVDVDVNVN",
+        "source": "Direct",
+        "sequence": "",
+        "metadata": {
+          "length": "0"
+        }
+      }
+    ],
+    "input_file_path": null,
+    "workspace_object_ref": null,
+    "output_dir": "test/outputs",
+    "performance_mode": "standard"
+  },
+  "stage_results": {
+    "input_validation": {
+      "success": true,
+      "execution_time": 0.0006780624389648438,
+      "error_message": null,
+      "output_data": {
+        "validated_input": {
+          "protein_records": [],
+          "input_type": "uniprot_identifiers",
+          "input_source": "uniprot",
+          "validation_summary": {
+            "total_inputs": 1,
+            "valid_inputs": 0,
+            "invalid_inputs": 1,
+            "warnings": [
+              "Invalid UniProt identifier: MKVLLTLLCVVVLVLPGCELASTKPVKNAEVLHIQTAKNSVSGVQTPTDVVVSSDAGVTFYQYKPFVVDVTAKLVDCNKFGPDPVKAVDKTDVVFHVDVDVNVNVDVDVNVNVDVDVNVN"
+            ],
+            "errors": []
+          },
+          "metadata": null
+        },
+        "validation_stats": {
+          "total_inputs": 1,
+          "valid_inputs": 0,
+          "invalid_inputs": 1,
+          "warnings": [
+            "Invalid UniProt identifier: MKVLLTLLCVVVLVLPGCELASTKPVKNAEVLHIQTAKNSVSGVQTPTDVVVSSDAGVTFYQYKPFVVDVTAKLVDCNKFGPDPVKAVDKTDVVFHVDVDVNVNVDVDVNVNVDVDVNVN"
+          ],
+          "errors": []
+        },
+        "validated_data": {
+          "protein_records": [],
+          "input_type": "uniprot_identifiers"
+        }
+      }
+    },
+    "data_extraction": {
+      "success": true,
+      "execution_time": 0.0004086494445800781,
+      "error_message": null,
+      "output_data": {
+        "extracted_data": {
+          "protein_records": [],
+          "extraction_stats": {
+            "total_requested": 0,
+            "successfully_extracted": 0,
+            "failed_extractions": 0,
+            "errors": []
+          },
+          "metadata": {
+            "source": "uniprot",
+            "extraction_method": "api"
+          }
+        }
+      }
+    },
+    "embedding_generation": {
+      "success": false,
+      "execution_time": 0.0009520053863525391,
+      "error_message": "Input validation failed"
+    }
+  },
+  "output_files": {
+    "csv_files": {},
+    "visualization_files": {},
+    "data_files": {}
+  },
+  "performance_metrics": {
+    "input_validation": {
+      "execution_time": 0.0010991096496582031,
+      "success": true,
+      "output_size": 724
+    },
+    "data_extraction": {
+      "execution_time": 0.0008029937744140625,
+      "success": true,
+      "output_size": 218
+    },
+    "embedding_generation": {
+      "execution_time": 0.13204193115234375,
+      "success": false,
+      "output_size": 2
+    }
+  },
+  "protein_statistics": {},
+  "analysis_summary": {
+    "pipeline_success": false,
+    "total_stages_run": 2,
+    "total_files_generated": 0,
+    "visualization_files_count": 0,
+    "csv_files_count": 0,
+    "data_files_count": 0
+  }
+}

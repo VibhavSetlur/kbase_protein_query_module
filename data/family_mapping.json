@@ -1,122 +1,122 @@
 {
-  "cell_adhesion_molecule": {
-    "file_safe_id": "cell_adhesion_molecule",
-    "num_proteins": 2000,
+  "ABC_transporter": {
+    "file_safe_id": "ABC_transporter",
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.3733510971069336
-  },
-  "FAM4": {
-    "file_safe_id": "FAM4",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.368271827697754
-  },
-  "family_0": {
-    "file_safe_id": "family_0",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.368194580078125
-  },
-  "membrane_channel": {
-    "file_safe_id": "membrane_channel",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.3671865463256836
-  },
-  "zinc_finger_protein": {
-    "file_safe_id": "zinc_finger_protein",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.3648948669433594
-  },
-  "FAMX": {
-    "file_safe_id": "FAMX",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.370062828063965
-  },
-  "FAMZ": {
-    "file_safe_id": "FAMZ",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.372025489807129
-  },
-  "FAMY": {
-    "file_safe_id": "FAMY",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.371333122253418
-  },
-  "serine_protease": {
-    "file_safe_id": "serine_protease",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.365279197692871
-  },
-  "kinase_enzyme": {
-    "file_safe_id": "kinase_enzyme",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.366374969482422
+    "file_size_mb": 0.12862396240234375
   },
   "G_protein_coupled_receptor": {
     "file_safe_id": "G_protein_coupled_receptor",
-    "num_proteins": 2000,
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.371614456176758
+    "file_size_mb": 0.12856578826904297
   },
-  "FAM2": {
-    "file_safe_id": "FAM2",
-    "num_proteins": 2000,
+  "serine_protease": {
+    "file_safe_id": "serine_protease",
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.3751697540283203
+    "file_size_mb": 0.12850570678710938
   },
-  "FAM3": {
-    "file_safe_id": "FAM3",
-    "num_proteins": 2000,
+  "zinc_finger_protein": {
+    "file_safe_id": "zinc_finger_protein",
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.366497039794922
+    "file_size_mb": 0.12854480743408203
   },
-  "ABC_transporter": {
-    "file_safe_id": "ABC_transporter",
-    "num_proteins": 2000,
+  "membrane_channel": {
+    "file_safe_id": "membrane_channel",
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.366826057434082
+    "file_size_mb": 0.12785816192626953
+  },
+  "kinase_enzyme": {
+    "file_safe_id": "kinase_enzyme",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.12836551666259766
   },
   "transcription_factor": {
     "file_safe_id": "transcription_factor",
-    "num_proteins": 2000,
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.3657608032226562
+    "file_size_mb": 0.12796401977539062
   },
-  "metabolic_enzyme": {
-    "file_safe_id": "metabolic_enzyme",
-    "num_proteins": 2000,
+  "cell_adhesion_molecule": {
+    "file_safe_id": "cell_adhesion_molecule",
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.372518539428711
-  },
-  "family_1": {
-    "file_safe_id": "family_1",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.362813949584961
-  },
-  "FAM1": {
-    "file_safe_id": "FAM1",
-    "num_proteins": 2000,
-    "embedding_dim": 320,
-    "file_size_mb": 2.3715600967407227
+    "file_size_mb": 0.12832164764404297
   },
   "immune_receptor": {
     "file_safe_id": "immune_receptor",
-    "num_proteins": 2000,
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.3703575134277344
+    "file_size_mb": 0.12807655334472656
+  },
+  "metabolic_enzyme": {
+    "file_safe_id": "metabolic_enzyme",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.1284198760986328
   },
   "FAM0": {
     "file_safe_id": "FAM0",
-    "num_proteins": 2000,
+    "num_proteins": 100,
     "embedding_dim": 320,
-    "file_size_mb": 2.366419792175293
+    "file_size_mb": 0.12436580657958984
+  },
+  "FAM1": {
+    "file_safe_id": "FAM1",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.1249227523803711
+  },
+  "FAM2": {
+    "file_safe_id": "FAM2",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.12452220916748047
+  },
+  "FAM3": {
+    "file_safe_id": "FAM3",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.12455368041992188
+  },
+  "FAM4": {
+    "file_safe_id": "FAM4",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.12447357177734375
+  },
+  "FAMX": {
+    "file_safe_id": "FAMX",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.1245737075805664
+  },
+  "FAMY": {
+    "file_safe_id": "FAMY",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.12452030181884766
+  },
+  "FAMZ": {
+    "file_safe_id": "FAMZ",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.124481201171875
+  },
+  "family_0": {
+    "file_safe_id": "family_0",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.1284036636352539
+  },
+  "family_1": {
+    "file_safe_id": "family_1",
+    "num_proteins": 100,
+    "embedding_dim": 320,
+    "file_size_mb": 0.12836265563964844
   }
 }

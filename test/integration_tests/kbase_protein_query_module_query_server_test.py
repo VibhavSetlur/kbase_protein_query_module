@@ -138,12 +138,18 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # SDK server methods return a list with one dict
         ret0 = ret[0] if isinstance(ret, list) else ret
         self.assertIsInstance(ret0, dict)
-        # Check for required fields in the response
+        # Check for required fields in the response - directory-based structure
         self.assertIn('input_parameters', ret0)
         self.assertIn('summary', ret0)
         self.assertIn('start_time', ret0)
-        self.assertIn('report_name', ret0)
-        self.assertIn('report_ref', ret0)
+        self.assertIn('job_id', ret0)
+        self.assertIn('analysis_result_ref', ret0)
+        self.assertIn('output_directory', ret0)
+        self.assertIn('general_info_dir', ret0)
+        self.assertIn('network_analysis_dir', ret0)
+        self.assertIn('sequence_analysis_dir', ret0)
+        self.assertIn('embeddings_file_path', ret0)
+        self.assertIn('top_proteins_csv_path', ret0)
         self.assertIn('protein_count', ret0)
         self.assertIn('stages_completed', ret0)
         
@@ -338,23 +344,31 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         ret = self.serviceImpl.summarize_and_visualize_results(self.ctx, params)
         ret0 = ret[0] if isinstance(ret, list) else ret
         
-        # Verify the result structure
-        self.assertIn('report_name', ret0)
-        self.assertIn('report_ref', ret0)
+        # Verify the result structure - directory-based output
+        self.assertIn('analysis_result_ref', ret0)
         self.assertIn('input_parameters', ret0)
         self.assertIn('start_time', ret0)
-        self.assertIn('output_dir', ret0)
+        self.assertIn('output_directory', ret0)
         self.assertIn('summary', ret0)
-        self.assertIn('html_report_path', ret0)
-        self.assertIn('sequence_analysis_ref', ret0)
+        self.assertIn('general_info_dir', ret0)
+        self.assertIn('network_analysis_dir', ret0)
+        self.assertIn('sequence_analysis_dir', ret0)
+        self.assertIn('embeddings_file_path', ret0)
+        self.assertIn('top_proteins_csv_path', ret0)
+        self.assertIn('protein_count', ret0)
+        self.assertIn('stages_completed', ret0)
         
         # Verify data types
-        self.assertIsInstance(ret0['report_name'], str)
-        self.assertIsInstance(ret0['report_ref'], str)
-        self.assertIsInstance(ret0['output_dir'], str)
+        self.assertIsInstance(ret0['analysis_result_ref'], str)
+        self.assertIsInstance(ret0['output_directory'], str)
         self.assertIsInstance(ret0['summary'], str)
-        self.assertIsInstance(ret0['html_report_path'], str)
-        self.assertIsInstance(ret0['sequence_analysis_ref'], str)
+        self.assertIsInstance(ret0['general_info_dir'], str)
+        self.assertIsInstance(ret0['network_analysis_dir'], str)
+        self.assertIsInstance(ret0['sequence_analysis_dir'], str)
+        self.assertIsInstance(ret0['embeddings_file_path'], str)
+        self.assertIsInstance(ret0['top_proteins_csv_path'], str)
+        self.assertIsInstance(ret0['protein_count'], int)
+        self.assertIsInstance(ret0['stages_completed'], list)
         
         from kbase_protein_query_module.src.storage.protein_storage import _create_artificial_families
         ids = [f'P{i:05d}' for i in range(7)]
@@ -378,23 +392,31 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         ret = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
         ret0 = ret[0] if isinstance(ret, list) else ret
         
-        # Verify the result structure
-        self.assertIn('report_name', ret0)
-        self.assertIn('report_ref', ret0)
+        # Verify the result structure - directory-based output
+        self.assertIn('job_id', ret0)
         self.assertIn('analysis_result_ref', ret0)
         self.assertIn('summary', ret0)
         self.assertIn('input_parameters', ret0)
         self.assertIn('start_time', ret0)
-        self.assertIn('html_report_path', ret0)
+        self.assertIn('output_directory', ret0)
+        self.assertIn('general_info_dir', ret0)
+        self.assertIn('network_analysis_dir', ret0)
+        self.assertIn('sequence_analysis_dir', ret0)
+        self.assertIn('embeddings_file_path', ret0)
+        self.assertIn('top_proteins_csv_path', ret0)
         self.assertIn('protein_count', ret0)
         self.assertIn('stages_completed', ret0)
         
         # Verify data types
-        self.assertIsInstance(ret0['report_name'], str)
-        self.assertIsInstance(ret0['report_ref'], str)
+        self.assertIsInstance(ret0['job_id'], str)
         self.assertIsInstance(ret0['analysis_result_ref'], str)
         self.assertIsInstance(ret0['summary'], str)
-        self.assertIsInstance(ret0['html_report_path'], str)
+        self.assertIsInstance(ret0['output_directory'], str)
+        self.assertIsInstance(ret0['general_info_dir'], str)
+        self.assertIsInstance(ret0['network_analysis_dir'], str)
+        self.assertIsInstance(ret0['sequence_analysis_dir'], str)
+        self.assertIsInstance(ret0['embeddings_file_path'], str)
+        self.assertIsInstance(ret0['top_proteins_csv_path'], str)
         self.assertIsInstance(ret0['protein_count'], int)
         self.assertIsInstance(ret0['stages_completed'], list)
         
@@ -408,7 +430,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         import faiss
         
         # Check if centroids file exists
-        if not os.path.exists(self.centroids_file):
+        if self.centroids_file is None or not os.path.exists(self.centroids_file):
             self.skipTest(f"Centroids file not found at {self.centroids_file}. Skipping test.")
         
         # Load real centroids

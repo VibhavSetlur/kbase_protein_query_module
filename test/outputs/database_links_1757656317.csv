@@ -1,0 +1,33 @@
+protein_id,database_name,database_category,search_url,description
+P00002,UniProt,sequence_database,https://www.uniprot.org/uniprot/P00002,Comprehensive protein sequence and annotation database
+P00002,NCBI Protein,sequence_database,https://www.ncbi.nlm.nih.gov/protein/P00002,National Center for Biotechnology Information protein database
+P00002,Protein Data Bank,structure_database,https://www.rcsb.org/structure/P00002,3D protein structure database
+P00002,AlphaFold DB,structure_database,https://alphafold.ebi.ac.uk/entry/P00002,AI-predicted protein structures
+P00002,Pfam,domain_database,https://pfam.xfam.org/protein/P00002,Protein family and domain database
+P00002,InterPro,domain_database,https://www.ebi.ac.uk/interpro/protein/P00002,Integrated protein classification database
+P00002,SMART,domain_database,https://smart.embl.de/smart/do_annotation.pl?DOMAIN=P00002,Simple Modular Architecture Research Tool
+P00002,KEGG,pathway_database,https://www.genome.jp/dbget-bin/www_bget?P00002,Kyoto Encyclopedia of Genes and Genomes
+P00002,Reactome,pathway_database,https://reactome.org/content/detail/P00002,Pathway database
+P00002,STRING,interaction_database,https://string-db.org/cgi/input.pl?sessionId=P00002,Protein-protein interaction database
+P00002,IntAct,interaction_database,https://www.ebi.ac.uk/intact/interactions/P00002,Molecular interaction database
+P00002,MINT,interaction_database,https://mint.bio.uniroma2.it/P00002,Molecular INTeraction database
+P00002,Gene Ontology,annotation_database,http://amigo.geneontology.org/amigo/term/P00002,Gene Ontology functional annotation
+P00002,ProteomicsDB,proteomics_database,https://www.proteomicsdb.org/proteomicsdb/#protein/proteinDetails/P00002,Human proteome database
+P00002,PeptideAtlas,proteomics_database,https://db.systemsbiology.net/sbeams/cgi/PeptideAtlas/GetProtein?protein_name=P00002,Peptide identification database
+P00002,VenomKB,toxin_database,https://venomkb.org/proteins/P00002,Venom knowledge base
+P00003,UniProt,sequence_database,https://www.uniprot.org/uniprot/P00003,Comprehensive protein sequence and annotation database
+P00003,NCBI Protein,sequence_database,https://www.ncbi.nlm.nih.gov/protein/P00003,National Center for Biotechnology Information protein database
+P00003,Protein Data Bank,structure_database,https://www.rcsb.org/structure/P00003,3D protein structure database
+P00003,AlphaFold DB,structure_database,https://alphafold.ebi.ac.uk/entry/P00003,AI-predicted protein structures
+P00003,Pfam,domain_database,https://pfam.xfam.org/protein/P00003,Protein family and domain database
+P00003,InterPro,domain_database,https://www.ebi.ac.uk/interpro/protein/P00003,Integrated protein classification database
+P00003,SMART,domain_database,https://smart.embl.de/smart/do_annotation.pl?DOMAIN=P00003,Simple Modular Architecture Research Tool
+P00003,KEGG,pathway_database,https://www.genome.jp/dbget-bin/www_bget?P00003,Kyoto Encyclopedia of Genes and Genomes
+P00003,Reactome,pathway_database,https://reactome.org/content/detail/P00003,Pathway database
+P00003,STRING,interaction_database,https://string-db.org/cgi/input.pl?sessionId=P00003,Protein-protein interaction database
+P00003,IntAct,interaction_database,https://www.ebi.ac.uk/intact/interactions/P00003,Molecular interaction database
+P00003,MINT,interaction_database,https://mint.bio.uniroma2.it/P00003,Molecular INTeraction database
+P00003,Gene Ontology,annotation_database,http://amigo.geneontology.org/amigo/term/P00003,Gene Ontology functional annotation
+P00003,ProteomicsDB,proteomics_database,https://www.proteomicsdb.org/proteomicsdb/#protein/proteinDetails/P00003,Human proteome database
+P00003,PeptideAtlas,proteomics_database,https://db.systemsbiology.net/sbeams/cgi/PeptideAtlas/GetProtein?protein_name=P00003,Peptide identification database
+P00003,VenomKB,toxin_database,https://venomkb.org/proteins/P00003,Venom knowledge base

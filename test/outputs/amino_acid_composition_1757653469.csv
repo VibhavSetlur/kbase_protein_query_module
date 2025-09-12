@@ -1,0 +1,41 @@
+protein_id,amino_acid_code,amino_acid_name,three_letter_code,count,percentage
+P00002,A,Alanine,Ala,6,5.71
+P00002,R,Arginine,Arg,2,1.9
+P00002,N,Asparagine,Asn,5,4.76
+P00002,D,Aspartic acid,Asp,3,2.86
+P00002,C,Cysteine,Cys,2,1.9
+P00002,E,Glutamic acid,Glu,8,7.62
+P00002,Q,Glutamine,Gln,2,1.9
+P00002,G,Glycine,Gly,13,12.38
+P00002,H,Histidine,His,3,2.86
+P00002,I,Isoleucine,Ile,7,6.67
+P00002,L,Leucine,Leu,6,5.71
+P00002,K,Lysine,Lys,18,17.14
+P00002,M,Methionine,Met,4,3.81
+P00002,F,Phenylalanine,Phe,3,2.86
+P00002,P,Proline,Pro,4,3.81
+P00002,S,Serine,Ser,2,1.9
+P00002,T,Threonine,Thr,8,7.62
+P00002,W,Tryptophan,Trp,1,0.95
+P00002,Y,Tyrosine,Tyr,5,4.76
+P00002,V,Valine,Val,3,2.86
+P00003,A,Alanine,Ala,5,4.76
+P00003,R,Arginine,Arg,3,2.86
+P00003,N,Asparagine,Asn,5,4.76
+P00003,D,Aspartic acid,Asp,3,2.86
+P00003,C,Cysteine,Cys,2,1.9
+P00003,E,Glutamic acid,Glu,9,8.57
+P00003,Q,Glutamine,Gln,2,1.9
+P00003,G,Glycine,Gly,13,12.38
+P00003,H,Histidine,His,3,2.86
+P00003,I,Isoleucine,Ile,8,7.62
+P00003,L,Leucine,Leu,6,5.71
+P00003,K,Lysine,Lys,17,16.19
+P00003,M,Methionine,Met,4,3.81
+P00003,F,Phenylalanine,Phe,4,3.81
+P00003,P,Proline,Pro,3,2.86
+P00003,S,Serine,Ser,2,1.9
+P00003,T,Threonine,Thr,8,7.62
+P00003,W,Tryptophan,Trp,1,0.95
+P00003,Y,Tyrosine,Tyr,4,3.81
+P00003,V,Valine,Val,3,2.86

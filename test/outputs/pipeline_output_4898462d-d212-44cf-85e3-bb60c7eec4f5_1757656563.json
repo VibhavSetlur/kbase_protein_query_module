@@ -1,0 +1,167 @@
+{
+  "metadata": {
+    "run_id": "4898462d-d212-44cf-85e3-bb60c7eec4f5",
+    "pipeline_version": "1.0.0",
+    "timestamp": "2025-09-12 05:56:03",
+    "total_execution_time_seconds": 0.1449594497680664,
+    "success": false,
+    "stages_completed": [
+      "input_validation",
+      "data_extraction"
+    ],
+    "stages_failed": [
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "network_analysis",
+      "bioinformatics_analysis",
+      "report_generation",
+      "visualization",
+      "data_export"
+    ],
+    "error_message": "Input validation failed"
+  },
+  "input_configuration": {
+    "analysis_stages": [
+      "input_validation",
+      "data_extraction",
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "network_analysis",
+      "bioinformatics_analysis",
+      "report_generation",
+      "visualization",
+      "data_export"
+    ],
+    "input_proteins": [
+      {
+        "protein_id": "MKVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+        "source": "Direct",
+        "sequence": "",
+        "metadata": {
+          "length": "0"
+        }
+      },
+      {
+        "protein_id": "MATLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+        "source": "Direct",
+        "sequence": "",
+        "metadata": {
+          "length": "0"
+        }
+      },
+      {
+        "protein_id": "MRVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+        "source": "Direct",
+        "sequence": "",
+        "metadata": {
+          "length": "0"
+        }
+      }
+    ],
+    "input_file_path": null,
+    "workspace_object_ref": null,
+    "output_dir": "test/outputs",
+    "performance_mode": "standard"
+  },
+  "stage_results": {
+    "input_validation": {
+      "success": true,
+      "execution_time": 0.000164031982421875,
+      "error_message": null,
+      "output_data": {
+        "validated_input": {
+          "protein_records": [],
+          "input_type": "uniprot_identifiers",
+          "input_source": "uniprot",
+          "validation_summary": {
+            "total_inputs": 3,
+            "valid_inputs": 0,
+            "invalid_inputs": 3,
+            "warnings": [
+              "Invalid UniProt identifier: MKVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+              "Invalid UniProt identifier: MATLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+              "Invalid UniProt identifier: MRVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ"
+            ],
+            "errors": []
+          },
+          "metadata": null
+        },
+        "validation_stats": {
+          "total_inputs": 3,
+          "valid_inputs": 0,
+          "invalid_inputs": 3,
+          "warnings": [
+            "Invalid UniProt identifier: MKVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+            "Invalid UniProt identifier: MATLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ",
+            "Invalid UniProt identifier: MRVLLTLLCLAVAALAQGQAWEQRVALVKDGTLLQLKSKPSHLLAVLGASVLSAVVSKNGSLLSLKGPGSVLVQ"
+          ],
+          "errors": []
+        },
+        "validated_data": {
+          "protein_records": [],
+          "input_type": "uniprot_identifiers"
+        }
+      }
+    },
+    "data_extraction": {
+      "success": true,
+      "execution_time": 0.00011420249938964844,
+      "error_message": null,
+      "output_data": {
+        "extracted_data": {
+          "protein_records": [],
+          "extraction_stats": {
+            "total_requested": 0,
+            "successfully_extracted": 0,
+            "failed_extractions": 0,
+            "errors": []
+          },
+          "metadata": {
+            "source": "uniprot",
+            "extraction_method": "api"
+          }
+        }
+      }
+    },
+    "embedding_generation": {
+      "success": false,
+      "execution_time": 0.00033020973205566406,
+      "error_message": "Input validation failed"
+    }
+  },
+  "output_files": {
+    "csv_files": {},
+    "visualization_files": {},
+    "data_files": {}
+  },
+  "performance_metrics": {
+    "input_validation": {
+      "execution_time": 0.0003132820129394531,
+      "success": true,
+      "output_size": 1056
+    },
+    "data_extraction": {
+      "execution_time": 0.00023317337036132812,
+      "success": true,
+      "output_size": 218
+    },
+    "embedding_generation": {
+      "execution_time": 0.1428372859954834,
+      "success": false,
+      "output_size": 2
+    }
+  },
+  "protein_statistics": {},
+  "analysis_summary": {
+    "pipeline_success": false,
+    "total_stages_run": 2,
+    "total_files_generated": 0,
+    "visualization_files_count": 0,
+    "csv_files_count": 0,
+    "data_files_count": 0
+  }
+}

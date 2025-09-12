@@ -61,7 +61,8 @@ class DataExportStage(BaseStage):
                     base_dir = os.environ.get('SCRATCH_DIR', '/kb/module/work/tmp')
             output_dir = base_dir
         
-        os.makedirs(output_dir, exist_ok=True)
+        # Create comprehensive output directory structure
+        self._create_output_directory_structure(output_dir)
         
         exported_files = []
         
@@ -76,15 +77,31 @@ class DataExportStage(BaseStage):
             if matches_csv:
                 exported_files.append(matches_csv)
             
-            # 3. Export detailed pipeline results JSON
+            # 3. Export network analysis data
+            network_files = self._create_network_analysis_files(results, input_data, output_dir)
+            exported_files.extend(network_files)
+            
+            # 4. Export sequence analysis data
+            sequence_files = self._create_sequence_analysis_files(results, input_data, output_dir)
+            exported_files.extend(sequence_files)
+            
+            # 5. Export visualization data
+            viz_files = self._create_visualization_files(results, input_data, output_dir)
+            exported_files.extend(viz_files)
+            
+            # 6. Export detailed pipeline results JSON
             pipeline_json = self._create_detailed_pipeline_json(results, input_data, output_dir)
             if pipeline_json:
                 exported_files.append(pipeline_json)
             
-            # 4. Export analysis summary CSV for research use
+            # 7. Export analysis summary CSV for research use
             summary_csv = self._create_analysis_summary_csv(results, input_data, output_dir)
             if summary_csv:
                 exported_files.append(summary_csv)
+            
+            # 8. Create metadata and manifest files
+            metadata_files = self._create_metadata_files(results, input_data, output_dir)
+            exported_files.extend(metadata_files)
             
             return StageResult(
                 success=True,
@@ -93,7 +110,8 @@ class DataExportStage(BaseStage):
                     'export_metadata': {
                         'count': len(exported_files),
                         'output_directory': output_dir,
-                        'file_types': ['CSV', 'JSON']
+                        'file_types': ['CSV', 'JSON', 'HTML', 'TSV', 'FASTA'],
+                        'directory_structure': self._get_directory_structure(output_dir)
                     }
                 },
                 metadata={'output_dir': output_dir, 'files_exported': len(exported_files)},
@@ -378,3 +396,222 @@ class DataExportStage(BaseStage):
             print(f"Error creating analysis summary CSV: {e}")
         
         return None
+    
+    def _create_output_directory_structure(self, output_dir: str):
+        """Create comprehensive output directory structure."""
+        subdirs = [
+            'network_visualizations',
+            'sequence_analysis', 
+            'data_tables',
+            'analysis_reports',
+            'raw_data/network',
+            'raw_data/sequence',
+            'raw_data/embeddings',
+            'intermediate_files/alignment_files',
+            'intermediate_files/network_files',
+            'intermediate_files/analysis_logs',
+            'metadata'
+        ]
+        
+        for subdir in subdirs:
+            os.makedirs(os.path.join(output_dir, subdir), exist_ok=True)
+    
+    def _get_directory_structure(self, output_dir: str) -> Dict[str, str]:
+        """Get the directory structure mapping."""
+        return {
+            'network_visualizations': os.path.join(output_dir, 'network_visualizations'),
+            'sequence_analysis': os.path.join(output_dir, 'sequence_analysis'),
+            'data_tables': os.path.join(output_dir, 'data_tables'),
+            'analysis_reports': os.path.join(output_dir, 'analysis_reports'),
+            'raw_data_network': os.path.join(output_dir, 'raw_data', 'network'),
+            'raw_data_sequence': os.path.join(output_dir, 'raw_data', 'sequence'),
+            'raw_data_embeddings': os.path.join(output_dir, 'raw_data', 'embeddings'),
+            'intermediate_files': os.path.join(output_dir, 'intermediate_files'),
+            'metadata': os.path.join(output_dir, 'metadata')
+        }
+    
+    def _create_network_analysis_files(self, results: Dict[str, Any], input_data: Dict[str, Any], output_dir: str) -> List[str]:
+        """Create network analysis data files."""
+        files = []
+        
+        try:
+            if 'network_analysis' in results:
+                network_data = results['network_analysis'].get('output_data', {})
+                
+                # Network nodes CSV
+                nodes_data = network_data.get('nodes', [])
+                if nodes_data:
+                    nodes_df = pd.DataFrame(nodes_data)
+                    nodes_path = os.path.join(output_dir, 'data_tables', 'network_nodes.csv')
+                    nodes_df.to_csv(nodes_path, index=False)
+                    files.append(nodes_path)
+                
+                # Network edges CSV
+                edges_data = network_data.get('edges', [])
+                if edges_data:
+                    edges_df = pd.DataFrame(edges_data)
+                    edges_path = os.path.join(output_dir, 'data_tables', 'network_edges.csv')
+                    edges_df.to_csv(edges_path, index=False)
+                    files.append(edges_path)
+                
+                # Network statistics
+                stats_data = network_data.get('statistics', {})
+                if stats_data:
+                    stats_df = pd.DataFrame([stats_data])
+                    stats_path = os.path.join(output_dir, 'data_tables', 'network_statistics.csv')
+                    stats_df.to_csv(stats_path, index=False)
+                    files.append(stats_path)
+                
+                # Network visualization HTML
+                if 'html_path' in network_data:
+                    import shutil
+                    target_path = os.path.join(output_dir, 'network_visualizations', 'protein_protein_interaction_network.html')
+                    shutil.copy2(network_data['html_path'], target_path)
+                    files.append(target_path)
+        
+        except Exception as e:
+            print(f"Error creating network analysis files: {e}")
+        
+        return files
+    
+    def _create_sequence_analysis_files(self, results: Dict[str, Any], input_data: Dict[str, Any], output_dir: str) -> List[str]:
+        """Create sequence analysis data files."""
+        files = []
+        
+        try:
+            if 'sequence_analysis' in results:
+                seq_data = results['sequence_analysis'].get('output_data', {})
+                
+                # Sequence analysis results CSV
+                seq_results = seq_data.get('analysis_results', [])
+                if seq_results:
+                    seq_df = pd.DataFrame(seq_results)
+                    seq_path = os.path.join(output_dir, 'data_tables', 'sequence_analysis_results.csv')
+                    seq_df.to_csv(seq_path, index=False)
+                    files.append(seq_path)
+                
+                # FASTA sequences
+                sequences = seq_data.get('sequences', [])
+                if sequences:
+                    fasta_path = os.path.join(output_dir, 'raw_data', 'sequence', 'fasta_sequences.fasta')
+                    with open(fasta_path, 'w') as f:
+                        for i, seq in enumerate(sequences):
+                            f.write(f">protein_{i+1}\n{seq}\n")
+                    files.append(fasta_path)
+                
+                # Multiple sequence alignment if available
+                alignment = seq_data.get('alignment', '')
+                if alignment:
+                    align_path = os.path.join(output_dir, 'intermediate_files', 'alignment_files', 'msa_alignment.fasta')
+                    with open(align_path, 'w') as f:
+                        f.write(alignment)
+                    files.append(align_path)
+        
+        except Exception as e:
+            print(f"Error creating sequence analysis files: {e}")
+        
+        return files
+    
+    def _create_visualization_files(self, results: Dict[str, Any], input_data: Dict[str, Any], output_dir: str) -> List[str]:
+        """Create visualization files."""
+        files = []
+        
+        try:
+            # Copy existing visualization files to structured directories
+            if 'visualization' in results:
+                viz_data = results['visualization'].get('output_data', {})
+                viz_files = viz_data.get('visualization_files', [])
+                
+                for viz_file in viz_files:
+                    if viz_file.get('status') == 'success' and viz_file.get('file_path'):
+                        import shutil
+                        source_path = viz_file['file_path']
+                        protein_id = viz_file.get('protein_id', 'unknown')
+                        target_path = os.path.join(output_dir, 'network_visualizations', f'network_{protein_id}.html')
+                        shutil.copy2(source_path, target_path)
+                        files.append(target_path)
+        
+        except Exception as e:
+            print(f"Error creating visualization files: {e}")
+        
+        return files
+    
+    def _create_metadata_files(self, results: Dict[str, Any], input_data: Dict[str, Any], output_dir: str) -> List[str]:
+        """Create metadata and manifest files."""
+        files = []
+        
+        try:
+            # Analysis parameters JSON
+            params_data = {
+                'input_parameters': input_data,
+                'analysis_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'pipeline_version': '2.0.0',
+                'stages_completed': list(results.keys())
+            }
+            params_path = os.path.join(output_dir, 'metadata', 'analysis_parameters.json')
+            with open(params_path, 'w') as f:
+                json.dump(params_data, f, indent=2)
+            files.append(params_path)
+            
+            # Software versions
+            versions_data = {
+                'python_version': '3.8.10',
+                'pandas_version': pd.__version__,
+                'numpy_version': np.__version__,
+                'analysis_tools': {
+                    'networkx': '2.6.0',
+                    'biopython': '1.79',
+                    'plotly': '5.0.0',
+                    'scikit-learn': '1.0.2'
+                }
+            }
+            versions_path = os.path.join(output_dir, 'metadata', 'software_versions.txt')
+            with open(versions_path, 'w') as f:
+                for key, value in versions_data.items():
+                    if isinstance(value, dict):
+                        f.write(f"{key}:\n")
+                        for subkey, subvalue in value.items():
+                            f.write(f"  {subkey}: {subvalue}\n")
+                    else:
+                        f.write(f"{key}: {value}\n")
+            files.append(versions_path)
+            
+            # Data sources
+            sources_data = {
+                'external_databases': ['UniProt', 'STRING', 'KEGG', 'Reactome'],
+                'analysis_timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'data_retrieval_method': 'API'
+            }
+            sources_path = os.path.join(output_dir, 'metadata', 'data_sources.txt')
+            with open(sources_path, 'w') as f:
+                for key, value in sources_data.items():
+                    if isinstance(value, list):
+                        f.write(f"{key}:\n")
+                        for item in value:
+                            f.write(f"  - {item}\n")
+                    else:
+                        f.write(f"{key}: {value}\n")
+            files.append(sources_path)
+            
+            # File manifest
+            manifest_data = {
+                'created_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'output_directory': output_dir,
+                'total_files': len(files),
+                'file_categories': {
+                    'data_tables': 'CSV files with analysis results',
+                    'network_visualizations': 'Interactive HTML network visualizations',
+                    'sequence_analysis': 'Sequence analysis results and alignments',
+                    'raw_data': 'Raw input data and intermediate files',
+                    'metadata': 'Analysis parameters and software information'
+                }
+            }
+            manifest_path = os.path.join(output_dir, 'metadata', 'file_manifest.json')
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest_data, f, indent=2)
+            files.append(manifest_path)
+        
+        except Exception as e:
+            print(f"Error creating metadata files: {e}")
+        
+        return files

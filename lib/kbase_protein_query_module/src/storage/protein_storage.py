@@ -669,13 +669,16 @@ class ProteinStorage:
         
         embedding_dim = embeddings.shape[1]
         num_proteins = embeddings.shape[0]
-        optimal_chunk_size = min(self.chunk_size, max(1, min(num_proteins, 10000 // embedding_dim)))
+        optimal_chunk_size = min(self.chunk_size, max(1, min(num_proteins, max(1, 10000 // embedding_dim))))
+        
+        # Ensure chunk size is at least 1
+        optimal_chunk_size = max(1, optimal_chunk_size)
         
         with h5py.File(family_file, 'w') as f:
             f.create_dataset(
                 'embeddings',
                 data=embeddings,
-                chunks=(min(optimal_chunk_size, num_proteins), embedding_dim),
+                chunks=(max(1, min(optimal_chunk_size, num_proteins)), max(1, embedding_dim)),
                 compression=self.compression,
                 compression_opts=self.compression_opts,
                 shuffle=True
@@ -684,7 +687,7 @@ class ProteinStorage:
                 'protein_ids',
                 data=protein_ids,
                 dtype=h5py.special_dtype(vlen=str),
-                chunks=(min(optimal_chunk_size, num_proteins),),
+                chunks=(max(1, min(optimal_chunk_size, num_proteins)),),
                 compression=self.compression,
                 compression_opts=self.compression_opts
             )

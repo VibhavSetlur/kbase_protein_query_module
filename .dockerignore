@@ -16,7 +16,6 @@ outputs/**
 backup/**
 
 # Tests and local-only materials
-test/**
 test_local/**
 
 

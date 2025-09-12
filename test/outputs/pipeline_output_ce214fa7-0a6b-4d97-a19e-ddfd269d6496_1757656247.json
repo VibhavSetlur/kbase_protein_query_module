@@ -1,0 +1,294 @@
+{
+  "metadata": {
+    "run_id": "ce214fa7-0a6b-4d97-a19e-ddfd269d6496",
+    "pipeline_version": "1.0.0",
+    "timestamp": "2025-09-12 05:50:47",
+    "total_execution_time_seconds": 0.5328052043914795,
+    "success": false,
+    "stages_completed": [
+      "input_validation",
+      "data_extraction",
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search"
+    ],
+    "stages_failed": [
+      "sequence_analysis",
+      "network_analysis",
+      "bioinformatics_analysis",
+      "report_generation",
+      "visualization",
+      "data_export"
+    ],
+    "error_message": null
+  },
+  "input_configuration": {
+    "analysis_stages": [
+      "input_validation",
+      "data_extraction",
+      "embedding_generation",
+      "family_assignment",
+      "similarity_search",
+      "sequence_analysis",
+      "network_analysis",
+      "bioinformatics_analysis",
+      "report_generation",
+      "visualization",
+      "data_export"
+    ],
+    "input_proteins": [
+      {
+        "protein_id": "P00001",
+        "source": "Direct",
+        "sequence": "",
+        "metadata": {
+          "length": "0"
+        }
+      }
+    ],
+    "input_file_path": null,
+    "workspace_object_ref": null,
+    "output_dir": "test/outputs",
+    "performance_mode": "standard"
+  },
+  "stage_results": {
+    "input_validation": {
+      "success": true,
+      "execution_time": 0.00029015541076660156,
+      "error_message": null,
+      "output_data": {
+        "validated_input": {
+          "protein_records": [
+            {
+              "protein_id": "P00001",
+              "source": "uniprot",
+              "sequence": "",
+              "metadata": {
+                "length": "0"
+              }
+            }
+          ],
+          "input_type": "uniprot_identifiers",
+          "input_source": "uniprot",
+          "validation_summary": {
+            "total_inputs": 1,
+            "valid_inputs": 1,
+            "invalid_inputs": 0,
+            "warnings": [],
+            "errors": []
+          },
+          "metadata": null
+        },
+        "validation_stats": {
+          "total_inputs": 1,
+          "valid_inputs": 1,
+          "invalid_inputs": 0,
+          "warnings": [],
+          "errors": []
+        },
+        "validated_data": {
+          "protein_records": [
+            {
+              "protein_id": "P00001",
+              "sequence": ""
+            }
+          ],
+          "input_type": "uniprot_identifiers"
+        }
+      }
+    },
+    "data_extraction": {
+      "success": true,
+      "execution_time": 0.37663936614990234,
+      "error_message": null,
+      "output_data": {
+        "extracted_data": {
+          "protein_records": [
+            {
+              "protein_id": "P00001",
+              "source": "uniprot",
+              "sequence": "",
+              "metadata": {
+                "uniprot_id": "P00001",
+                "entry_name": "",
+                "protein_name": "",
+                "organism": "",
+                "length": "0"
+              }
+            }
+          ],
+          "extraction_stats": {
+            "total_requested": 1,
+            "successfully_extracted": 1,
+            "failed_extractions": 0,
+            "errors": []
+          },
+          "metadata": {
+            "source": "uniprot",
+            "extraction_method": "api"
+          }
+        }
+      }
+    },
+    "embedding_generation": {
+      "success": true,
+      "execution_time": 0.0004451274871826172,
+      "error_message": null,
+      "summary": {
+        "embeddings_generated": 0,
+        "model_name": "",
+        "embedding_dim": 0
+      }
+    },
+    "family_assignment": {
+      "success": true,
+      "execution_time": 0.003394603729248047,
+      "error_message": null,
+      "output_data": {
+        "family_assignments": {
+          "protein_0": {
+            "family_id": "unknown",
+            "confidence": 0.0,
+            "eigenprotein_id": null,
+            "status": "error",
+            "error": "could not convert string to float: 'protein_embeddings'"
+          },
+          "protein_1": {
+            "family_id": "unknown",
+            "confidence": 0.0,
+            "eigenprotein_id": null,
+            "status": "error",
+            "error": "could not convert string to float: 'embedding_stats'"
+          },
+          "protein_2": {
+            "family_id": "unknown",
+            "confidence": 0.0,
+            "eigenprotein_id": null,
+            "status": "error",
+            "error": "could not convert string to float: 'metadata'"
+          }
+        },
+        "family_metadata": {}
+      }
+    },
+    "similarity_search": {
+      "success": true,
+      "execution_time": 0.0011622905731201172,
+      "error_message": null,
+      "output_data": {
+        "similarity_results": {
+          "protein_0": {
+            "similar_proteins": [],
+            "similarity_scores": [],
+            "total_found": 0,
+            "status": "error",
+            "error": "No family assignment"
+          },
+          "protein_1": {
+            "similar_proteins": [],
+            "similarity_scores": [],
+            "total_found": 0,
+            "status": "error",
+            "error": "No family assignment"
+          },
+          "protein_2": {
+            "similar_proteins": [],
+            "similarity_scores": [],
+            "total_found": 0,
+            "status": "error",
+            "error": "No family assignment"
+          }
+        },
+        "similar_proteins": {
+          "protein_0": {
+            "similar_proteins": [],
+            "similarity_scores": [],
+            "total_found": 0,
+            "status": "error",
+            "error": "No family assignment"
+          },
+          "protein_1": {
+            "similar_proteins": [],
+            "similarity_scores": [],
+            "total_found": 0,
+            "status": "error",
+            "error": "No family assignment"
+          },
+          "protein_2": {
+            "similar_proteins": [],
+            "similarity_scores": [],
+            "total_found": 0,
+            "status": "error",
+            "error": "No family assignment"
+          }
+        }
+      }
+    },
+    "sequence_analysis": {
+      "success": false,
+      "execution_time": 0.0003275871276855469,
+      "error_message": null,
+      "summary": {
+        "total_analyses": 1,
+        "successful_analyses": 0,
+        "failed_analyses": 1
+      }
+    }
+  },
+  "output_files": {
+    "csv_files": {},
+    "visualization_files": {},
+    "data_files": {}
+  },
+  "performance_metrics": {
+    "input_validation": {
+      "execution_time": 0.000518798828125,
+      "success": true,
+      "output_size": 555
+    },
+    "data_extraction": {
+      "execution_time": 0.3770618438720703,
+      "success": true,
+      "output_size": 387
+    },
+    "embedding_generation": {
+      "execution_time": 0.14514541625976562,
+      "success": true,
+      "output_size": 300
+    },
+    "family_assignment": {
+      "execution_time": 0.003952980041503906,
+      "success": true,
+      "output_size": 544
+    },
+    "similarity_search": {
+      "execution_time": 0.0013120174407958984,
+      "success": true,
+      "output_size": 850
+    },
+    "sequence_analysis": {
+      "execution_time": 0.0021848678588867188,
+      "success": false,
+      "output_size": 463
+    }
+  },
+  "protein_statistics": {
+    "total_proteins_analyzed": 1,
+    "successful_analyses": 0,
+    "property_distributions": {
+      "molecular_weights": {},
+      "isoelectric_points": {},
+      "instability_indices": {},
+      "aliphatic_indices": {},
+      "extinction_coefficients_280nm": {}
+    }
+  },
+  "analysis_summary": {
+    "pipeline_success": false,
+    "total_stages_run": 5,
+    "total_files_generated": 0,
+    "visualization_files_count": 0,
+    "csv_files_count": 0,
+    "data_files_count": 0
+  }
+}
