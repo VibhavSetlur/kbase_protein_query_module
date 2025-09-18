@@ -1,8 +1,0 @@
-python_version: 3.8.10
-pandas_version: 2.2.3
-numpy_version: 2.2.4
-analysis_tools:
-  networkx: 2.6.0
-  biopython: 1.79
-  plotly: 5.0.0
-  scikit-learn: 1.0.2

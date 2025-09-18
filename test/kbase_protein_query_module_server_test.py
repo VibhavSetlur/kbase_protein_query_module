@@ -26,9 +26,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.token = os.environ.get('KB_AUTH_TOKEN', None)
-        if not cls.token:
-            raise ValueError('KB_AUTH_TOKEN environment variable is required')
+        cls.token = os.environ.get('KB_AUTH_TOKEN', 'test_token')
+        # Allow tests to run without real token for basic functionality testing
         
         # Use proper KBase development workspace URL
         cls.wsURL = os.environ.get('KB_WORKSPACE_URL', 'https://appdev.kbase.us/services/ws')
@@ -185,7 +184,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
     def test_summarize_and_visualize_results(self):
         """Test result summarization and visualization."""
         # Create some demo result refs
-        demo_refs = ['demo_ref_1', 'demo_ref_2']
+        demo_refs = ['1/1/1', '1/2/1']  # Proper KBase object reference format
         
         params = {
             'result_refs': demo_refs,
@@ -199,13 +198,17 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(result[0], dict)
         self.assertIn('output_directory', result[0])
         self.assertIn('general_info_dir', result[0])
+        # KBase report fields expected per SDK docs
+        self.assertTrue(len(result[0].get('report_name', '')))
+        self.assertTrue(len(result[0].get('report_ref', '')))
 
     def test_run_protein_query_analysis(self):
         """Test the main unified analysis pipeline."""
         params = {
             'workspace_name': self.wsName,
-            'input_proteins': self.test_protein_ids,
-            'analysis_stages': ['embedding_generation']
+            'input_type': 'uniprot_ids',
+            'input_data': self.test_protein_ids,
+            'enabled_stages': ['embedding_generation', 'family_assignment']
         }
         
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
@@ -215,13 +218,17 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIn('output_directory', result[0])
         self.assertIn('analysis_result_ref', result[0])
         self.assertIn('stages_completed', result[0])
+        # Ensure report info is provided for Narrative integration
+        self.assertTrue(len(result[0].get('report_name', '')))
+        self.assertTrue(len(result[0].get('report_ref', '')))
 
     def test_legacy_method_compatibility(self):
         """Test backward compatibility with legacy method name."""
         params = {
             'workspace_name': self.wsName,
-            'input_proteins': ['P00001'],
-            'analysis_stages': ['embedding_generation']
+            'input_type': 'uniprot_ids',
+            'input_data': ['P00001'],
+            'enabled_stages': ['embedding_generation']
         }
         
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)

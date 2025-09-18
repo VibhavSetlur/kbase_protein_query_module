@@ -19,14 +19,14 @@
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": ["uniprot_identifiers"],
+      "default_values": ["uniprot_ids"],
       "field_type": "dropdown",
       "dropdown_options": {
         "options": [
-          {"value": "uniprot_identifiers", "display": "UniProt Identifiers"},
+          {"value": "uniprot_ids", "display": "UniProt Identifiers"},
           {"value": "fasta_file", "display": "FASTA File"},
-          {"value": "workspace_object", "display": "Workspace Object"},
-          {"value": "sequence_strings", "display": "Direct Protein Sequences"}
+          {"value": "workspace_object_ref", "display": "Workspace Object"},
+          {"value": "sequence", "display": "Direct Protein Sequences"}
         ]
       },
       "ui_name": "Input Type",

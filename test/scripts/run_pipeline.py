@@ -704,15 +704,11 @@ class PipelineRunner:
             df.to_csv(csv_file, index=False)
             print(f"✅ CSV summary: {csv_file}")
         
-        # Create HTML report
-        html_content = self.generate_html_report()
-        html_file = self.output_dir / "pipeline_report.html"
-        with open(html_file, 'w') as f:
-            f.write(html_content)
-        print(f"✅ HTML report: {html_file}")
+        # HTML report removed in new design; outputs consolidated in scenario dir
+        print("ℹ️ HTML report generation skipped (removed in new design)")
     
     def generate_html_report(self) -> str:
-        """Generate a comprehensive HTML report with multiple tabs and visualizations."""
+        """Deprecated: retained for compatibility; returns minimal placeholder."""
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         
         # Import sequence analyzer

@@ -1,5 +1,0 @@
-Protein Query Analysis Output Files
-Generated: 2025-09-12 05:56:05
-Output Directory: test/outputs
-
-pipeline_summary: pipeline_summary.json

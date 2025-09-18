@@ -4,6 +4,10 @@ sdk.cfg
 test_output
 backups
 
+# Misc
+trash
+archive
+
 # Large data files
 data/indexes/
 data/families/
