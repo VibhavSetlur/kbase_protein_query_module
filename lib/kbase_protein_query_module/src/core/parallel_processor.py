@@ -227,6 +227,81 @@ class ParallelProcessor:
         
         return all_results
     
+    def submit_task(self, function: Callable, *args, **kwargs) -> str:
+        """Submit a task for execution and return task ID."""
+        # Generate a unique task ID
+        task_id = f"task_{len(self.active_tasks) + len(self.completed_tasks) + len(self.failed_tasks)}"
+        
+        task = ProcessingTask(
+            task_id=task_id,
+            function=function,
+            args=args,
+            kwargs=kwargs
+        )
+        
+        with self._lock:
+            self.active_tasks[task_id] = task
+        
+        # Execute task immediately in a simple implementation
+        try:
+            result = self._execute_task_safely(task)
+            with self._lock:
+                self.completed_tasks[task_id] = result
+                # Keep in active_tasks until explicitly removed
+        except Exception as e:
+            with self._lock:
+                self.failed_tasks[task_id] = e
+                # Keep in active_tasks until explicitly removed
+        
+        return task_id
+    
+    def get_task_result(self, task_id: str) -> Any:
+        """Get the result of a completed task."""
+        with self._lock:
+            if task_id in self.completed_tasks:
+                return self.completed_tasks[task_id]
+            elif task_id in self.failed_tasks:
+                return None
+            else:
+                return None
+    
+    def cancel_task(self, task_id: str) -> bool:
+        """Cancel a task if it's still active."""
+        with self._lock:
+            if task_id in self.active_tasks:
+                del self.active_tasks[task_id]
+                return True
+            return False
+    
+    def get_task_status(self, task_id: str) -> Optional[str]:
+        """Get the status of a task."""
+        with self._lock:
+            if task_id in self.completed_tasks:
+                return "completed"
+            elif task_id in self.failed_tasks:
+                return "failed"
+            elif task_id in self.active_tasks:
+                return "running"
+            else:
+                return None
+    
+    def list_active_tasks(self) -> List[str]:
+        """List all active task IDs."""
+        with self._lock:
+            return list(self.active_tasks.keys())
+    
+    def list_completed_tasks(self) -> List[str]:
+        """List all completed task IDs."""
+        with self._lock:
+            return list(self.completed_tasks.keys())
+    
+    def clear_completed_tasks(self) -> int:
+        """Clear all completed tasks and return count."""
+        with self._lock:
+            count = len(self.completed_tasks)
+            self.completed_tasks.clear()
+            return count
+    
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for the parallel processor."""
         with self._lock:

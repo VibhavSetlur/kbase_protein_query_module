@@ -60,6 +60,14 @@ ANALYSIS_CONFIG = {
         "category": "classification",
         "dependencies": ["embeddings", "similarity_search"],
         "output_type": "family_data"
+    },
+    "embeddings": {
+        "enabled": True,
+        "name": "Protein Embeddings",
+        "description": "Generates protein sequence embeddings using deep learning models",
+        "category": "preprocessing",
+        "dependencies": [],
+        "output_type": "embedding_data"
     }
 }
 

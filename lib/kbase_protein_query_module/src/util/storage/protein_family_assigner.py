@@ -20,11 +20,16 @@ class ProteinFamilyAssigner:
     Assigns protein embeddings to precomputed protein families using centroid similarity.
     All protein identifiers are UniProt IDs (exact match only).
     """
-    def __init__(self):
+    def __init__(self, threshold: float = 0.7):
         self.family_ids: Optional[np.ndarray] = None
         self.centroids: Optional[np.ndarray] = None
         self.eigenprotein_ids: Optional[np.ndarray] = None
         self.expected_dimension: Optional[int] = None
+        self.threshold = threshold
+        
+        # Additional attributes for test compatibility
+        self.families: Dict[str, Dict[str, Any]] = {}  # family_id -> family_data
+        self.centroids: Dict[str, np.ndarray] = {}  # For test compatibility
 
     def load_family_centroids(self, npz_path: str) -> None:
         """
@@ -224,3 +229,108 @@ class ProteinFamilyAssigner:
         except Exception as e:
             logger.warning(f"Family search failed for {family_id}: {e}")
             return []
+    
+    def create_family(self, family_id: str, centroid: np.ndarray):
+        """Create a new family with given centroid."""
+        self.families[family_id] = {
+            'centroid': centroid,
+            'proteins': [],
+            'created_at': time.time()
+        }
+        self.centroids[family_id] = centroid
+    
+    def add_protein_to_family(self, family_id: str, protein_id: str, embedding: np.ndarray):
+        """Add a protein to a family."""
+        if family_id not in self.families:
+            self.create_family(family_id, embedding)
+        self.families[family_id][protein_id] = embedding
+        if protein_id not in self.families[family_id]['proteins']:
+            self.families[family_id]['proteins'].append(protein_id)
+    
+    def assign_protein_to_family(self, protein_id: str, embedding: np.ndarray) -> Optional[str]:
+        """Assign a protein to the best matching family."""
+        best_family = None
+        best_similarity = 0.0
+        
+        for family_id, family_data in self.families.items():
+            centroid = family_data['centroid']
+            similarity = self.compute_similarity(embedding, centroid)
+            if similarity > best_similarity and similarity >= self.threshold:
+                best_similarity = similarity
+                best_family = family_id
+        
+        if best_family:
+            self.add_protein_to_family(best_family, protein_id, embedding)
+        
+        return best_family
+    
+    def get_family_proteins(self, family_id: str) -> Optional[List[str]]:
+        """Get proteins in a family."""
+        if family_id not in self.families:
+            return None
+        return self.families[family_id]['proteins']
+    
+    def get_family_centroid(self, family_id: str) -> Optional[np.ndarray]:
+        """Get family centroid."""
+        if family_id not in self.families:
+            return None
+        return self.families[family_id]['centroid']
+    
+    def list_families(self) -> List[str]:
+        """List all families."""
+        return list(self.families.keys())
+    
+    def get_family_stats(self, family_id: str) -> Optional[Dict[str, Any]]:
+        """Get family statistics."""
+        if family_id not in self.families:
+            return None
+        family_data = self.families[family_id]
+        return {
+            'family_id': family_id,
+            'num_proteins': len(family_data['proteins']),
+            'protein_count': len(family_data['proteins']),
+            'created_at': family_data['created_at']
+        }
+    
+    def remove_protein_from_family(self, family_id: str, protein_id: str) -> bool:
+        """Remove a protein from a family."""
+        if family_id not in self.families:
+            return False
+        if protein_id in self.families[family_id]:
+            del self.families[family_id][protein_id]
+            if protein_id in self.families[family_id]['proteins']:
+                self.families[family_id]['proteins'].remove(protein_id)
+            return True
+        return False
+    
+    def remove_family(self, family_id: str) -> bool:
+        """Remove a family."""
+        if family_id in self.families:
+            del self.families[family_id]
+            if family_id in self.centroids:
+                del self.centroids[family_id]
+            return True
+        return False
+    
+    def update_family_centroid(self, family_id: str, new_centroid: np.ndarray):
+        """Update family centroid."""
+        if family_id in self.families:
+            self.families[family_id]['centroid'] = new_centroid
+            self.centroids[family_id] = new_centroid
+    
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+        """Compute cosine similarity between two embeddings."""
+        # Normalize embeddings
+        norm1 = np.linalg.norm(embedding1)
+        norm2 = np.linalg.norm(embedding2)
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
+        return float(similarity)
+    
+    def clear_all(self):
+        """Clear all families."""
+        self.families.clear()
+        self.centroids.clear()

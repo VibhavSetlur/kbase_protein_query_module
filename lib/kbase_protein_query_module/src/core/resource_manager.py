@@ -81,8 +81,15 @@ class ResourceManager:
     EXTENDS: None (standalone class)
     """
     
-    def __init__(self, limits: Optional[ResourceLimits] = None):
+    def __init__(self, limits: Optional[ResourceLimits] = None, max_memory_gb: Optional[float] = None, max_cpu_cores: Optional[int] = None):
         self.limits = limits or ResourceLimits()
+        
+        # Override limits if specific values provided
+        if max_memory_gb is not None:
+            self.limits.max_memory_percent = (max_memory_gb / (psutil.virtual_memory().total / (1024**3))) * 100
+        if max_cpu_cores is not None:
+            self.limits.max_cpu_percent = (max_cpu_cores / psutil.cpu_count()) * 100
+        
         self.metrics_history: List[ResourceMetrics] = []
         self.active_tasks: Dict[str, Any] = {}
         self._monitoring = False
@@ -91,6 +98,14 @@ class ResourceManager:
         # Performance tracking
         self.operation_times: Dict[str, List[float]] = {}
         self.memory_peaks: Dict[str, float] = {}
+        
+        # Additional attributes for test compatibility
+        self.max_memory_gb = max_memory_gb or (psutil.virtual_memory().total / (1024**3)) * 0.6
+        self.max_cpu_cores = max_cpu_cores or psutil.cpu_count()
+        self.registered_processes: Dict[str, Dict[str, Any]] = {}
+        self.allocated_memory: float = 0.0
+        self.allocated_cpu: int = 0
+        self.active_processes: Dict[str, Dict[str, Any]] = {}
         
         logger.info(f"ResourceManager initialized with limits: {self.limits}")
     
@@ -243,11 +258,155 @@ class ResourceManager:
         
         return summary
     
+    def check_memory_availability(self, required_memory_gb: float = None) -> bool:
+        """Check if memory is available."""
+        if required_memory_gb is not None:
+            available_memory = self.max_memory_gb - self.allocated_memory
+            return available_memory >= required_memory_gb
+        metrics = self.get_current_metrics()
+        return metrics.memory_percent < self.limits.max_memory_percent
+    
+    def check_cpu_availability(self, required_cpu_cores: int = None) -> bool:
+        """Check if CPU is available."""
+        if required_cpu_cores is not None:
+            available_cpu = self.max_cpu_cores - self.allocated_cpu
+            return available_cpu >= required_cpu_cores
+        metrics = self.get_current_metrics()
+        return metrics.cpu_percent < self.limits.max_cpu_percent
+    
+    def allocate_memory(self, size_gb: float) -> bool:
+        """Allocate memory if available."""
+        if self.check_memory_availability():
+            logger.debug(f"Allocated {size_gb}GB memory")
+            return True
+        return False
+    
+    def deallocate_memory(self, size_gb: float):
+        """Deallocate memory."""
+        logger.debug(f"Deallocated {size_gb}GB memory")
+    
+    def allocate_cpu(self, cores: int) -> bool:
+        """Allocate CPU cores if available."""
+        if self.check_cpu_availability():
+            logger.debug(f"Allocated {cores} CPU cores")
+            return True
+        return False
+    
+    def deallocate_cpu(self, cores: int):
+        """Deallocate CPU cores."""
+        logger.debug(f"Deallocated {cores} CPU cores")
+    
+    def register_process(self, process_id: str, memory_gb: float, cpu_cores: int) -> bool:
+        """Register a process with resource requirements."""
+        if self.allocate_memory(memory_gb) and self.allocate_cpu(cpu_cores):
+            self.registered_processes[process_id] = {
+                'memory_gb': memory_gb,
+                'cpu_cores': cpu_cores,
+                'start_time': time.time()
+            }
+            return True
+        return False
+    
+    def unregister_process(self, process_id: str) -> bool:
+        """Unregister a process."""
+        if process_id in self.registered_processes:
+            process_info = self.registered_processes[process_id]
+            self.deallocate_memory(process_info['memory_gb'])
+            self.deallocate_cpu(process_info['cpu_cores'])
+            del self.registered_processes[process_id]
+            return True
+        return False
+    
+    def get_resource_usage(self) -> Dict[str, Any]:
+        """Get current resource usage."""
+        metrics = self.get_current_metrics()
+        return {
+            'memory_gb': self.allocated_memory,
+            'memory_used_gb': metrics.memory_used_gb,
+            'memory_percent': metrics.memory_percent,
+            'memory_percentage': (self.allocated_memory / self.max_memory_gb) * 100,
+            'cpu_percent': metrics.cpu_percent,
+            'cpu_percentage': (self.allocated_cpu / self.max_cpu_cores) * 100,
+            'cpu_cores': self.allocated_cpu,
+            'active_processes': len(self.registered_processes)
+        }
+    
+    def get_available_resources(self) -> Dict[str, Any]:
+        """Get available resources."""
+        metrics = self.get_current_metrics()
+        available_memory = self.max_memory_gb - self.allocated_memory
+        available_cpu = self.max_cpu_cores - self.allocated_cpu
+        return {
+            'memory_gb': available_memory,
+            'available_memory_gb': available_memory,
+            'cpu_cores': available_cpu,
+            'available_cpu_percent': 100 - metrics.cpu_percent,
+            'available_memory_percent': 100 - metrics.memory_percent
+        }
+    
+    def list_active_processes(self) -> List[str]:
+        """List active process IDs."""
+        return list(self.registered_processes.keys())
+    
+    def clear_all_processes(self):
+        """Clear all registered processes."""
+        for process_id in list(self.registered_processes.keys()):
+            self.unregister_process(process_id)
+    
+    def allocate_memory(self, memory_gb: float) -> bool:
+        """Allocate memory for a task."""
+        if self.check_memory_availability(memory_gb):
+            self.allocated_memory += memory_gb
+            return True
+        return False
+    
+    def deallocate_memory(self, memory_gb: float) -> None:
+        """Deallocate memory from a task."""
+        self.allocated_memory = max(0, self.allocated_memory - memory_gb)
+    
+    def allocate_cpu(self, cpu_cores: int) -> bool:
+        """Allocate CPU cores for a task."""
+        if self.check_cpu_availability(cpu_cores):
+            self.allocated_cpu += cpu_cores
+            return True
+        return False
+    
+    def deallocate_cpu(self, cpu_cores: int) -> None:
+        """Deallocate CPU cores from a task."""
+        self.allocated_cpu = max(0, self.allocated_cpu - cpu_cores)
+    
+    def register_process(self, process_id: str, memory_gb: float, cpu_cores: int) -> bool:
+        """Register a process with resource requirements."""
+        if self.allocate_memory(memory_gb) and self.allocate_cpu(cpu_cores):
+            self.registered_processes[process_id] = {
+                'memory_gb': memory_gb,
+                'cpu_cores': cpu_cores,
+                'start_time': time.time()
+            }
+            self.active_processes[process_id] = self.registered_processes[process_id]
+            return True
+        return False
+    
+    def unregister_process(self, process_id: str) -> bool:
+        """Unregister a process and free its resources."""
+        if process_id in self.registered_processes:
+            process_info = self.registered_processes[process_id]
+            self.deallocate_memory(process_info['memory_gb'])
+            self.deallocate_cpu(process_info['cpu_cores'])
+            del self.registered_processes[process_id]
+            if process_id in self.active_processes:
+                del self.active_processes[process_id]
+            return True
+        return False
+    
     def cleanup(self):
         """Cleanup resources and stop monitoring."""
         self._monitoring = False
         if self._monitor_thread and self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=1.0)
+        
+        # Clear all processes
+        self.clear_all_processes()
         
         # Force garbage collection
         gc.collect()

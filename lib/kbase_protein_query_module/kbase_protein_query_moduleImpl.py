@@ -959,7 +959,7 @@ Contact: https://kbase.us/contact-us/
             setattr(config, 'workspace_client', workspace_client)
             setattr(config, 'workspace_name', workspace_name)
 
-            workflow = ProteinQueryWorkflow(config=config, kb_util=self.kb_util)
+            workflow = WorkflowOrchestrator(config=config, kb_util=self.kb_util)
             wf_result = workflow.execute()
             final = wf_result.final_output or {}
             stages_completed = wf_result.stages_completed or final.get('stages_completed', [])

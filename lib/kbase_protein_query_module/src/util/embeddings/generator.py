@@ -10,7 +10,7 @@ import time
 import numpy as np
 import pandas as pd
 import h5py
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 import logging
 from tqdm import tqdm
 import warnings
@@ -205,8 +205,8 @@ class ProteinEmbeddingGenerator:
             if not sequence or len(sequence.strip()) == 0:
                 raise ValueError("Empty or invalid protein sequence")
             
-            # Clean sequence
-            sequence = sequence.strip().upper()
+            # Validate and preprocess sequence
+            sequence = self._preprocess_sequence(sequence)
             
             # Tokenize with proper max_length
             max_length = 1024  # Set a reasonable max length for ESM-2
@@ -318,7 +318,10 @@ class ProteinEmbeddingGenerator:
             sequences_dict: Optional dictionary mapping protein IDs to sequences
             metadata: Optional metadata DataFrame to save alongside embeddings
         """
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        # Only create directory if there's a directory path
+        dir_path = os.path.dirname(output_file)
+        if dir_path:
+            os.makedirs(dir_path, exist_ok=True)
         
         with h5py.File(output_file, 'w') as f:
             # Save embeddings
@@ -439,6 +442,54 @@ class ProteinEmbeddingGenerator:
         self.generate_embeddings_batch = mock_generate_embeddings_batch
         
         logger.info("Mock components created for testing")
+    
+    def _validate_sequence(self, sequence: str) -> bool:
+        """Validate protein sequence format."""
+        if not sequence or not isinstance(sequence, str):
+            return False
+        # Check if sequence contains only valid amino acid characters
+        valid_aa = set('ACDEFGHIKLMNPQRSTVWY')
+        sequence_clean = sequence.strip().upper()
+        
+        # Require minimum length of 3 amino acids
+        if len(sequence_clean) < 3:
+            return False
+            
+        return all(aa in valid_aa for aa in sequence_clean)
+    
+    def _preprocess_sequence(self, sequence: str) -> str:
+        """Preprocess protein sequence."""
+        if not sequence:
+            raise ValueError("Empty sequence provided")
+        sequence = sequence.strip().upper()
+        if not self._validate_sequence(sequence):
+            raise ValueError(f"Invalid protein sequence: {sequence[:50]}...")
+        return sequence
+    
+    def get_embedding_dimension(self) -> int:
+        """Get the embedding dimension."""
+        return self.embedding_dim or 320
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get model information."""
+        return {
+            'model_name': self.model_name,
+            'embedding_dim': self.embedding_dim,
+            'embedding_dimension': self.embedding_dim,  # Alternative key for compatibility
+            'device': str(self.device)
+        }
+    
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+        """Compute cosine similarity between two embeddings."""
+        # Normalize embeddings
+        norm1 = np.linalg.norm(embedding1)
+        norm2 = np.linalg.norm(embedding2)
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
+        return float(similarity)
 
 
 def generate_embeddings_from_fasta(fasta_file: str, 

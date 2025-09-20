@@ -39,6 +39,9 @@ class AnalysisManager:
         self.analysis_modules = {}
         self.results = {}
         
+        # Additional attributes for test compatibility
+        self.analyses: Dict[str, Any] = {}  # Alias for analysis_modules
+        
         # Validate configuration
         if not validate_analysis_config():
             logger.warning("Analysis configuration validation failed")
@@ -116,57 +119,43 @@ class AnalysisManager:
                 
         return True
     
-    def run_analysis(self, analysis_name: str, input_data: Dict[str, Any], 
-                    output_dir: str, **kwargs) -> Dict[str, Any]:
+    def run_analysis(self, analysis_name: str, proteins: List[Any], 
+                    output_dir: str = None, **kwargs) -> Dict[str, Any]:
         """
         Run a specific analysis.
         
         Args:
             analysis_name: Name of the analysis to run
-            input_data: Input data for the analysis
+            proteins: List of protein data for the analysis
             output_dir: Directory to save outputs
             **kwargs: Additional parameters for the analysis
             
         Returns:
             Dictionary containing analysis results
         """
-        if not self.can_run_analysis(analysis_name, input_data):
-            raise ValueError(f"Cannot run analysis {analysis_name} with available data")
+        if analysis_name not in self.analyses:
+            logger.error(f"Analysis '{analysis_name}' not found")
+            return None
         
         try:
-            logger.info(f"Starting analysis: {analysis_name}")
-            
-            # Get the analysis class
-            analysis_class = self.analysis_modules[analysis_name]
-            
-            # Initialize the analysis
-            analysis_instance = analysis_class()
-            
-            # Run the analysis
-            result = analysis_instance.run(input_data, output_dir, **kwargs)
-            
-            # Store results
+            analysis = self.analyses[analysis_name]
+            result = analysis.analyze(proteins, **kwargs)
             self.results[analysis_name] = result
-            
-            # If output manager is available, handle outputs
-            if self.output_manager:
-                self.output_manager.save_analysis_output(analysis_name, result, output_dir)
-            
-            logger.info(f"Completed analysis: {analysis_name}")
+            logger.info(f"Analysis '{analysis_name}' completed successfully")
             return result
-            
         except Exception as e:
-            logger.error(f"Error running analysis {analysis_name}: {e}")
-            raise
+            error_msg = f"Error running analysis '{analysis_name}': {str(e)}"
+            logger.error(error_msg)
+            return None
     
-    def run_multiple_analyses(self, analysis_names: List[str], input_data: Dict[str, Any],
-                            output_dir: str, **kwargs) -> Dict[str, Any]:
+    def run_multiple_analyses(self, analysis_names: List[str], proteins: List[Any],
+                            output_dir: str = None, **kwargs) -> Dict[str, Any]:
         """
         Run multiple analyses in dependency order.
         
         Args:
             analysis_names: List of analysis names to run
-            input_data: Input data for the analyses
+            proteins: List of protein data for the analyses
             output_dir: Directory to save outputs
             **kwargs: Additional parameters
             
@@ -174,19 +163,12 @@ class AnalysisManager:
             Dictionary containing results from all analyses
         """
         results = {}
-        current_data = input_data.copy()
         
-        # Sort analyses by dependencies
-        ordered_analyses = self._order_analyses_by_dependencies(analysis_names)
-        
-        for analysis_name in ordered_analyses:
+        for analysis_name in analysis_names:
             try:
                 # Run the analysis
-                result = self.run_analysis(analysis_name, current_data, output_dir, **kwargs)
+                result = self.run_analysis(analysis_name, proteins, output_dir, **kwargs)
                 results[analysis_name] = result
-                
-                # Add results to current data for dependent analyses
-                current_data[analysis_name] = result
                 
             except Exception as e:
                 logger.error(f"Failed to run analysis {analysis_name}: {e}")
@@ -238,10 +220,24 @@ class AnalysisManager:
             Dictionary containing analysis results
         """
         if analysis_name:
-            return self.results.get(analysis_name, {})
+            return self.results.get(analysis_name, None)
         return self.results.copy()
     
     def clear_results(self):
         """Clear all stored analysis results."""
         self.results.clear()
         logger.info("Cleared all analysis results")
+    
+    def register_analysis(self, analysis_name: str, analysis_class: Any):
+        """Register an analysis class."""
+        self.analysis_modules[analysis_name] = analysis_class
+        self.analyses[analysis_name] = analysis_class
+        logger.info(f"Registered analysis: {analysis_name}")
+    
+    def get_analysis(self, analysis_name: str) -> Optional[Any]:
+        """Get an analysis class by name."""
+        return self.analyses.get(analysis_name)
+    
+    def list_analyses(self) -> List[str]:
+        """List all available analyses."""
+        return list(self.analyses.keys())

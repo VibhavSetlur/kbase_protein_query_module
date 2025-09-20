@@ -10,7 +10,7 @@ import logging
 import time
 import uuid
 import gc
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
 
 # Import managers from new structure
@@ -24,6 +24,7 @@ from ..util import (
     ProteinFamilyAssigner, ProteinExistenceChecker,
     IndexingStrategy
 )
+from .pipeline_config import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class WorkflowResult:
     final_output: Dict[str, Any]
     execution_time: float
     output_directory: str
+    stages_completed: List[str] = field(default_factory=list)
     error_message: Optional[str] = None
 
 class WorkflowOrchestrator:
@@ -48,14 +50,16 @@ class WorkflowOrchestrator:
     through dedicated managers for each component.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, kb_util=None):
         """
         Initialize the Workflow Orchestrator.
         
         Args:
             config: Configuration dictionary for the workflow
+            kb_util: KBase utility library instance
         """
         self.config = config or {}
+        self.kb_util = kb_util
         self.run_id = str(uuid.uuid4())[:8]
         
         # Initialize managers
@@ -165,7 +169,8 @@ class WorkflowOrchestrator:
                 analysis_results=analysis_results,
                 final_output=final_output,
                 execution_time=execution_time,
-                output_directory=self.output_manager.get_root_dir()
+                output_directory=self.output_manager.get_root_dir(),
+                stages_completed=analyses_to_run  # Use analyses as stages for now
             )
             
             # Save final metadata
@@ -186,6 +191,7 @@ class WorkflowOrchestrator:
                 final_output={},
                 execution_time=execution_time,
                 output_directory=output_dir,
+                stages_completed=[],
                 error_message=str(e)
             )
     
@@ -412,6 +418,28 @@ class WorkflowOrchestrator:
             
         except Exception as e:
             logger.error(f"Error saving final metadata: {e}")
+    
+    def execute(self, input_data: Optional[Union[Dict[str, Any], PipelineConfig]] = None) -> WorkflowResult:
+        """Execute the workflow with the given input data.
+        
+        This is the main entry point for the workflow orchestrator.
+        If no input_data is provided, it will use the config data.
+        """
+        if input_data is None:
+            input_data = self.config or {}
+        
+        # Handle both dict and PipelineConfig objects
+        if hasattr(input_data, 'output_dir'):
+            # It's a PipelineConfig object
+            output_dir = input_data.output_dir or '/tmp/protein_query_output'
+            # Convert to dict for run_workflow
+            input_dict = input_data.to_dict() if hasattr(input_data, 'to_dict') else {}
+        else:
+            # It's a dictionary
+            output_dir = input_data.get('output_dir', '/tmp/protein_query_output')
+            input_dict = input_data
+        
+        return self.run_workflow(input_dict, output_dir)
     
     def get_available_analyses(self) -> Dict[str, Dict[str, Any]]:
         """
