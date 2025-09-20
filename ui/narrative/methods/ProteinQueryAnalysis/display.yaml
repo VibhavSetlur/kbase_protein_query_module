@@ -6,86 +6,48 @@ parameters:
         ui-name: Input Type
         short-hint: Choose input source
         description: |
-            Options:
-            - uniprot_ids: One or more UniProt IDs (e.g., P12345)
-            - fasta_file: Upload a FASTA file
-            - workspace_object_ref: Reference to a workspace object
-            - sequence: Raw protein sequence
-
-    input_proteins:
-        ui-name: Input Proteins
-        short-hint: List of proteins (optional)
-        description: |
-            Optional list input. Prefer using input_type + input_data for clarity.
+            Select the type of protein input to analyze:
+            - UniProt Identifiers: Enter UniProt IDs
+            - FASTA File: Upload a FASTA file
+            - Workspace Object: Select from workspace
+            - Direct Protein Sequences: Enter sequences directly
 
     uniprot_ids:
         ui-name: UniProt Identifiers
-        short-hint: UniProt IDs (e.g., P12345)
+        short-hint: UniProt IDs (comma, tab, or newline separated)
         description: |
-            Enter one or more UniProt IDs (comma or newline separated).
+            Enter UniProt protein identifiers separated by commas, tabs, or newlines.
+            Examples: P12345, Q67890, R11111
 
     fasta_file:
         ui-name: FASTA File
-        short-hint: Upload FASTA
+        short-hint: Upload FASTA file
         description: |
-            Protein sequences in standard FASTA format.
+            Upload a FASTA file containing protein sequences in standard FASTA format.
 
     workspace_object:
-        ui-name: Workspace Object Reference
-        short-hint: Reference to a workspace object
+        ui-name: Workspace Object
+        short-hint: Select workspace object
         description: |
-            Supported types include Genome, GenomeSet, ProteinSequenceSet, FeatureSet.
+            Select a workspace object from your workspace.
+            Supported types: Genome, GenomeSet, ProteinSequenceSet, FeatureSet.
 
     direct_sequences:
-        ui-name: Sequence
-        short-hint: Raw protein sequence
+        ui-name: Direct Protein Sequences
+        short-hint: Protein sequences (one per line or comma separated)
         description: |
-            One sequence per line or comma-separated. Use amino acids A–Y.
+            Enter protein sequences directly. Multiple sequences can be separated by commas or newlines.
+            Use valid amino acid characters (ACDEFGHIKLMNPQRSTVWY).
 
-    analysis_type:
-        ui-name: Analysis Type
-        short-hint: What to run
+    analysis_name:
+        ui-name: Analysis Name
+        short-hint: Name for the analysis run
         description: |
-            comprehensive | sequence_only | similarity_only | network_only | check_existence
-
-    enabled_stages:
-        ui-name: Enabled Stages
-        short-hint: Pipeline stages
-        description: |
-            Enable specific stages (e.g., embedding_generation, family_assignment, similarity_search, report_generation).
-
-    stop_after_stage:
-        ui-name: Stop After Stage
-        short-hint: Stop after
-        description: |
-            Optional. Stop after a specific stage.
-
-    input_data:
-        ui-name: Input Data
-        short-hint: Data matching input_type
-        description: |
-            Provide data for the selected input_type.
-
-    output_directory:
-        ui-name: Output Directory
-        short-hint: Directory name for files
-        description: |
-            Folder name to organize exported files.
-
-    output_analysis_name:
-        ui-name: Output Analysis Name
-        short-hint: Analysis object name
-        description: |
-            Name of the workspace analysis object.
-
-    output_data:
-        ui-name: Output Data Object Name
-        short-hint: Data object name
-        description: |
-            Name of the workspace data object.
+            Name for this analysis run. Results will be saved with this name in your workspace.
 
 description: |
-    Unified protein analysis: embeddings, families, similarity search, sequence metrics, networks, and reports. Simple inputs, organized outputs, KBase-ready.
+    Unified protein analysis: embeddings, families, similarity search, sequence metrics, networks, and reports. 
+    Simple inputs, organized outputs, KBase-ready.
 
 screenshots:
     - protein_query_analysis_dashboard.png

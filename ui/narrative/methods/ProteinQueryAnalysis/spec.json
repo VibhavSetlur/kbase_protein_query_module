@@ -25,30 +25,13 @@
         "options": [
           {"value": "uniprot_ids", "display": "UniProt Identifiers"},
           {"value": "fasta_file", "display": "FASTA File"},
-          {"value": "workspace_object_ref", "display": "Workspace Object"},
-          {"value": "sequence", "display": "Direct Protein Sequences"}
+          {"value": "workspace_object", "display": "Workspace Object"},
+          {"value": "direct_sequences", "display": "Direct Protein Sequences"}
         ]
       },
       "ui_name": "Input Type",
       "short_hint": "Type of protein input to analyze",
-      "description": "Select the type of protein input you want to analyze. UniProt IDs will be fetched from UniProt database, FASTA files can be uploaded, workspace objects can be selected from your workspace, or you can provide direct protein sequences.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "input_proteins",
-      "optional": false,
-      "advanced": false,
-      "allow_multiple": true,
-      "default_values": [],
-      "field_type": "text",
-      "text_options": {
-        "valid_ws_types": ["KBaseGenomes.Genome", "KBaseGenomes.GenomeSet", "KBaseGenomes.ContigSet", "KBaseFBA.NewModel", "KBaseFBA.FBAModel", "KBaseGenomes.ProteinSequenceSet"],
-        "validate_as": "workspace_object_name",
-        "is_output_name": false
-      },
-      "ui_name": "Input Proteins",
-      "short_hint": "Protein sequences to analyze (UniProt IDs, FASTA file, workspace object, or direct sequence)",
-      "description": "Protein sequences to analyze. For UniProt IDs: enter one or more UniProt identifiers (e.g., P12345, Q67890). For FASTA: upload a FASTA file. For workspace objects: select from your workspace. For direct sequences: paste protein sequences.",
+      "description": "Select the type of protein input you want to analyze.",
       "allowed_types": ["string"]
     },
     {
@@ -63,8 +46,8 @@
         "is_output_name": false
       },
       "ui_name": "UniProt Identifiers",
-      "short_hint": "One or more UniProt protein identifiers (e.g., P12345, Q67890)",
-      "description": "Enter UniProt protein identifiers separated by commas or newlines. Examples: P12345, Q67890, R11111. The sequences will be automatically fetched from UniProt database.",
+      "short_hint": "UniProt IDs (comma, tab, or newline separated)",
+      "description": "Enter UniProt protein identifiers separated by commas, tabs, or newlines. Examples: P12345, Q67890, R11111",
       "allowed_types": ["string"]
     },
     {
@@ -80,7 +63,7 @@
       },
       "ui_name": "FASTA File",
       "short_hint": "Upload a FASTA file containing protein sequences",
-      "description": "Upload a FASTA file containing protein sequences. The file should have protein sequences in standard FASTA format with headers starting with '>'.",
+      "description": "Upload a FASTA file containing protein sequences in standard FASTA format.",
       "allowed_types": ["string"]
     },
     {
@@ -97,7 +80,7 @@
       },
       "ui_name": "Workspace Object",
       "short_hint": "Select a workspace object containing protein data",
-      "description": "Select a workspace object from your workspace. Supported types: Genome (extracts CDS features), GenomeSet (extracts from multiple genomes), ProteinSequenceSet (direct protein sequences), FeatureSet (extracts CDS features).",
+      "description": "Select a workspace object from your workspace. Supported types: Genome, GenomeSet, ProteinSequenceSet, FeatureSet.",
       "allowed_types": ["string"]
     },
     {
@@ -112,102 +95,12 @@
         "is_output_name": false
       },
       "ui_name": "Direct Protein Sequences",
-      "short_hint": "Enter protein sequences directly (one per line or separated by commas)",
-      "description": "Enter protein sequences directly. You can provide multiple sequences separated by commas or newlines. Each sequence should contain only valid amino acid characters (ACDEFGHIKLMNPQRSTVWY).",
+      "short_hint": "Protein sequences (one per line or comma separated)",
+      "description": "Enter protein sequences directly. Multiple sequences can be separated by commas or newlines. Use valid amino acid characters (ACDEFGHIKLMNPQRSTVWY).",
       "allowed_types": ["string"]
     },
     {
-      "id": "analysis_type",
-      "optional": true,
-      "advanced": false,
-      "allow_multiple": false,
-      "default_values": ["comprehensive"],
-      "field_type": "dropdown",
-      "dropdown_options": {
-        "options": [
-          {"value": "comprehensive", "display": "Comprehensive Analysis"},
-          {"value": "sequence_only", "display": "Sequence Analysis Only"},
-          {"value": "similarity_only", "display": "Similarity Search Only"},
-          {"value": "network_only", "display": "Network Analysis Only"},
-          {"value": "check_existence", "display": "Check Protein Existence"}
-        ]
-      },
-      "ui_name": "Analysis Type",
-      "short_hint": "Type of analysis to perform",
-      "description": "Select the type of analysis to perform on the input proteins. Comprehensive includes all analyses, or you can select specific analysis types. Check existence verifies if proteins exist in UniProt and optionally generates embeddings.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "enabled_stages",
-      "optional": true,
-      "advanced": true,
-      "allow_multiple": true,
-      "default_values": ["input_validation", "data_extraction", "embedding_generation", "family_assignment", "similarity_search", "sequence_analysis", "network_analysis", "bioinformatics_analysis", "report_generation", "visualization", "data_export"],
-      "field_type": "dropdown",
-      "dropdown_options": {
-        "options": [
-          {"value": "input_validation", "display": "Input Validation"},
-          {"value": "data_extraction", "display": "Data Extraction"},
-          {"value": "embedding_generation", "display": "Embedding Generation"},
-          {"value": "family_assignment", "display": "Family Assignment"},
-          {"value": "similarity_search", "display": "Similarity Search"},
-          {"value": "sequence_analysis", "display": "Sequence Analysis"},
-          {"value": "network_analysis", "display": "Network Analysis"},
-          {"value": "bioinformatics_analysis", "display": "Bioinformatics Analysis"},
-          {"value": "report_generation", "display": "Report Generation"},
-          {"value": "visualization", "display": "Visualization"},
-          {"value": "data_export", "display": "Data Export"}
-        ]
-      },
-      "ui_name": "Enabled Stages",
-      "short_hint": "Pipeline stages to enable",
-      "description": "Select which pipeline stages to enable for the analysis. This allows fine-grained control over the analysis workflow.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "stop_after_stage",
-      "optional": true,
-      "advanced": true,
-      "allow_multiple": false,
-      "default_values": [],
-      "field_type": "dropdown",
-      "dropdown_options": {
-        "options": [
-          {"value": "input_validation", "display": "Stop after Input Validation"},
-          {"value": "data_extraction", "display": "Stop after Data Extraction"},
-          {"value": "embedding_generation", "display": "Stop after Embedding Generation"},
-          {"value": "family_assignment", "display": "Stop after Family Assignment"},
-          {"value": "similarity_search", "display": "Stop after Similarity Search"},
-          {"value": "sequence_analysis", "display": "Stop after Sequence Analysis"},
-          {"value": "network_analysis", "display": "Stop after Network Analysis"},
-          {"value": "bioinformatics_analysis", "display": "Stop after Bioinformatics Analysis"},
-          {"value": "report_generation", "display": "Stop after Report Generation"},
-          {"value": "visualization", "display": "Stop after Visualization"},
-          {"value": "data_export", "display": "Stop after Data Export"}
-        ]
-      },
-      "ui_name": "Stop After Stage",
-      "short_hint": "Stop pipeline after this stage",
-      "description": "Stop the pipeline execution after the specified stage (for debugging or partial analysis).",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "output_directory",
-      "optional": true,
-      "advanced": false,
-      "allow_multiple": false,
-      "default_values": [],
-      "field_type": "text",
-      "text_options": {
-        "is_output_name": false
-      },
-      "ui_name": "Output Directory",
-      "short_hint": "Directory name to organize exported files (created under workspace staging)",
-      "description": "Optional: Where to organize exported outputs (CSV/TSV, HTML, network files). If not set, a timestamped directory is created.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "output_analysis_name",
+      "id": "analysis_name",
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
@@ -216,40 +109,9 @@
       "text_options": {
         "is_output_name": true
       },
-      "ui_name": "Output Analysis Name",
-      "short_hint": "Name for the output analysis object",
-      "description": "Name for the output analysis object in the workspace. This will contain references to all generated data files and analysis results.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "output_data",
-      "optional": true,
-      "advanced": false,
-      "allow_multiple": false,
-      "default_values": [],
-      "field_type": "text",
-      "text_options": {
-        "valid_ws_types": ["KBaseGenomes.ProteinSequenceSet"],
-        "is_output_name": true
-      },
-      "ui_name": "Output Data Object Name",
-      "short_hint": "Name for the output data object",
-      "description": "Name for the output data object containing processed protein data and analysis results.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "input_data",
-      "optional": true,
-      "advanced": true,
-      "allow_multiple": false,
-      "default_values": [],
-      "field_type": "text",
-      "text_options": {
-        "is_output_name": false
-      },
-      "ui_name": "Generic Input Data",
-      "short_hint": "Optional generic input payload (advanced)",
-      "description": "Optional generic input payload used by the backend to accept flexible inputs. Leave blank unless directed.",
+      "ui_name": "Analysis Name",
+      "short_hint": "Name for the analysis run",
+      "description": "Name for this analysis run. Results will be saved with this name in your workspace.",
       "allowed_types": ["string"]
     }
   ],
@@ -269,10 +131,6 @@
           "target_property": "input_type"
         },
         {
-          "input_parameter": "input_proteins",
-          "target_property": "input_proteins"
-        },
-        {
           "input_parameter": "uniprot_ids",
           "target_property": "uniprot_ids"
         },
@@ -289,32 +147,8 @@
           "target_property": "direct_sequences"
         },
         {
-          "input_parameter": "analysis_type",
-          "target_property": "analysis_type"
-        },
-        {
-          "input_parameter": "enabled_stages",
-          "target_property": "enabled_stages"
-        },
-        {
-          "input_parameter": "stop_after_stage",
-          "target_property": "stop_after_stage"
-        },
-        {
-          "input_parameter": "output_directory",
-          "target_property": "output_directory"
-        },
-        {
-          "input_parameter": "output_analysis_name",
-          "target_property": "output_analysis_name"
-        },
-        {
-          "input_parameter": "output_data",
-          "target_property": "output_data"
-        },
-        {
-          "input_parameter": "input_data",
-          "target_property": "input_data"
+          "input_parameter": "analysis_name",
+          "target_property": "analysis_name"
         }
       ],
       "output_mapping": [
@@ -325,30 +159,6 @@
         {
           "service_method_output_path": [0, "job_id"],
           "target_property": "job_id"
-        },
-        {
-          "service_method_output_path": [0, "output_directory"],
-          "target_property": "output_directory"
-        },
-        {
-          "service_method_output_path": [0, "general_info_dir"],
-          "target_property": "general_info_dir"
-        },
-        {
-          "service_method_output_path": [0, "network_analysis_dir"],
-          "target_property": "network_analysis_dir"
-        },
-        {
-          "service_method_output_path": [0, "sequence_analysis_dir"],
-          "target_property": "sequence_analysis_dir"
-        },
-        {
-          "service_method_output_path": [0, "embeddings_file_path"],
-          "target_property": "embeddings_file_path"
-        },
-        {
-          "service_method_output_path": [0, "top_proteins_csv_path"],
-          "target_property": "top_proteins_csv_path"
         },
         {
           "narrative_system_variable": "workspace",
