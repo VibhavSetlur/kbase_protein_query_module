@@ -106,8 +106,9 @@ class PublicApiTest(unittest.TestCase):
     def test_run_protein_query_analysis_sequence_input(self):
         params = {
             'workspace_name': self.wsName,
-            'input_type': 'sequence',
-            'input_data': 'M' * 80,
+            'input_type': 'direct_sequences',
+            'direct_sequences': ['M' * 80],
+            'analysis_name': 'test_analysis',
             'enabled_stages': ['embedding_generation', 'family_assignment', 'similarity_search', 'report_generation']
         }
         res = self.impl.run_protein_query_analysis(self.ctx, params)

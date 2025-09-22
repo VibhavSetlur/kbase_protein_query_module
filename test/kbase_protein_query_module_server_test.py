@@ -207,7 +207,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         params = {
             'workspace_name': self.wsName,
             'input_type': 'uniprot_ids',
-            'input_data': self.test_protein_ids,
+            'uniprot_ids': self.test_protein_ids,
+            'analysis_name': 'test_analysis',
             'enabled_stages': ['embedding_generation', 'family_assignment']
         }
         
@@ -227,7 +228,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         params = {
             'workspace_name': self.wsName,
             'input_type': 'uniprot_ids',
-            'input_data': ['P00001'],
+            'uniprot_ids': ['P00001'],
+            'analysis_name': 'legacy_test',
             'enabled_stages': ['embedding_generation']
         }
         

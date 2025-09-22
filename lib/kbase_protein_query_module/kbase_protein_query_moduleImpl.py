@@ -121,13 +121,13 @@ Contact: https://kbase.us/contact-us/
             self.kb_util = None
         
         # Initialize components (simplified)
-            self.existence_checker = None
-            self.family_assigner = None
-            self.embedding_generator = None
-            self.hierarchical_index = None
-            self.network_builder = None
-            self.html_report_generator = None
-            self.workflow_orchestrator = None
+        self.existence_checker = None
+        self.family_assigner = None
+        self.embedding_generator = None
+        self.hierarchical_index = None
+        self.network_builder = None
+        self.html_report_generator = None
+        self.workflow_orchestrator = None
         
         #END_CONSTRUCTOR
         pass
@@ -913,22 +913,41 @@ Contact: https://kbase.us/contact-us/
                 raise ValueError("workspace_name is required")
 
             input_type = params.get('input_type')
-            input_data = params.get('input_data')
             input_kwargs = {}
-            if input_type in ('workspace_object_ref', 'workspace_ref'):
-                input_kwargs['workspace_object_ref'] = input_data
-            elif input_type in ('fasta_file', 'sequence_file', 'file_path'):
-                input_kwargs['input_file_path'] = input_data
-            elif input_type in ('sequence', 'sequences', 'uniprot_id', 'uniprot_ids', 'protein_ids'):
-                input_kwargs['input_proteins'] = input_data if isinstance(input_data, list) else [input_data]
+            
+            # Handle conditional input parameters based on input_type
+            if input_type == 'uniprot_ids':
+                uniprot_ids = params.get('uniprot_ids', [])
+                if not uniprot_ids:
+                    raise ValueError("UniProt IDs are required when input_type is 'uniprot_ids'")
+                input_kwargs['input_proteins'] = uniprot_ids if isinstance(uniprot_ids, list) else [uniprot_ids]
+                
+            elif input_type == 'fasta_file':
+                fasta_file = params.get('fasta_file')
+                if not fasta_file:
+                    raise ValueError("FASTA file is required when input_type is 'fasta_file'")
+                input_kwargs['input_file_path'] = fasta_file
+                
+            elif input_type == 'workspace_object':
+                workspace_object = params.get('workspace_object')
+                if not workspace_object:
+                    raise ValueError("Workspace object is required when input_type is 'workspace_object'")
+                input_kwargs['workspace_object_ref'] = workspace_object
+                
+            elif input_type == 'direct_sequences':
+                direct_sequences = params.get('direct_sequences', [])
+                if not direct_sequences:
+                    raise ValueError("Direct sequences are required when input_type is 'direct_sequences'")
+                input_kwargs['input_proteins'] = direct_sequences if isinstance(direct_sequences, list) else [direct_sequences]
+                
             else:
-                if isinstance(input_data, list):
-                    input_kwargs['input_proteins'] = input_data
-                elif isinstance(input_data, str) and input_data:
-                    input_kwargs['input_proteins'] = [input_data]
-                else:
-                    raise ValueError("input_type/input_data are required and must specify proteins, file, or workspace ref")
+                raise ValueError(f"Invalid input_type: {input_type}. Must be one of: uniprot_ids, fasta_file, workspace_object, direct_sequences")
 
+            # Get analysis name for output
+            analysis_name = params.get('analysis_name')
+            if not analysis_name:
+                raise ValueError("analysis_name is required")
+            
             enabled_stages = params.get('enabled_stages') or [
                 'input_validation','data_extraction','embedding_generation','family_assignment','similarity_search','sequence_analysis','network_analysis','bioinformatics_analysis','report_generation','visualization','data_export'
             ]
@@ -965,7 +984,7 @@ Contact: https://kbase.us/contact-us/
             stages_completed = wf_result.stages_completed or final.get('stages_completed', [])
 
             # Ensure report fields are always present for Narrative integration
-            report_name = final.get('report_name') or final.get('report', {}).get('name') or f"protein_analysis_{wf_result.run_id}"
+            report_name = final.get('report_name') or final.get('report', {}).get('name') or f"{analysis_name}_report"
             report_ref = final.get('report_ref') or final.get('report', {}).get('ref') or ''
 
             normalized = {
@@ -993,7 +1012,7 @@ Contact: https://kbase.us/contact-us/
                     report_info = report_client.create_extended_report({
                         'message': normalized['summary'],
                         'workspace_name': workspace_name,
-                        'report_object_name': f"protein_analysis_{wf_result.run_id}"
+                        'report_object_name': f"{analysis_name}_report"
                     })
                     normalized['report_name'] = report_info.get('name', normalized['report_name'])
                     normalized['report_ref'] = report_info.get('ref', normalized['report_ref'])
@@ -1001,9 +1020,9 @@ Contact: https://kbase.us/contact-us/
                     logger.warning(f"Failed to create fallback report: {e}")
             # Final safety: ensure non-empty placeholders
             if not normalized['report_name']:
-                normalized['report_name'] = f"protein_analysis_{wf_result.run_id}"
+                normalized['report_name'] = f"{analysis_name}_report"
             if not normalized['report_ref']:
-                normalized['report_ref'] = f"report_{wf_result.run_id}"
+                normalized['report_ref'] = f"report_{analysis_name}"
             return [normalized]
         except Exception as e:
             self._log_with_kbutillib('ERROR', f"run_protein_query_analysis failed: {e}")
