@@ -46,17 +46,6 @@ parameters:
             Name for this analysis run. Results will be saved with this name in your workspace.
 
 description: |
-    Unified protein analysis: embeddings, families, similarity search, sequence metrics, networks, and reports. 
-    Simple inputs, organized outputs, KBase-ready.
+    Unified protein analysis for various analyses
 
-screenshots:
-    - protein_query_analysis_dashboard.png
-    - protein_query_analysis_detail.png
 
-publications:
-    - doi: 10.1038/s41592-022-01465-8
-      display-text: "ESM-2: Language models of protein sequences"
-    - doi: 10.1093/bioinformatics/btab653
-      display-text: "FAISS: A library for efficient similarity search"
-
-icon: protein-analysis-icon.png
