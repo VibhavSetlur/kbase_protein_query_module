@@ -62,46 +62,24 @@ class PublicApiTest(unittest.TestCase):
         self.assertEqual(res[0]['state'], 'OK')
 
     def test_check_protein_existence(self):
-        params = {'protein_id': 'P00001', 'workspace_name': self.wsName, 'generate_embedding': True}
-        res = self.impl.check_protein_existence(self.ctx, params)
-        out = res[0]
-        self.assertIn('exists', out)
-        self.assertIn('family_id', out)
-        self.assertIn('protein_existence_result_ref', out)
+        # Deprecated direct endpoint: ensure attribute not present in unified API
+        self.assertFalse(hasattr(self.impl, 'check_protein_existence'))
 
     def test_generate_protein_embedding(self):
-        seq = 'M' * 50
-        params = {'input_type': 'sequence', 'input_data': seq, 'workspace_name': self.wsName}
-        res = self.impl.generate_protein_embedding(self.ctx, params)
-        out = res[0]
-        self.assertIn('embedding_result_ref', out)
-        self.assertGreater(out['embedding_norm'], 0.0)
-        self.assertEqual(out['sequence_length'], len(seq))
+        # Deprecated direct endpoint: ensure attribute not present in unified API
+        self.assertFalse(hasattr(self.impl, 'generate_protein_embedding'))
 
     def test_assign_family_fast(self):
-        params = {'embedding_ref': '1/3/1', 'protein_id': 'P00001', 'workspace_name': self.wsName}
-        res = self.impl.assign_family_fast(self.ctx, params)
-        out = res[0]
-        self.assertIn('family_id', out)
-        self.assertIn('confidence', out)
-        self.assertIn('family_assignment_result_ref', out)
+        # Deprecated direct endpoint: ensure attribute not present in unified API
+        self.assertFalse(hasattr(self.impl, 'assign_family_fast'))
 
     def test_find_top_matches_from_embedding(self):
-        params = {'embedding_ref': '1/3/1', 'protein_id': 'P00001', 'workspace_name': self.wsName, 'max_matches': 3}
-        res = self.impl.find_top_matches_from_embedding(self.ctx, params)
-        out = res[0]
-        self.assertIn('matches', out)
-        self.assertLessEqual(out['top_n'], 5)
-        self.assertIn('similarity_search_result_ref', out)
+        # Deprecated direct endpoint: ensure attribute not present in unified API
+        self.assertFalse(hasattr(self.impl, 'find_top_matches_from_embedding'))
 
     def test_summarize_and_visualize_results(self):
-        # Use two dummy refs in proper format
-        params = {'result_refs': ['1/1/1', '1/2/1'], 'output_name': 'ut_summary', 'workspace_name': self.wsName}
-        res = self.impl.summarize_and_visualize_results(self.ctx, params)
-        out = res[0]
-        self.assertIn('analysis_result_ref', out)
-        self.assertIn('output_directory', out)
-        self.assertIn('general_info_dir', out)
+        # Deprecated direct endpoint: ensure attribute not present in unified API
+        self.assertFalse(hasattr(self.impl, 'summarize_and_visualize_results'))
 
     def test_run_protein_query_analysis_sequence_input(self):
         params = {

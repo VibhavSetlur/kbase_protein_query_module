@@ -1025,7 +1025,13 @@ Contact: https://kbase.us/contact-us/
                 normalized['report_ref'] = f"report_{analysis_name}"
             return [normalized]
         except Exception as e:
-            self._log_with_kbutillib('ERROR', f"run_protein_query_analysis failed: {e}")
+            try:
+                if hasattr(self, '_log_with_kbutillib'):
+                    self._log_with_kbutillib('ERROR', f"run_protein_query_analysis failed: {e}")
+                else:
+                    logger.error(f"run_protein_query_analysis failed: {e}")
+            except Exception:
+                logger.error(f"run_protein_query_analysis failed: {e}")
             return [{
                 'job_id': f'error_{int(time.time())}',
                 'analysis_result_ref': 'error',

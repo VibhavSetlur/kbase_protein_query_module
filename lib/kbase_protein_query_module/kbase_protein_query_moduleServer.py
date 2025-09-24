@@ -342,26 +342,11 @@ class Application(object):
                              name='kbase_protein_query_module.run_protein_query_analysis',
                              types=[dict])
         self.method_authentication['kbase_protein_query_module.run_protein_query_analysis'] = 'required'  # noqa
-        self.rpc_service.add(impl_kbase_protein_query_module.check_protein_existence,
-                             name='kbase_protein_query_module.check_protein_existence',
-                             types=[dict])
-        self.method_authentication['kbase_protein_query_module.check_protein_existence'] = 'required'  # noqa
-        self.rpc_service.add(impl_kbase_protein_query_module.generate_protein_embedding,
-                             name='kbase_protein_query_module.generate_protein_embedding',
-                             types=[dict])
-        self.method_authentication['kbase_protein_query_module.generate_protein_embedding'] = 'required'  # noqa
-        self.rpc_service.add(impl_kbase_protein_query_module.assign_family_fast,
-                             name='kbase_protein_query_module.assign_family_fast',
-                             types=[dict])
-        self.method_authentication['kbase_protein_query_module.assign_family_fast'] = 'required'  # noqa
-        self.rpc_service.add(impl_kbase_protein_query_module.find_top_matches_from_embedding,
-                             name='kbase_protein_query_module.find_top_matches_from_embedding',
-                             types=[dict])
-        self.method_authentication['kbase_protein_query_module.find_top_matches_from_embedding'] = 'required'  # noqa
-        self.rpc_service.add(impl_kbase_protein_query_module.summarize_and_visualize_results,
-                             name='kbase_protein_query_module.summarize_and_visualize_results',
-                             types=[dict])
-        self.method_authentication['kbase_protein_query_module.summarize_and_visualize_results'] = 'required'  # noqa
+        # Expose only unified discovery endpoint for UI
+        self.rpc_service.add(impl_kbase_protein_query_module.get_available_analyses,
+                             name='kbase_protein_query_module.get_available_analyses',
+                             types=[])
+        self.method_authentication['kbase_protein_query_module.get_available_analyses'] = 'required'  # noqa
         self.rpc_service.add(impl_kbase_protein_query_module.status,
                              name='kbase_protein_query_module.status',
                              types=[dict])

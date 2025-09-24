@@ -116,91 +116,13 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         
         # Workspace client is now always available (either real or mock)
 
-    def test_check_protein_existence(self):
-        """Test protein existence check functionality."""
-        params = {
-            'protein_id': 'P00001',
-            'workspace_name': self.wsName,
-            'generate_embedding': False
-        }
-        
-        result = self.serviceImpl.check_protein_existence(self.ctx, params)
-        
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(result[0], dict)
-        self.assertIn('exists', result[0])
-        self.assertIn('family_id', result[0])
-        self.assertIn('summary', result[0])
-
-    def test_generate_protein_embedding(self):
-        """Test protein embedding generation."""
-        params = {
-            'input_type': 'sequence',
-            'input_data': self.test_sequence,
-            'workspace_name': self.wsName,
-            'model_name': 'esm2_t6_8M_UR50D'
-        }
-        
-        result = self.serviceImpl.generate_protein_embedding(self.ctx, params)
-        
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(result[0], dict)
-        self.assertIn('embedding_result_ref', result[0])
-        self.assertIn('embedding_norm', result[0])
-
-    def test_assign_family_fast(self):
-        """Test family assignment functionality."""
-        # Use mock data to avoid workspace dependencies
-        params = {
-            'embedding_ref': 'demo_embedding_ref',
-            'protein_id': 'P00001',
-            'workspace_name': self.wsName
-        }
-        
-        result = self.serviceImpl.assign_family_fast(self.ctx, params)
-        
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(result[0], dict)
-        self.assertIn('family_id', result[0])
-        self.assertIn('confidence', result[0])
-
-    def test_find_top_matches_from_embedding(self):
-        """Test similarity search functionality."""
-        # Use mock data to avoid workspace dependencies
-        params = {
-            'embedding_ref': 'demo_embedding_ref',
-            'protein_id': 'P00001',
-            'workspace_name': self.wsName,
-            'max_matches': 5
-        }
-        
-        result = self.serviceImpl.find_top_matches_from_embedding(self.ctx, params)
-        
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(result[0], dict)
-        self.assertIn('matches', result[0])
-        self.assertIn('family_id', result[0])
-
-    def test_summarize_and_visualize_results(self):
-        """Test result summarization and visualization."""
-        # Create some demo result refs
-        demo_refs = ['1/1/1', '1/2/1']  # Proper KBase object reference format
-        
-        params = {
-            'result_refs': demo_refs,
-            'output_name': 'test_analysis',
-            'workspace_name': self.wsName
-        }
-        
-        result = self.serviceImpl.summarize_and_visualize_results(self.ctx, params)
-        
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(result[0], dict)
-        self.assertIn('output_directory', result[0])
-        self.assertIn('general_info_dir', result[0])
-        # KBase report fields expected per SDK docs
-        self.assertTrue(len(result[0].get('report_name', '')))
-        self.assertTrue(len(result[0].get('report_ref', '')))
+    def test_get_available_analyses(self):
+        """Test discovery endpoint for available analyses."""
+        res = self.serviceImpl.get_available_analyses(self.ctx)
+        self.assertIsInstance(res, list)
+        self.assertIsInstance(res[0], dict)
+        self.assertIn('available_analyses', res[0])
+        self.assertIn('summary', res[0])
 
     def test_run_protein_query_analysis(self):
         """Test the main unified analysis pipeline."""
@@ -263,22 +185,29 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     def test_error_handling(self):
         """Test error handling for invalid parameters."""
-        # Test with missing required parameter
-        params = {}  # Missing protein_id
-        
-        with self.assertRaises(ValueError):
-            self.serviceImpl.check_protein_existence(self.ctx, params)
+        # Missing workspace_name and required fields
+        params = {}
+        res = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIsInstance(res, list)
+        out = res[0]
+        self.assertEqual(out.get('analysis_result_ref'), 'error')
+        self.assertIn('summary', out)
+        self.assertIn('report_name', out)
+        self.assertIn('report_ref', out)
 
     def test_parameter_validation(self):
         """Test parameter validation."""
-        # Test with missing input_data (should raise ValueError)
+        # Missing conditional input for selected type
         params = {
-            'input_type': 'sequence',
-            'input_data': ''  # Empty input data
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'analysis_name': 'x'
         }
-        
-        with self.assertRaises(ValueError):
-            self.serviceImpl.generate_protein_embedding(self.ctx, params)
+        res = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIsInstance(res, list)
+        out = res[0]
+        self.assertEqual(out.get('analysis_result_ref'), 'error')
+        self.assertIn('summary', out)
 
 
 if __name__ == '__main__':
