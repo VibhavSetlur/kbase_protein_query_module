@@ -209,6 +209,207 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertEqual(out.get('analysis_result_ref'), 'error')
         self.assertIn('summary', out)
 
+    def test_all_input_types(self):
+        """Test all supported input types."""
+        # Test direct_sequences input type
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence],
+            'analysis_name': 'test_direct_sequences'
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('output_directory', result[0])
+        
+        # Test fasta_file input type
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'fasta_file',
+            'fasta_file': 'test.fasta',
+            'analysis_name': 'test_fasta'
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('output_directory', result[0])
+        
+        # Test workspace_object input type
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'workspace_object',
+            'workspace_object': 'test_genome',
+            'analysis_name': 'test_workspace_object'
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('output_directory', result[0])
+
+    def test_individual_methods(self):
+        """Test individual backend methods."""
+        # Test check_protein_existence
+        params = {
+            'workspace_name': self.wsName,
+            'protein_id': 'P00001',
+            'generate_embedding': False
+        }
+        result = self.serviceImpl.check_protein_existence(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('protein_exists', result[0])
+        
+        # Test generate_protein_embedding
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'sequence',
+            'input_data': self.test_sequence,
+            'model_name': 'esm2_t6_8M_UR50D'
+        }
+        result = self.serviceImpl.generate_protein_embedding(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('embedding_ref', result[0])
+        
+        # Test assign_family_fast
+        params = {
+            'workspace_name': self.wsName,
+            'embedding_ref': 'test_embedding',
+            'family_threshold': 0.8
+        }
+        result = self.serviceImpl.assign_family_fast(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('family_assignment_ref', result[0])
+        
+        # Test find_top_matches_from_embedding
+        params = {
+            'workspace_name': self.wsName,
+            'embedding_ref': 'test_embedding',
+            'top_k': 10,
+            'family_id': 'test_family'
+        }
+        result = self.serviceImpl.find_top_matches_from_embedding(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('top_matches_ref', result[0])
+        
+        # Test summarize_and_visualize_results
+        params = {
+            'workspace_name': self.wsName,
+            'result_refs': ['test_ref1', 'test_ref2'],
+            'visualization_type': 'network'
+        }
+        result = self.serviceImpl.summarize_and_visualize_results(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('report_ref', result[0])
+
+    def test_output_validation(self):
+        """Test output structure validation."""
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence],
+            'analysis_name': 'output_test'
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        
+        # Validate main output structure
+        output = result[0]
+        required_fields = [
+            'report_name', 'report_ref', 'analysis_result_ref', 'summary',
+            'input_parameters', 'start_time', 'protein_count', 'stages_completed',
+            'output_directory', 'general_info_dir', 'network_analysis_dir',
+            'sequence_analysis_dir', 'embeddings_file_path', 'top_proteins_csv_path'
+        ]
+        
+        for field in required_fields:
+            self.assertIn(field, output, f"Missing required output field: {field}")
+        
+        # Validate data types
+        self.assertIsInstance(output['start_time'], (int, float))
+        self.assertIsInstance(output['protein_count'], int)
+        self.assertIsInstance(output['stages_completed'], list)
+        self.assertIsInstance(output['input_parameters'], dict)
+
+    def test_error_scenarios(self):
+        """Test various error scenarios."""
+        # Test invalid input type
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'invalid_type',
+            'analysis_name': 'error_test'
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertEqual(result[0].get('analysis_result_ref'), 'error')
+        
+        # Test missing workspace
+        params = {
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence],
+            'analysis_name': 'no_workspace'
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertEqual(result[0].get('analysis_result_ref'), 'error')
+        
+        # Test empty analysis name
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence],
+            'analysis_name': ''
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertEqual(result[0].get('analysis_result_ref'), 'error')
+
+    def test_legacy_compatibility(self):
+        """Test backward compatibility with legacy method names."""
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence],
+            'analysis_name': 'legacy_test'
+        }
+        result = self.serviceImpl.run_kbase_protein_query_module(self.ctx, params)
+        self.assertIsInstance(result, list)
+        self.assertIn('output_directory', result[0])
+
+    def test_stage_selection(self):
+        """Test different analysis stage combinations."""
+        base_params = {
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence],
+            'analysis_name': 'stage_test'
+        }
+        
+        # Test embedding only
+        params = {**base_params, 'enabled_stages': ['embedding_generation']}
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIn('embedding_generation', result[0]['stages_completed'])
+        
+        # Test family assignment only
+        params = {**base_params, 'enabled_stages': ['family_assignment']}
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIn('family_assignment', result[0]['stages_completed'])
+        
+        # Test full pipeline
+        params = {**base_params, 'enabled_stages': ['embedding_generation', 'family_assignment', 'similarity_search']}
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertGreater(len(result[0]['stages_completed']), 2)
+
+    def test_performance_monitoring(self):
+        """Test performance monitoring and resource usage."""
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'direct_sequences',
+            'direct_sequences': [self.test_sequence] * 10,  # Multiple sequences
+            'analysis_name': 'perf_test'
+        }
+        
+        start_time = time.time()
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        execution_time = time.time() - start_time
+        
+        # Validate timing information
+        self.assertIn('start_time', result[0])
+        self.assertGreater(execution_time, 0)
+        self.assertLess(execution_time, 60)  # Should complete within reasonable time
+
 
 if __name__ == '__main__':
     unittest.main()

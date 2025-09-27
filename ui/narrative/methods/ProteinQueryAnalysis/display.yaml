@@ -1,51 +1,29 @@
-name: Protein Query Analysis v2.0
-tooltip: Protein analysis pipeline with embeddings, similarity, families, and reports
+name: Protein Query Analysis
+tooltip: Protein query analysis pipeline
+screenshots: []
 
 parameters:
     input_type:
         ui-name: Input Type
-        short-hint: Choose input source
-        description: |
-            Select the type of protein input to analyze:
-            - UniProt Identifiers: Enter UniProt IDs
-            - FASTA File: Upload a FASTA file
-            - Workspace Object: Select from workspace
-            - Direct Protein Sequences: Enter sequences directly
+        short-hint: Select input type
 
-    uniprot_ids:
-        ui-name: UniProt Identifiers
-        short-hint: UniProt IDs (comma, tab, or newline separated)
-        description: |
-            Enter UniProt protein identifiers separated by commas, tabs, or newlines.
-            Examples: P12345, Q67890, R11111
+    direct_sequence:
+        ui-name: Direct Sequence
+        short-hint: Protein sequence
 
-    fasta_file:
+    fasta:
         ui-name: FASTA File
         short-hint: Upload FASTA file
-        description: |
-            Upload a FASTA file containing protein sequences in standard FASTA format.
 
     workspace_object:
         ui-name: Workspace Object
         short-hint: Select workspace object
-        description: |
-            Select a workspace object from your workspace.
-            Supported types: Genome, GenomeSet, ProteinSequenceSet, FeatureSet.
-
-    direct_sequences:
-        ui-name: Direct Protein Sequences
-        short-hint: Protein sequences (one per line or comma separated)
-        description: |
-            Enter protein sequences directly. Multiple sequences can be separated by commas or newlines.
-            Use valid amino acid characters (ACDEFGHIKLMNPQRSTVWY).
 
     analysis_name:
         ui-name: Analysis Name
-        short-hint: Name for the analysis run
-        description: |
-            Name for this analysis run. Results will be saved with this name in your workspace.
+        short-hint: Name for analysis
 
 description: |
-    Unified protein analysis for various analyses
+    Protein query analysis pipeline
 
 

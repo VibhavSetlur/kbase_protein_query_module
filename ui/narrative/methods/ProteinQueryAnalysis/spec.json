@@ -2,10 +2,10 @@
   "ver": 1,
   "name": "ProteinQueryAnalysis",
   "label": "Protein Query Analysis",
-  "tooltip": "Analyze protein sequences using advanced bioinformatics methods including embedding generation, similarity search, and network analysis",
+  "tooltip": "Protein query analysis pipeline",
   "header": "Protein Query Analysis",
-  "description": "This app performs comprehensive protein analysis including sequence analysis, embedding generation, similarity search, family assignment, network analysis, and bioinformatics analysis. Supports multiple input types: UniProt IDs, FASTA files, workspace objects (Genome, GenomeSet, ProteinSequenceSet), and direct protein sequences.",
-  "categories": ["annotation", "metagenomes", "sequence analysis"],
+  "description": "Protein query analysis pipeline",
+  "categories": ["annotation", "sequence analysis"],
   "icon": "protein",
   "screenshots": [],
   "contact": "help@kbase.us",
@@ -19,100 +19,66 @@
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": ["uniprot_ids"],
+      "default_values": ["direct_sequence"],
       "field_type": "dropdown",
       "dropdown_options": {
         "options": [
-          {"value": "uniprot_ids", "display": "UniProt Identifiers"},
-          {"value": "fasta_file", "display": "FASTA File"},
-          {"value": "workspace_object", "display": "Workspace Object"},
-          {"value": "direct_sequences", "display": "Direct Protein Sequences"}
+          {"value": "direct_sequence", "display": "Direct Sequence"},
+          {"value": "fasta", "display": "FASTA"},
+          {"value": "workspace_object", "display": "Workspace Object"}
         ]
-      },
-      "ui_name": "Input Type",
-      "short_hint": "Type of protein input to analyze",
-      "description": "Select the type of protein input you want to analyze.",
-      "allowed_types": ["string"]
+      }
     },
     {
-      "id": "uniprot_ids",
-      "optional": true,
-      "advanced": false,
-      "allow_multiple": true,
-      "default_values": [],
-      "field_type": "text",
-      "text_options": {
-        "validate_as": "uniprot_id",
-        "is_output_name": false
-      },
-      "ui_name": "UniProt Identifiers",
-      "short_hint": "UniProt IDs (comma, tab, or newline separated)",
-      "description": "Enter UniProt protein identifiers separated by commas, tabs, or newlines. Examples: P12345, Q67890, R11111",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "fasta_file",
+      "id": "direct_sequence",
       "optional": true,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": [],
-      "field_type": "file",
-      "text_options": {
-        "validate_as": "fasta_file",
-        "is_output_name": false
-      },
-      "ui_name": "FASTA File",
-      "short_hint": "Upload a FASTA file containing protein sequences",
-      "description": "Upload a FASTA file containing protein sequences in standard FASTA format.",
-      "allowed_types": ["string"]
+      "default_values": [""],
+      "field_type": "text",
+      "conditional": {
+        "control_param": "input_type",
+        "control_value": "direct_sequence"
+      }
+    },
+    {
+      "id": "fasta",
+      "optional": true,
+      "advanced": false,
+      "allow_multiple": false,
+      "default_values": [""],
+      "field_type": "upload",
+      "valid_file_types": ["fasta"],
+      "conditional": {
+        "control_param": "input_type",
+        "control_value": "fasta"
+      }
     },
     {
       "id": "workspace_object",
       "optional": true,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": [],
-      "field_type": "text",
+      "default_values": [""],
+      "field_type": "dropdown",
       "text_options": {
-        "valid_ws_types": ["KBaseGenomes.Genome", "KBaseGenomes.GenomeSet", "KBaseGenomes.ContigSet", "KBaseFBA.NewModel", "KBaseFBA.FBAModel", "KBaseGenomes.ProteinSequenceSet"],
-        "validate_as": "workspace_object_name",
-        "is_output_name": false
+        "valid_ws_types": ["KBaseGenomes.Genome", "KBaseGenomes.GenomeSet", "KBaseGenomes.ProteinSequenceSet"]
       },
-      "ui_name": "Workspace Object",
-      "short_hint": "Select a workspace object containing protein data",
-      "description": "Select a workspace object from your workspace. Supported types: Genome, GenomeSet, ProteinSequenceSet, FeatureSet.",
-      "allowed_types": ["string"]
-    },
-    {
-      "id": "direct_sequences",
-      "optional": true,
-      "advanced": false,
-      "allow_multiple": true,
-      "default_values": [],
-      "field_type": "text",
-      "text_options": {
-        "validate_as": "protein_sequence",
-        "is_output_name": false
-      },
-      "ui_name": "Direct Protein Sequences",
-      "short_hint": "Protein sequences (one per line or comma separated)",
-      "description": "Enter protein sequences directly. Multiple sequences can be separated by commas or newlines. Use valid amino acid characters (ACDEFGHIKLMNPQRSTVWY).",
-      "allowed_types": ["string"]
+      "conditional": {
+        "control_param": "input_type",
+        "control_value": "workspace_object"
+      }
     },
     {
       "id": "analysis_name",
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": [],
+      "default_values": [""],
       "field_type": "text",
       "text_options": {
         "is_output_name": true
-      },
-      "ui_name": "Analysis Name",
-      "short_hint": "Name for the analysis run",
-      "description": "Name for this analysis run. Results will be saved with this name in your workspace.",
-      "allowed_types": ["string"]
+      }
     }
   ],
   "job_id_output_field": "docker",
@@ -131,20 +97,16 @@
           "target_property": "input_type"
         },
         {
-          "input_parameter": "uniprot_ids",
-          "target_property": "uniprot_ids"
+          "input_parameter": "direct_sequence",
+          "target_property": "direct_sequences"
         },
         {
-          "input_parameter": "fasta_file",
+          "input_parameter": "fasta",
           "target_property": "fasta_file"
         },
         {
           "input_parameter": "workspace_object",
           "target_property": "workspace_object"
-        },
-        {
-          "input_parameter": "direct_sequences",
-          "target_property": "direct_sequences"
         },
         {
           "input_parameter": "analysis_name",
