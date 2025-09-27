@@ -980,6 +980,10 @@ Contact: https://kbase.us/contact-us/
             wf_result = workflow.execute()
             final = wf_result.final_output or {}
             stages_completed = wf_result.stages_completed or final.get('stages_completed', [])
+            
+            # Get workspace objects created by the workflow
+            workspace_objects = final.get('workspace_objects', [])
+            workspace_objects_summary = final.get('workspace_objects_summary', {})
 
             # Ensure report fields are always present for Narrative integration
             report_name = final.get('report_name') or final.get('report', {}).get('name') or f"{analysis_name}_report"
@@ -1007,10 +1011,19 @@ Contact: https://kbase.us/contact-us/
             if not normalized['report_ref']:
                 try:
                     report_client = KBaseReport(self.callback_url)
+                    
+                    # Create report message with workspace objects information
+                    report_message = normalized['summary']
+                    if workspace_objects:
+                        report_message += f"\n\nCreated {len(workspace_objects)} workspace objects:\n"
+                        for obj in workspace_objects:
+                            report_message += f"- {obj.get('name', 'Unknown')}: {obj.get('description', 'No description')}\n"
+                    
                     report_info = report_client.create_extended_report({
-                        'message': normalized['summary'],
+                        'message': report_message,
                         'workspace_name': workspace_name,
-                        'report_object_name': f"{analysis_name}_report"
+                        'report_object_name': f"{analysis_name}_report",
+                        'objects_created': workspace_objects  # Include workspace objects in report
                     })
                     normalized['report_name'] = report_info.get('name', normalized['report_name'])
                     normalized['report_ref'] = report_info.get('ref', normalized['report_ref'])
@@ -1030,6 +1043,22 @@ Contact: https://kbase.us/contact-us/
                     logger.error(f"run_protein_query_analysis failed: {e}")
             except Exception:
                 logger.error(f"run_protein_query_analysis failed: {e}")
+            # Create error report without HTML
+            try:
+                report_client = KBaseReport(self.callback_url)
+                error_report = report_client.create_extended_report({
+                    'message': f'Analysis failed: {str(e)}',
+                    'objects_created': [],
+                    'workspace_name': workspace_name,
+                    'report_object_name': f"{analysis_name}_error_report"
+                })
+            except Exception as report_error:
+                logger.error(f"Failed to create error report: {report_error}")
+                error_report = {
+                    'name': f"{analysis_name}_error_report",
+                    'ref': f'report_error_{int(time.time())}'
+                }
+            
             return [{
                 'job_id': f'error_{int(time.time())}',
                 'analysis_result_ref': 'error',
@@ -1042,11 +1071,11 @@ Contact: https://kbase.us/contact-us/
                 'sequence_analysis_dir': self.shared_folder,
                 'embeddings_file_path': '',
                 'top_proteins_csv_path': '',
-                'html_report_path': 'error_report.html',
+                'html_report_path': '',  # No HTML error reports
                 'protein_count': 0,
                 'stages_completed': [],
-                'report_name': 'error_report',
-                'report_ref': f'report_{int(time.time())}'
+                'report_name': error_report['name'],
+                'report_ref': error_report['ref']
             }]
             
             workspace_name = params.get('workspace_name')
@@ -1101,104 +1130,14 @@ Contact: https://kbase.us/contact-us/
                         'results': [{'protein_id': protein_id, 'result': f'mock_{stage}_result'} for protein_id in input_proteins]
                     }
             
-            # Create test output directory if in test environment
+            # Create data output directory for CSV and JSON files only (no HTML reports)
             output_directory = None
-            test_files = []
+            data_files = []
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             
             if os.path.exists("test/outputs"):
                 test_output_dir = os.path.join("test", "outputs", f"pipeline_run_{timestamp}")
                 os.makedirs(test_output_dir, exist_ok=True)
-                
-                # Create comprehensive analysis summary
-                index_content = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Protein Analysis Results</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="container mt-4">
-    <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h1>Protein Analysis Results</h1>
-        </div>
-        <div class="card-body">
-            <h2>Analysis Summary</h2>
-            <table class="table table-striped">
-                <tr><td><strong>Analysis ID:</strong></td><td>{output_report_name}</td></tr>
-                <tr><td><strong>Proteins Analyzed:</strong></td><td>{len(input_proteins)}</td></tr>
-                <tr><td><strong>Analysis Stages:</strong></td><td>{', '.join(analysis_stages)}</td></tr>
-                <tr><td><strong>Generated:</strong></td><td>{timestamp}</td></tr>
-            </table>
-            
-            <h2>Available Reports</h2>
-            <div class="list-group">
-                <a href="sequence_analysis.html" class="list-group-item list-group-item-action">
-                    <strong>Sequence Analysis</strong><br>
-                    <small>Molecular properties and sequence characterization</small>
-                </a>
-                <a href="family_assignment.html" class="list-group-item list-group-item-action">
-                    <strong>Family Assignment</strong><br>
-                    <small>Protein family classification results</small>
-                </a>
-                <a href="similarity_search.html" class="list-group-item list-group-item-action">
-                    <strong>Similarity Search</strong><br>
-                    <small>Similar protein matches and rankings</small>
-                </a>
-            </div>
-            
-            <h2>Data Downloads</h2>
-            <div class="row">
-                <div class="col-md-6">
-                    <a href="top_proteins_with_metadata.csv" class="btn btn-success btn-block">
-                        Download Protein Data CSV
-                    </a>
-                </div>
-                <div class="col-md-6">
-                    <a href="pipeline_results.json" class="btn btn-info btn-block">
-                        Download Complete Results JSON
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>"""
-                
-                # Write index.html
-                index_path = os.path.join(test_output_dir, "index.html")
-                with open(index_path, 'w') as f:
-                    f.write(index_content)
-                test_files.append(index_path)
-                
-                # Create individual analysis HTML files
-                for stage in analysis_stages:
-                    stage_html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{stage.title()} Analysis</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="container mt-4">
-    <h1>{stage.replace('_', ' ').title()} Analysis</h1>
-    <div class="card">
-        <div class="card-body">
-            <h2>Results</h2>
-            <p>Analysis completed for {len(input_proteins)} proteins.</p>
-            <h3>Stage Data</h3>
-            <pre>{pipeline_results.get(stage, {})}</pre>
-        </div>
-    </div>
-    <a href="index.html" class="btn btn-secondary">Back to Summary</a>
-</body>
-</html>"""
-                    stage_path = os.path.join(test_output_dir, f"{stage}.html")
-                    with open(stage_path, 'w') as f:
-                        f.write(stage_html)
-                    test_files.append(stage_path)
                 
                 # Create CSV file
                 csv_content = "rank,protein_id,similarity_score,family,description,source_type,input_protein_index\n"
@@ -1209,7 +1148,7 @@ Contact: https://kbase.us/contact-us/
                 csv_path = os.path.join(test_output_dir, "top_proteins_with_metadata.csv")
                 with open(csv_path, 'w') as f:
                     f.write(csv_content)
-                test_files.append(csv_path)
+                data_files.append(csv_path)
                 
                 # Create JSON results
                 import json
@@ -1224,176 +1163,40 @@ Contact: https://kbase.us/contact-us/
                 json_path = os.path.join(test_output_dir, "pipeline_results.json")
                 with open(json_path, 'w') as f:
                     json.dump(json_data, f, indent=2)
-                test_files.append(json_path)
+                data_files.append(json_path)
                 
                 output_directory = test_output_dir
                 logger.info(f"Created test output directory: {test_output_dir}")
-                print(f"Generated {len(test_files)} output files in {test_output_dir}")
+                print(f"Generated {len(data_files)} data files in {test_output_dir}")
             
-            # Create simple KBase report
+            # Create KBase report with data files only (no HTML reports)
             try:
                 report_client = KBaseReport(self.callback_url)
                 report_info = report_client.create_extended_report({
-                    'message': f'Protein analysis completed for {protein_count} proteins. Analysis stages: {", ".join(analysis_stages)}. Results include individual HTML reports, CSV data, and comprehensive pipeline results.',
+                    'message': f'Protein analysis completed for {protein_count} proteins. Analysis stages: {", ".join(analysis_stages)}. Results include CSV data files and comprehensive pipeline results saved as workspace objects.',
                     'workspace_name': workspace_name,
                     'report_object_name': output_report_name,
-                    'html_links': [{'path': output_directory, 'name': 'index.html', 'description': 'Analysis Summary Report'}] if output_directory else [],
-                    'file_links': [{'path': f, 'name': os.path.basename(f), 'description': f'Analysis file: {os.path.basename(f)}'} for f in test_files] if test_files else []
+                    'file_links': [{'path': f, 'name': os.path.basename(f), 'description': f'Analysis data file: {os.path.basename(f)}'} for f in data_files] if data_files else []
                 })
             except Exception as e:
                 logger.error(f"Failed to create report: {e}")
                 report_info = {'name': output_report_name, 'ref': f'report_{int(time.time())}'}
             
             # Set up proper output directory for KBase Narrative integration
-            os.environ['HTML_REPORTS_DIR'] = self.shared_folder
             os.environ['EXPORTS_DIR'] = self.shared_folder
             os.environ['SCRATCH_DIR'] = self.shared_folder
             
-            # Generate comprehensive directory-based outputs
-            report_stage = ReportGenerationStage()
-            report_result = report_stage.run({
-                'pipeline_results': pipeline_results,
-                'protein_id': f"analysis_{protein_count}_proteins"
-            })
-            
-            # Validate report result
-            if not hasattr(report_result, 'success'):
-                logger.error("Report stage returned invalid result object")
-                report_result = type('StageResult', (), {
-                    'success': False,
-                    'output_data': {},
-                    'metadata': {},
-                    'execution_time': 0
-                })()
-            
-            # Export data files (CSV, JSON)
-            export_stage = DataExportStage()
-            export_result = export_stage.run({
-                'pipeline_results': pipeline_results,
-                'input_proteins': input_proteins,
-                'output_directory': report_result.output_data.get('output_directory') if report_result.success else None
-            })
-            
-            # Validate export result
-            if not hasattr(export_result, 'success'):
-                logger.error("Export stage returned invalid result object")
-                export_result = type('StageResult', (), {
-                    'success': False,
-                    'output_data': {},
-                    'metadata': {},
-                    'execution_time': 0
-                })()
-            
-            # Create KBase report with directory-based outputs
-            try:
-                if report_result.success and 'output_directory' in report_result.output_data:
-                    output_directory = report_result.output_data['output_directory']
-                    
-                    # Validate output directory exists
-                    if not output_directory or not os.path.exists(output_directory):
-                        logger.error(f"Output directory not found: {output_directory}")
-                        raise ValueError("Output directory not generated properly")
-                else:
-                    # Create fallback output directory
-                    logger.warning("Report generation failed, creating fallback output directory")
-                    timestamp = time.strftime("%Y%m%d_%H%M%S")
-                    fallback_dir = os.path.join(self.shared_folder, f"protein_analysis_{timestamp}")
-                    os.makedirs(fallback_dir, exist_ok=True)
-                    
-                    # Create minimal index.html
-                    index_content = f"""<!DOCTYPE html>
-<html><head><title>Protein Analysis</title></head>
-<body><h1>Protein Analysis Results</h1>
-<p>Analysis completed for {protein_count} proteins.</p>
-<p>Generated: {timestamp}</p></body></html>"""
-                    
-                    index_path = os.path.join(fallback_dir, 'index.html')
-                    with open(index_path, 'w') as f:
-                        f.write(index_content)
-                    
-                    output_directory = fallback_dir
-                    
-                    # Prepare file links for KBaseReport
-                    file_links = []
-                    if export_result.success:
-                        export_files = export_result.output_data.get('export_files', [])
-                        for file_path in export_files:
-                            if os.path.exists(file_path):
-                                file_links.append({
-                                    'path': file_path,
-                                    'name': os.path.basename(file_path),
-                                    'description': f'Analysis data export: {os.path.basename(file_path)}'
-                                })
-                    
-                    # Create report with directory structure optimized for KBase Narrative
-                    if self.kb_util and hasattr(self.kb_util, 'create_report'):
-                        report_data = {
-                            'message': f"""Protein Analysis Complete - {protein_count} proteins analyzed
-                            
-Your comprehensive protein analysis results are ready! This analysis includes:
-
-???? SUMMARY REPORT: Complete overview with download links
-???? INDIVIDUAL ANALYSES: Separate HTML files for each analysis type
-???? DATA FILES: CSV files with top proteins, metadata, and research data
-???? DETAILED LOGS: Complete pipeline execution information
-
-FILES INCLUDED:
-??? Summary Report (index.html) - Main overview and navigation
-??? Individual Analysis Reports - Separate HTML for each analysis stage  
-??? Top Proteins CSV - Comprehensive protein data with metadata and input correlations
-??? Metadata Files - Research-ready data exports
-??? Pipeline Logs - Complete execution details
-
-All files are organized in a single directory for easy download and use in KBase Narrative.""",
-                            'html_links': [{
-                                'path': output_directory,
-                                'name': 'index.html',
-                                'description': 'Protein Analysis Summary - Individual reports, data downloads, and comprehensive results'
-                            }],
-                            'direct_html_link_index': 0,
-                            'file_links': file_links,
-                            'workspace_name': workspace_name,
-                            'report_object_name': output_report_name
-                        }
-                        report_info = self.kb_util.create_report(report_data, workspace_name)
-                    else:
-                        # Fallback to direct report client usage
-                        report_client = KBaseReport(self.callback_url)
-                report_info = report_client.create_extended_report({
-                            'message': f"""Protein Analysis Complete - {protein_count} proteins analyzed
-
-Your comprehensive protein analysis results include individual HTML reports for each analysis, a summary HTML file, and CSV files with top protein matches and metadata. All files are organized in a downloadable directory structure.""",
-                            'html_links': [{
-                                'path': output_directory,
-                                'name': 'index.html',
-                                'description': 'Protein Analysis Summary - Individual reports, data downloads, and comprehensive results'
-                            }],
-                            'direct_html_link_index': 0,
-                            'file_links': file_links,
-                    'workspace_name': workspace_name,
-                            'report_object_name': output_report_name
-                        })
-            except Exception as e:
-                logger.error(f"Failed to create KBase report: {e}")
-                report_info = {
-                    'name': f'protein_analysis_{int(time.time())}',
-                    'ref': 'error_report_ref'
-                }
-            
-                        # Update output with directory-based results
+            # Update output with directory-based results
             stages_completed = list(pipeline_results.keys())
             
-            # Include test output directory if created
-            output_directory = test_output_dir if os.path.exists("test/outputs") and os.path.exists(test_output_dir) else (output_directory or self.shared_folder)
-                
             output = {
-                    'report_name': report_info['name'],
-                    'report_ref': report_info['ref'],
+                'report_name': report_info['name'],
+                'report_ref': report_info['ref'],
                 'analysis_result_ref': f'analysis_{int(time.time())}',
-                'summary': f'Completed protein query analysis with {len(stages_completed)} stages. Output directory contains separate HTML files for each analysis stage.',
-                    'input_parameters': params,
-                    'start_time': start_time,
-                'html_report_path': report_result.output_data.get('main_report_path', 'index.html') if report_result.success else 'analysis_report.html',
+                'summary': f'Completed protein query analysis with {len(stages_completed)} stages. Results saved as workspace objects and data files.',
+                'input_parameters': params,
+                'start_time': start_time,
+                'html_report_path': '',  # No HTML reports
                 'protein_count': protein_count,
                 'stages_completed': stages_completed,
                 'output_directory': output_directory,
@@ -1401,15 +1204,14 @@ Your comprehensive protein analysis results include individual HTML reports for 
                 'network_analysis_dir': output_directory,
                 'sequence_analysis_dir': output_directory,
                 'job_id': f'job_{int(time.time())}',
-                'embeddings_file_path': csv_path if output_directory else None,
-                'top_proteins_csv_path': csv_path if output_directory else None,
-                'exported_files': [csv_path] if output_directory else [],
-                'html_report_files': [index_path] if output_directory else []
-                }
+                'embeddings_file_path': csv_path if output_directory else '',
+                'top_proteins_csv_path': csv_path if output_directory else '',
+                'exported_files': data_files if output_directory else []
+            }
             
         except Exception as e:
             logger.error(f"Protein query analysis failed: {e}")
-            # Inline error report creation
+            # Create error report without HTML
             try:
                 error_report_client = KBaseReport(self.callback_url)
                 error_report = error_report_client.create_extended_report({
@@ -1432,7 +1234,7 @@ Your comprehensive protein analysis results include individual HTML reports for 
                 'summary': f'Analysis failed: {str(e)}',
                 'input_parameters': params,
                 'start_time': start_time,
-                'html_report_path': 'error_report.html',
+                'html_report_path': '',  # No HTML error reports
                 'protein_count': 0,
                 'stages_completed': [],
                 'output_directory': self.shared_folder,
@@ -1440,8 +1242,8 @@ Your comprehensive protein analysis results include individual HTML reports for 
                 'network_analysis_dir': self.shared_folder,
                 'sequence_analysis_dir': self.shared_folder,
                 'job_id': f'error_job_{int(time.time())}',
-                'embeddings_file_path': f'{self.shared_folder}/embeddings.csv',
-                'top_proteins_csv_path': f'{self.shared_folder}/top_proteins.csv'
+                'embeddings_file_path': '',
+                'top_proteins_csv_path': ''
             }
         #END run_protein_query_analysis
 

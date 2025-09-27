@@ -35,7 +35,7 @@ class OutputManager:
     """
     
     def __init__(self, base_output_dir: str, run_id: str, 
-                 workspace_name: Optional[str] = None):
+                 workspace_name: Optional[str] = None, kb_util=None):
         """
         Initialize the Output Manager.
         
@@ -43,10 +43,12 @@ class OutputManager:
             base_output_dir: Base directory for all outputs
             run_id: Unique identifier for this run
             workspace_name: KBase workspace name if applicable
+            kb_util: KBase utility library instance for workspace operations
         """
         self.base_output_dir = base_output_dir
         self.run_id = run_id
         self.workspace_name = workspace_name
+        self.kb_util = kb_util
         self.timestamp = time.strftime("%Y%m%d_%H%M%S")
         
         # Create main output directory structure
@@ -59,7 +61,8 @@ class OutputManager:
         
         # Initialize tracking
         self.artifacts: List[ArtifactRecord] = []
-        self.analysis_outputs: Dict[str, Any] = {}
+        self.analysis_outputs: Dict[str, Any] = []
+        self.workspace_objects: List[Dict[str, str]] = []  # Track created workspace objects
         
         # Create subdirectories
         self._create_directory_structure()
@@ -412,3 +415,211 @@ class OutputManager:
             summary["total_size_bytes"] += artifact.size_bytes
         
         return summary
+    
+    def create_workspace_objects(self, analysis_results: Dict[str, Any]) -> List[Dict[str, str]]:
+        """
+        Create KBase workspace objects from analysis results.
+        
+        Args:
+            analysis_results: Results from all analyses
+            
+        Returns:
+            List of created workspace object references
+        """
+        created_objects = []
+        
+        if not self.kb_util or not self.workspace_name:
+            logger.warning("No KBUtilLib or workspace name available for workspace object creation")
+            return created_objects
+        
+        try:
+            # Create main analysis results object
+            main_results_data = {
+                'run_id': self.run_id,
+                'timestamp': self.timestamp,
+                'workspace_name': self.workspace_name,
+                'analyses_completed': list(analysis_results.keys()),
+                'summary': self._generate_analysis_summary(analysis_results),
+                'analysis_results': analysis_results,
+                'total_artifacts': len(self.artifacts),
+                'output_directory': self.root_dir
+            }
+            
+            main_object_ref = self._save_workspace_object(
+                f"{self.run_id}_protein_analysis_results",
+                'KBaseProteinQueryModule.ProteinAnalysisResults',
+                main_results_data,
+                "Complete protein analysis results from all stages"
+            )
+            
+            if main_object_ref:
+                created_objects.append({
+                    'ref': main_object_ref,
+                    'name': f"{self.run_id}_protein_analysis_results",
+                    'type': 'KBaseProteinQueryModule.ProteinAnalysisResults',
+                    'description': 'Complete protein analysis results from all stages'
+                })
+            
+            # Create individual analysis result objects
+            for analysis_name, result_data in analysis_results.items():
+                if result_data and 'error' not in result_data:
+                    analysis_object_data = {
+                        'analysis_name': analysis_name,
+                        'run_id': self.run_id,
+                        'timestamp': self.timestamp,
+                        'results': result_data,
+                        'metadata': {
+                            'output_directory': self.root_dir,
+                            'artifacts_count': len([a for a in self.artifacts if a.analysis_type == analysis_name])
+                        }
+                    }
+                    
+                    analysis_object_ref = self._save_workspace_object(
+                        f"{self.run_id}_{analysis_name}_results",
+                        'KBaseProteinQueryModule.AnalysisResult',
+                        analysis_object_data,
+                        f"Results from {analysis_name} analysis"
+                    )
+                    
+                    if analysis_object_ref:
+                        created_objects.append({
+                            'ref': analysis_object_ref,
+                            'name': f"{self.run_id}_{analysis_name}_results",
+                            'type': 'KBaseProteinQueryModule.AnalysisResult',
+                            'description': f"Results from {analysis_name} analysis"
+                        })
+            
+            # Create data export objects for CSV and JSON files
+            csv_files = [a for a in self.artifacts if a.kind == 'csv']
+            json_files = [a for a in self.artifacts if a.kind == 'json']
+            
+            if csv_files:
+                csv_data = {
+                    'run_id': self.run_id,
+                    'timestamp': self.timestamp,
+                    'files': [{'path': a.path, 'description': a.description, 'size_bytes': a.size_bytes} for a in csv_files],
+                    'total_files': len(csv_files)
+                }
+                
+                csv_object_ref = self._save_workspace_object(
+                    f"{self.run_id}_data_exports",
+                    'KBaseProteinQueryModule.DataExports',
+                    csv_data,
+                    "CSV data exports from protein analysis"
+                )
+                
+                if csv_object_ref:
+                    created_objects.append({
+                        'ref': csv_object_ref,
+                        'name': f"{self.run_id}_data_exports",
+                        'type': 'KBaseProteinQueryModule.DataExports',
+                        'description': "CSV data exports from protein analysis"
+                    })
+            
+            if json_files:
+                json_data = {
+                    'run_id': self.run_id,
+                    'timestamp': self.timestamp,
+                    'files': [{'path': a.path, 'description': a.description, 'size_bytes': a.size_bytes} for a in json_files],
+                    'total_files': len(json_files)
+                }
+                
+                json_object_ref = self._save_workspace_object(
+                    f"{self.run_id}_analysis_metadata",
+                    'KBaseProteinQueryModule.AnalysisMetadata',
+                    json_data,
+                    "JSON metadata and configuration files from protein analysis"
+                )
+                
+                if json_object_ref:
+                    created_objects.append({
+                        'ref': json_object_ref,
+                        'name': f"{self.run_id}_analysis_metadata",
+                        'type': 'KBaseProteinQueryModule.AnalysisMetadata',
+                        'description': "JSON metadata and configuration files from protein analysis"
+                    })
+            
+            # Store created objects
+            self.workspace_objects = created_objects
+            
+            logger.info(f"Created {len(created_objects)} workspace objects")
+            return created_objects
+            
+        except Exception as e:
+            logger.error(f"Failed to create workspace objects: {e}")
+            return created_objects
+    
+    def _save_workspace_object(self, object_name: str, object_type: str, 
+                              object_data: Dict[str, Any], description: str = "") -> Optional[str]:
+        """
+        Save a single workspace object using KBUtilLib.
+        
+        Args:
+            object_name: Name for the workspace object
+            object_type: KBase object type
+            object_data: Data to save
+            description: Description of the object
+            
+        Returns:
+            Object reference if successful, None otherwise
+        """
+        try:
+            if hasattr(self.kb_util, 'save_workspace_object'):
+                object_ref = self.kb_util.save_workspace_object(
+                    self.workspace_name,
+                    object_name,
+                    object_type,
+                    object_data
+                )
+                logger.info(f"Saved workspace object: {object_name} ({object_type})")
+                return object_ref
+            else:
+                logger.warning("KBUtilLib save_workspace_object method not available")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to save workspace object {object_name}: {e}")
+            return None
+    
+    def _generate_analysis_summary(self, analysis_results: Dict[str, Any]) -> str:
+        """
+        Generate a summary of analysis results for workspace object.
+        
+        Args:
+            analysis_results: Results from all analyses
+            
+        Returns:
+            Summary string
+        """
+        summary_parts = [
+            f"Protein Query Analysis Run {self.run_id}",
+            f"Completed {len(analysis_results)} analyses:",
+        ]
+        
+        for analysis_name, result in analysis_results.items():
+            if isinstance(result, dict) and 'error' in result:
+                summary_parts.append(f"  - {analysis_name}: FAILED ({result['error']})")
+            else:
+                summary_parts.append(f"  - {analysis_name}: SUCCESS")
+        
+        summary_parts.extend([
+            f"Total artifacts generated: {len(self.artifacts)}",
+            f"Output directory: {self.root_dir}",
+            f"Generated: {self.timestamp}"
+        ])
+        
+        return "\n".join(summary_parts)
+    
+    def get_workspace_objects_summary(self) -> Dict[str, Any]:
+        """
+        Get summary of all created workspace objects.
+        
+        Returns:
+            Dictionary with workspace objects summary
+        """
+        return {
+            'total_objects': len(self.workspace_objects),
+            'objects': self.workspace_objects,
+            'workspace_name': self.workspace_name,
+            'run_id': self.run_id
+        }

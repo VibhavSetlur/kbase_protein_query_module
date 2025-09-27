@@ -86,11 +86,12 @@ class WorkflowOrchestrator:
             workspace_name: KBase workspace name if applicable
         """
         try:
-            # Initialize output manager
+            # Initialize output manager with KBUtilLib
             self.output_manager = OutputManager(
                 base_output_dir=output_dir,
                 run_id=self.run_id,
-                workspace_name=workspace_name
+                workspace_name=workspace_name,
+                kb_util=self.kb_util
             )
             
             # Initialize analysis manager with output manager
@@ -334,7 +335,7 @@ class WorkflowOrchestrator:
     
     def _generate_final_outputs(self, analysis_results: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate final consolidated outputs.
+        Generate final consolidated outputs and create workspace objects.
         
         Args:
             analysis_results: Results from all analyses
@@ -360,6 +361,16 @@ class WorkflowOrchestrator:
                 final_output,
                 description="Final consolidated output from all analyses"
             )
+            
+            # Create workspace objects for all outputs
+            logger.info("Creating workspace objects from analysis results")
+            workspace_objects = self.output_manager.create_workspace_objects(analysis_results)
+            
+            # Add workspace objects info to final output
+            final_output["workspace_objects"] = workspace_objects
+            final_output["workspace_objects_summary"] = self.output_manager.get_workspace_objects_summary()
+            
+            logger.info(f"Created {len(workspace_objects)} workspace objects")
             
             return final_output
             
