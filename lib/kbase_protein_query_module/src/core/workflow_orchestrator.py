@@ -50,15 +50,23 @@ class WorkflowOrchestrator:
     through dedicated managers for each component.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None, kb_util=None):
+    def __init__(self, config: Optional[Union[Dict[str, Any], PipelineConfig]] = None, kb_util=None):
         """
         Initialize the Workflow Orchestrator.
         
         Args:
-            config: Configuration dictionary for the workflow
+            config: Configuration dictionary or PipelineConfig object for the workflow
             kb_util: KBase utility library instance
         """
-        self.config = config or {}
+        # Handle both dict and PipelineConfig objects
+        if isinstance(config, PipelineConfig):
+            # Convert PipelineConfig to dictionary
+            self.config = self._pipeline_config_to_dict(config)
+            self.pipeline_config = config
+        else:
+            self.config = config or {}
+            self.pipeline_config = None
+            
         self.kb_util = kb_util
         self.run_id = str(uuid.uuid4())[:8]
         
@@ -77,6 +85,31 @@ class WorkflowOrchestrator:
         
         logger.info(f"WorkflowOrchestrator initialized with run_id: {self.run_id}")
     
+    def _pipeline_config_to_dict(self, config: PipelineConfig) -> Dict[str, Any]:
+        """Convert PipelineConfig object to dictionary."""
+        import dataclasses
+        
+        if hasattr(config, '__dict__'):
+            return {k: v for k, v in config.__dict__.items() if not k.startswith('_')}
+        elif dataclasses.is_dataclass(config):
+            return dataclasses.asdict(config)
+        else:
+            # Fallback: convert to dict manually
+            return {
+                'input_proteins': getattr(config, 'input_proteins', []),
+                'enabled_stages': getattr(config, 'enabled_stages', []),
+                'stage_configs': getattr(config, 'stage_configs', {}),
+                'storage_config': getattr(config, 'storage_config', {}),
+                'similarity_config': getattr(config, 'similarity_config', {}),
+                'output_dir': getattr(config, 'output_dir', '/tmp'),
+                'workspace_name': getattr(config, 'workspace_name', None),
+                'workspace_client': getattr(config, 'workspace_client', None),
+                'workspace_url': getattr(config, 'workspace_url', None),
+                'auth_token': getattr(config, 'auth_token', None),
+                'generate_html_report': getattr(config, 'generate_html_report', True),
+                'generate_network_visualization': getattr(config, 'generate_network_visualization', True)
+            }
+    
     def initialize_components(self, output_dir: str, workspace_name: Optional[str] = None):
         """
         Initialize all workflow components.
@@ -86,6 +119,10 @@ class WorkflowOrchestrator:
             workspace_name: KBase workspace name if applicable
         """
         try:
+            # Use workspace_name from config if not provided
+            if not workspace_name:
+                workspace_name = self.config.get('workspace_name')
+            
             # Initialize output manager with KBUtilLib
             self.output_manager = OutputManager(
                 base_output_dir=output_dir,
@@ -440,17 +477,19 @@ class WorkflowOrchestrator:
             input_data = self.config or {}
         
         # Handle both dict and PipelineConfig objects
-        if hasattr(input_data, 'output_dir'):
+        if isinstance(input_data, PipelineConfig):
             # It's a PipelineConfig object
-            output_dir = input_data.output_dir or '/tmp/protein_query_output'
+            output_dir = getattr(input_data, 'output_dir', None) or '/tmp/protein_query_output'
+            workspace_name = getattr(input_data, 'workspace_name', None)
             # Convert to dict for run_workflow
-            input_dict = input_data.to_dict() if hasattr(input_data, 'to_dict') else {}
+            input_dict = self._pipeline_config_to_dict(input_data)
         else:
             # It's a dictionary
             output_dir = input_data.get('output_dir', '/tmp/protein_query_output')
+            workspace_name = input_data.get('workspace_name')
             input_dict = input_data
         
-        return self.run_workflow(input_dict, output_dir)
+        return self.run_workflow(input_dict, output_dir, workspace_name)
     
     def get_available_analyses(self) -> Dict[str, Dict[str, Any]]:
         """
