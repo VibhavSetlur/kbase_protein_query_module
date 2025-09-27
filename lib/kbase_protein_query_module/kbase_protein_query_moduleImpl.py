@@ -916,17 +916,21 @@ Contact: https://kbase.us/contact-us/
             input_kwargs = {}
             
             # Handle conditional input parameters based on input_type
-            if input_type == 'uniprot_ids':
+            if input_type == 'protein_input':
+                protein_input = params.get('protein_input')
+                if not protein_input:
+                    raise ValueError("Protein input is required when input_type is 'protein_input'")
+                # The input parser will handle both direct sequences and FASTA format
+                input_kwargs['input_data'] = protein_input
+                
+            elif input_type == 'uniprot_ids':
                 uniprot_ids = params.get('uniprot_ids', [])
                 if not uniprot_ids:
                     raise ValueError("UniProt IDs are required when input_type is 'uniprot_ids'")
-                input_kwargs['input_proteins'] = uniprot_ids if isinstance(uniprot_ids, list) else [uniprot_ids]
-                
-            elif input_type == 'fasta_file':
-                fasta_file = params.get('fasta_file')
-                if not fasta_file:
-                    raise ValueError("FASTA file is required when input_type is 'fasta_file'")
-                input_kwargs['input_file_path'] = fasta_file
+                # Handle both single ID and list of IDs
+                if isinstance(uniprot_ids, str):
+                    uniprot_ids = [uniprot_ids.strip() for uniprot_ids in uniprot_ids.split(',') if uniprot_ids.strip()]
+                input_kwargs['input_proteins'] = uniprot_ids
                 
             elif input_type == 'workspace_object':
                 workspace_object = params.get('workspace_object')
@@ -934,14 +938,8 @@ Contact: https://kbase.us/contact-us/
                     raise ValueError("Workspace object is required when input_type is 'workspace_object'")
                 input_kwargs['workspace_object_ref'] = workspace_object
                 
-            elif input_type == 'direct_sequences':
-                direct_sequences = params.get('direct_sequences', [])
-                if not direct_sequences:
-                    raise ValueError("Direct sequences are required when input_type is 'direct_sequences'")
-                input_kwargs['input_proteins'] = direct_sequences if isinstance(direct_sequences, list) else [direct_sequences]
-                
             else:
-                raise ValueError(f"Invalid input_type: {input_type}. Must be one of: uniprot_ids, fasta_file, workspace_object, direct_sequences")
+                raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids, workspace_object")
 
             # Get analysis name for output
             analysis_name = params.get('analysis_name')

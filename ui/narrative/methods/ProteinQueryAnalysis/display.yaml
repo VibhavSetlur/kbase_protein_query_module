@@ -7,17 +7,26 @@ parameters:
         ui-name: Input Type
         short-hint: Select input type
 
-    direct_sequence:
-        ui-name: Direct Sequence
-        short-hint: Protein sequence
+    protein_input:
+        ui-name: Protein Input
+        short-hint: Protein sequences or FASTA content
+        description: |
+            Enter protein sequences directly or paste FASTA content.
+            Supports both raw sequences and FASTA format with headers.
 
-    fasta:
-        ui-name: FASTA File
-        short-hint: Upload FASTA file
+    uniprot_ids:
+        ui-name: UniProt IDs
+        short-hint: UniProt protein identifiers
+        description: |
+            Enter UniProt protein identifiers (e.g., P12345, Q67890).
+            Uses stored embeddings if available, otherwise generates new ones.
 
     workspace_object:
         ui-name: Workspace Object
         short-hint: Select workspace object
+        description: |
+            Choose a workspace object containing protein data.
+            Supported types: Genome, GenomeSet, ProteinSequenceSet
 
     analysis_name:
         ui-name: Analysis Name

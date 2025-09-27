@@ -19,39 +19,44 @@
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": ["direct_sequence"],
+      "default_values": ["protein_input"],
       "field_type": "dropdown",
       "dropdown_options": {
         "options": [
-          {"value": "direct_sequence", "display": "Direct Sequence"},
-          {"value": "fasta", "display": "FASTA"},
+          {"value": "protein_input", "display": "Protein Input"},
+          {"value": "uniprot_ids", "display": "UniProt IDs"},
           {"value": "workspace_object", "display": "Workspace Object"}
         ]
       }
     },
     {
-      "id": "direct_sequence",
+      "id": "protein_input",
       "optional": true,
       "advanced": false,
       "allow_multiple": false,
       "default_values": [""],
       "field_type": "text",
+      "text_options": {
+        "validate_as": "string"
+      },
       "conditional": {
         "control_param": "input_type",
-        "control_value": "direct_sequence"
+        "control_value": "protein_input"
       }
     },
     {
-      "id": "fasta",
+      "id": "uniprot_ids",
       "optional": true,
       "advanced": false,
-      "allow_multiple": false,
-      "default_values": [""],
-      "field_type": "upload",
-      "valid_file_types": ["fasta"],
+      "allow_multiple": true,
+      "default_values": [],
+      "field_type": "text",
+      "text_options": {
+        "validate_as": "string"
+      },
       "conditional": {
         "control_param": "input_type",
-        "control_value": "fasta"
+        "control_value": "uniprot_ids"
       }
     },
     {
@@ -60,9 +65,10 @@
       "advanced": false,
       "allow_multiple": false,
       "default_values": [""],
-      "field_type": "dropdown",
+      "field_type": "text",
       "text_options": {
-        "valid_ws_types": ["KBaseGenomes.Genome", "KBaseGenomes.GenomeSet", "KBaseGenomes.ProteinSequenceSet"]
+        "valid_ws_types": ["KBaseGenomes.Genome", "KBaseGenomes.GenomeSet", "KBaseGenomes.ProteinSequenceSet"],
+        "validate_as": "workspace_object_name"
       },
       "conditional": {
         "control_param": "input_type",
@@ -97,16 +103,17 @@
           "target_property": "input_type"
         },
         {
-          "input_parameter": "direct_sequence",
-          "target_property": "direct_sequences"
+          "input_parameter": "protein_input",
+          "target_property": "protein_input"
         },
         {
-          "input_parameter": "fasta",
-          "target_property": "fasta_file"
+          "input_parameter": "uniprot_ids",
+          "target_property": "uniprot_ids"
         },
         {
           "input_parameter": "workspace_object",
-          "target_property": "workspace_object"
+          "target_property": "workspace_object",
+          "target_type_transform": "resolved-ref"
         },
         {
           "input_parameter": "analysis_name",
