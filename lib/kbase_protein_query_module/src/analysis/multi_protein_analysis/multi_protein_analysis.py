@@ -21,6 +21,10 @@ from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstruct
 from Bio.Phylo.Consensus import bootstrap_trees, get_support
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 from scipy.spatial.distance import pdist, squareform
+
+# Set matplotlib backend before importing pyplot to prevent blank PNG issues
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for consistent saving
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -317,19 +321,39 @@ class MultiProteinAnalysisStage(BaseStage):
                         inertia += np.sum(cluster_distances**2) / 2
                 inertias.append(inertia)
             
-            # Find elbow point
-            if len(inertias) > 2:
-                # Simple elbow detection
-                optimal_k = 2  # Default to 2 clusters
-                for i in range(1, len(inertias)-1):
-                    if inertias[i-1] - inertias[i] > inertias[i] - inertias[i+1]:
-                        optimal_k = i + 1
+            # Find optimal number of clusters using improved elbow method
+            if len(inertias) > 3:
+                # Improved elbow detection with minimum cluster size constraint
+                optimal_k = 2  # Default minimum
+                min_cluster_size = max(2, n // 10)  # At least 10% of proteins per cluster
+                
+                for k in range(2, min(len(inertias) + 1, n // min_cluster_size)):
+                    test_clusters = fcluster(linkage_matrix, k, criterion='maxclust')
+                    cluster_sizes = [np.sum(test_clusters == i) for i in range(1, k+1)]
+                    
+                    # Check if all clusters meet minimum size requirement
+                    if all(size >= min_cluster_size for size in cluster_sizes):
+                        # Calculate improvement in inertia
+                        if k > 2:
+                            improvement = inertias[k-2] - inertias[k-1]
+                            if improvement > inertias[k-1] * 0.1:  # 10% improvement threshold
+                                optimal_k = k
+                        else:
+                            optimal_k = k
+                    else:
                         break
             else:
-                optimal_k = 2
+                optimal_k = max(2, min(4, n // 3))  # Reasonable default
             
-            # Generate clusters
+            # Generate clusters with improved parameters
             clusters = fcluster(linkage_matrix, optimal_k, criterion='maxclust')
+            
+            # Ensure we have meaningful clusters (not all in one cluster)
+            unique_clusters = len(np.unique(clusters))
+            if unique_clusters < 2:
+                # Force at least 2 clusters by using distance threshold
+                clusters = fcluster(linkage_matrix, t=0.7, criterion='distance')
+                optimal_k = len(np.unique(clusters))
             
             # Create cluster assignments
             cluster_assignments = {}
@@ -337,11 +361,18 @@ class MultiProteinAnalysisStage(BaseStage):
                 protein_id = protein_records[i].protein_id
                 cluster_assignments[protein_id] = int(cluster_id)
             
+            # Log clustering results for debugging
+            unique_clusters = np.unique(clusters)
+            cluster_sizes = [np.sum(clusters == c) for c in unique_clusters]
+            logger.info(f"Clustering analysis completed: {len(unique_clusters)} clusters, sizes: {cluster_sizes}")
+            
             return {
                 'distance_matrix': distance_matrix.tolist(),
                 'linkage_matrix': linkage_matrix.tolist(),
                 'cluster_assignments': cluster_assignments,
                 'optimal_clusters': optimal_k,
+                'cluster_sizes': cluster_sizes,
+                'unique_clusters': unique_clusters.tolist(),
                 'inertias': inertias,
                 'clustering_method': 'hierarchical_ward',
                 'distance_method': 'hamming_normalized'
@@ -520,44 +551,114 @@ class MultiProteinAnalysisStage(BaseStage):
             
             # Create conservation plot
             if 'conservation_scores' in msa_results:
-                plt.figure(figsize=(12, 6))
-                plt.plot(msa_results['conservation_scores'])
-                plt.title('Sequence Conservation Profile')
-                plt.xlabel('Alignment Position')
-                plt.ylabel('Conservation Score')
-                plt.grid(True, alpha=0.3)
+                fig, ax = plt.subplots(figsize=(12, 6))
+                ax.plot(msa_results['conservation_scores'])
+                ax.set_title('Sequence Conservation Profile')
+                ax.set_xlabel('Alignment Position')
+                ax.set_ylabel('Conservation Score')
+                ax.grid(True, alpha=0.3)
+                
+                # Ensure proper rendering
+                fig.canvas.draw()
+                
                 conservation_plot = os.path.join(viz_dir, 'conservation_profile.png')
-                plt.savefig(conservation_plot, dpi=300, bbox_inches='tight')
-                plt.close()
+                fig.savefig(conservation_plot, dpi=300, bbox_inches='tight', 
+                           facecolor='white', edgecolor='none')
+                plt.close(fig)
                 visualizations['conservation_profile'] = conservation_plot
             
             # Create similarity heatmap
             if 'similarity_matrix' in relationship_matrix:
-                plt.figure(figsize=(10, 8))
+                fig, ax = plt.subplots(figsize=(10, 8))
                 sns.heatmap(relationship_matrix['similarity_matrix'], 
                            xticklabels=relationship_matrix['protein_ids'],
                            yticklabels=relationship_matrix['protein_ids'],
-                           cmap='viridis', annot=True, fmt='.2f')
-                plt.title('Protein Similarity Matrix')
-                plt.xticks(rotation=45)
-                plt.yticks(rotation=0)
+                           cmap='viridis', annot=True, fmt='.2f', ax=ax)
+                ax.set_title('Protein Similarity Matrix')
+                ax.tick_params(axis='x', rotation=45)
+                ax.tick_params(axis='y', rotation=0)
+                
+                # Ensure proper rendering
+                fig.canvas.draw()
+                
                 similarity_heatmap = os.path.join(viz_dir, 'similarity_heatmap.png')
-                plt.savefig(similarity_heatmap, dpi=300, bbox_inches='tight')
-                plt.close()
+                fig.savefig(similarity_heatmap, dpi=300, bbox_inches='tight', 
+                           facecolor='white', edgecolor='none')
+                plt.close(fig)
                 visualizations['similarity_heatmap'] = similarity_heatmap
             
-            # Create clustering dendrogram
+            # Create clustering dendrogram with module colors
             if 'linkage_matrix' in clustering_results:
-                plt.figure(figsize=(12, 8))
-                dendrogram(clustering_results['linkage_matrix'], 
-                          labels=relationship_matrix['protein_ids'],
-                          leaf_rotation=45)
-                plt.title('Hierarchical Clustering Dendrogram')
-                plt.xlabel('Proteins')
-                plt.ylabel('Distance')
+                fig, ax = plt.subplots(figsize=(12, 10))
+                
+                # Create the dendrogram
+                linkage_matrix = np.array(clustering_results['linkage_matrix'])
+                protein_ids = relationship_matrix['protein_ids']
+                
+                # Create dendrogram
+                dend = dendrogram(linkage_matrix, 
+                                labels=protein_ids,
+                                leaf_rotation=45,
+                                color_threshold=0.7 * max(linkage_matrix[:, 2]),
+                                ax=ax)
+                
+                ax.set_title('Gene Dendrogram and Module Colors', fontsize=14, fontweight='bold')
+                ax.set_xlabel('Proteins', fontsize=12)
+                ax.set_ylabel('Height', fontsize=12)
+                
+                # Add module colors below the dendrogram
+                if 'cluster_assignments' in clustering_results:
+                    cluster_assignments = clustering_results['cluster_assignments']
+                    module_colors = self._create_module_colors(dend, cluster_assignments, protein_ids)
+                    
+                    # Create module colors bar
+                    fig.text(0.02, 0.15, 'Module colors', fontsize=10, fontweight='bold')
+                    
+                    # Draw module color bars
+                    y_pos = 0.12
+                    bar_height = 0.03
+                    
+                    # Define colors for different modules
+                    module_color_map = {
+                        1: '#FF0000',  # Red
+                        2: '#00FF00',  # Green  
+                        3: '#0000FF',  # Blue
+                        4: '#FFFF00',  # Yellow
+                        5: '#FF00FF',  # Magenta
+                        6: '#00FFFF',  # Cyan
+                        7: '#FFA500',  # Orange
+                        8: '#800080',  # Purple
+                        9: '#FFC0CB',  # Pink
+                        10: '#A52A2A'  # Brown
+                    }
+                    
+                    # Draw color bars for each module
+                    for module_id, color in module_color_map.items():
+                        if module_id in module_colors:
+                            x_start = module_colors[module_id]['start']
+                            x_end = module_colors[module_id]['end']
+                            width = x_end - x_start + 1  # Add 1 to make bars visible
+                            
+                            # Convert to figure coordinates
+                            x_start_fig = 0.05 + (x_start / len(protein_ids)) * 0.9
+                            width_fig = max(0.01, (width / len(protein_ids)) * 0.9)  # Ensure minimum width
+                            
+                            # Create rectangle patch for module color
+                            from matplotlib.patches import Rectangle
+                            rect = Rectangle((x_start_fig, y_pos), width_fig, bar_height,
+                                           facecolor=color, alpha=0.8, transform=fig.transFigure)
+                            fig.patches.append(rect)
+                
+                # Ensure the figure is properly rendered before saving
+                fig.canvas.draw()
+                
+                # Save the figure with high quality
                 dendrogram_plot = os.path.join(viz_dir, 'clustering_dendrogram.png')
-                plt.savefig(dendrogram_plot, dpi=300, bbox_inches='tight')
-                plt.close()
+                fig.savefig(dendrogram_plot, dpi=300, bbox_inches='tight', 
+                           facecolor='white', edgecolor='none')
+                
+                # Close the figure to free memory
+                plt.close(fig)
                 visualizations['clustering_dendrogram'] = dendrogram_plot
             
             return visualizations
@@ -565,6 +666,49 @@ class MultiProteinAnalysisStage(BaseStage):
         except Exception as e:
             logger.error(f"Visualization creation failed: {str(e)}")
             return {'error': str(e)}
+    
+    def _create_module_colors(self, dend, cluster_assignments: Dict[str, int], protein_ids: List[str]) -> Dict[int, Dict[str, float]]:
+        """
+        Create module color mapping for dendrogram visualization.
+        
+        Args:
+            dend: Dendrogram object from scipy.cluster.hierarchy.dendrogram
+            cluster_assignments: Dictionary mapping protein IDs to cluster IDs
+            protein_ids: List of protein IDs in dendrogram order
+            
+        Returns:
+            Dictionary mapping cluster IDs to their position ranges
+        """
+        try:
+            # Get the order of leaves in the dendrogram
+            if hasattr(dend, 'leaves'):
+                leaf_order = dend['leaves']
+            else:
+                leaf_order = list(range(len(protein_ids)))
+            
+            # Create module position mapping
+            module_positions = {}
+            
+            for i, leaf_idx in enumerate(leaf_order):
+                protein_id = protein_ids[leaf_idx]
+                if protein_id in cluster_assignments:
+                    cluster_id = cluster_assignments[protein_id]
+                    
+                    if cluster_id not in module_positions:
+                        module_positions[cluster_id] = {'start': i, 'end': i}
+                    else:
+                        # Update end position for contiguous clusters
+                        if i == module_positions[cluster_id]['end'] + 1:
+                            module_positions[cluster_id]['end'] = i
+                        else:
+                            # Non-contiguous, create new range
+                            module_positions[cluster_id] = {'start': i, 'end': i}
+            
+            return module_positions
+            
+        except Exception as e:
+            logger.error(f"Error creating module colors: {e}")
+            return {}
     
     def cleanup(self):
         """Clean up temporary files."""

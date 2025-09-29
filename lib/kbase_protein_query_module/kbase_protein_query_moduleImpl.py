@@ -920,8 +920,22 @@ Contact: https://kbase.us/contact-us/
                 protein_input = params.get('protein_input')
                 if not protein_input:
                     raise ValueError("Protein input is required when input_type is 'protein_input'")
-                # The input parser will handle both direct sequences and FASTA format
-                input_kwargs['input_data'] = protein_input
+                # Parse protein sequences from input
+                input_proteins = []
+                if isinstance(protein_input, str):
+                    # Handle both direct sequences and FASTA format
+                    lines = protein_input.strip().split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if line and not line.startswith('>'):
+                            input_proteins.append(line)
+                    if not input_proteins:
+                        input_proteins = [protein_input]  # Single sequence
+                elif isinstance(protein_input, list):
+                    input_proteins = protein_input
+                else:
+                    raise ValueError("Protein input must be a string or list")
+                input_kwargs['input_proteins'] = input_proteins
                 
             elif input_type == 'uniprot_ids':
                 uniprot_ids = params.get('uniprot_ids', [])
@@ -989,19 +1003,48 @@ Contact: https://kbase.us/contact-us/
             report_name = final.get('report_name') or final.get('report', {}).get('name') or f"{analysis_name}_report"
             report_ref = final.get('report_ref') or final.get('report', {}).get('ref') or ''
 
+            # Create workspace objects for outputs if no existing ones
+            if not workspace_objects and final.get('output_directory'):
+                try:
+                    # Create a fallback workspace object for outputs
+                    if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
+                        output_data = {
+                            'analysis_results': final.get('analysis_results', {}),
+                            'stages_completed': stages_completed,
+                            'protein_count': final.get('protein_count', 0),
+                            'metadata': {
+                                'analysis_name': analysis_name,
+                                'input_type': input_type,
+                                'timestamp': start_time
+                            }
+                        }
+                        
+                        output_ref = self.kb_util.save_workspace_object(
+                            workspace_name, f"{analysis_name}_analysis_outputs",
+                            'KBaseProteinQueryModule.AnalysisOutputs', output_data)
+                        
+                        workspace_objects = [{
+                            'ref': output_ref,
+                            'name': f"{analysis_name}_analysis_outputs",
+                            'type': 'KBaseProteinQueryModule.AnalysisOutputs',
+                            'description': 'Protein analysis outputs and results'
+                        }]
+                except Exception as e:
+                    logger.warning(f"Could not create fallback workspace object: {e}")
+
             normalized = {
                 'job_id': final.get('job_id') or wf_result.run_id,
-                'analysis_result_ref': final.get('analysis_result_ref') or final.get('sequence_analysis_ref') or '',
+                'analysis_result_ref': workspace_objects[0]['ref'] if workspace_objects else '',
                 'summary': final.get('summary') or 'Protein query analysis completed',
                 'input_parameters': params,
                 'start_time': start_time,
-                'output_directory': final.get('output_directory') or getattr(config, 'output_dir', self.shared_folder),
-                'general_info_dir': final.get('general_info_dir') or final.get('output_directory') or getattr(config, 'output_dir', self.shared_folder),
-                'network_analysis_dir': final.get('network_analysis_dir') or final.get('output_directory') or getattr(config, 'output_dir', self.shared_folder),
-                'sequence_analysis_dir': final.get('sequence_analysis_dir') or final.get('output_directory') or getattr(config, 'output_dir', self.shared_folder),
-                'embeddings_file_path': final.get('embeddings_file_path') or '',
-                'top_proteins_csv_path': final.get('top_proteins_csv_path') or '',
-                'html_report_path': final.get('html_report_path') or 'index.html',
+                'output_directory': '',  # Don't show internal paths to users
+                'general_info_dir': '',  # Don't show internal paths to users
+                'network_analysis_dir': '',  # Don't show internal paths to users
+                'sequence_analysis_dir': '',  # Don't show internal paths to users
+                'embeddings_file_path': '',  # Don't show internal file paths
+                'top_proteins_csv_path': '',  # Don't show internal file paths
+                'html_report_path': '',  # No HTML reports as requested
                 'protein_count': final.get('protein_count') or 0,
                 'stages_completed': stages_completed,
                 'report_name': report_name,
@@ -1065,12 +1108,12 @@ Contact: https://kbase.us/contact-us/
                 'summary': f'Analysis failed: {str(e)}',
                 'input_parameters': params,
                 'start_time': start_time,
-                'output_directory': self.shared_folder,
-                'general_info_dir': self.shared_folder,
-                'network_analysis_dir': self.shared_folder,
-                'sequence_analysis_dir': self.shared_folder,
-                'embeddings_file_path': '',
-                'top_proteins_csv_path': '',
+                'output_directory': '',  # Don't show internal paths to users
+                'general_info_dir': '',  # Don't show internal paths to users
+                'network_analysis_dir': '',  # Don't show internal paths to users
+                'sequence_analysis_dir': '',  # Don't show internal paths to users
+                'embeddings_file_path': '',  # Don't show internal file paths
+                'top_proteins_csv_path': '',  # Don't show internal file paths
                 'html_report_path': '',  # No HTML error reports
                 'protein_count': 0,
                 'stages_completed': [],
