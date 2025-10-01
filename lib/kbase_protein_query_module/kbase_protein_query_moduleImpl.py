@@ -182,706 +182,22 @@ Contact: https://kbase.us/contact-us/
             logger.error(f"KBUtilLib logging failed: {e}, message: {message}")
 
     def _deprecated_delegate(self, ctx, params, origin_method: str):
-        """Thin shim that logs deprecation and delegates to single entrypoint.
-        Maps legacy params to unified schema when possible.
-        """
-        self._log_with_kbutillib('WARNING', f'{origin_method} is deprecated; delegating to run_protein_query_analysis')
-        mapped = dict(params or {})
-        # Ensure workspace_name exists if possible
-        if 'workspace_name' not in mapped:
-            try:
-                if ctx.get('provenance') and len(ctx['provenance']) > 0:
-                    mapped['workspace_name'] = ctx['provenance'][0].get('ws_name')
-                else:
-                    mapped['workspace_name'] = ctx.get('ws_name')
-            except Exception:
-                pass
-        # Heuristic mappings for common legacy calls
-        if origin_method == 'check_protein_existence' and 'protein_id' in mapped and 'input_data' not in mapped:
-            mapped['input_type'] = 'uniprot_id'
-            mapped['input_data'] = mapped.get('protein_id')
-        if origin_method == 'generate_protein_embedding' and 'input_data' in mapped and 'input_type' not in mapped:
-            mapped['input_type'] = 'sequence'
-        if origin_method in ('assign_family_fast','find_top_matches_from_embedding') and 'embedding_ref' in mapped and 'input_data' not in mapped:
-            mapped['input_type'] = 'workspace_object_ref'
-            mapped['input_data'] = mapped.get('embedding_ref')
-        if origin_method == 'summarize_and_visualize_results' and 'result_refs' in mapped:
-            mapped.setdefault('enabled_stages', ['report_generation','data_export'])
-        return self.run_protein_query_analysis(ctx, mapped)
+        raise NotImplementedError("Legacy methods are removed. Use run_protein_query_analysis only.")
 
     def check_protein_existence(self, ctx, params):
-        """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "CheckProteinExistenceResults" (Check if a
-           protein exists in the storage system using UniProt ID and create a
-           workspace object with the result. Input: UniProt ID (e.g., P00001,
-           P12345) Output: Existence status, family assignment, metadata,
-           optional embedding) -> structure: parameter "report_name" of
-           String, parameter "report_ref" of String, parameter "exists" of
-           Long, parameter "family_id" of String, parameter "metadata" of
-           mapping from String to unspecified object, parameter
-           "input_parameters" of mapping from String to unspecified object,
-           parameter "start_time" of Double, parameter "summary" of String,
-           parameter "protein_existence_result_ref" of String, parameter
-           "embedding_result_ref" of String
-        """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN check_protein_existence
-        try:
-            start_time = time.time()
-            
-            protein_id = params.get('protein_id')
-            generate_embedding = params.get('generate_embedding', False)
-            
-            if not protein_id:
-                raise ValueError("protein_id parameter is required")
-            
-            # Setup workspace client using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'get_workspace_client'):
-                    workspace_client = self.kb_util.get_workspace_client()
-                    if self.kb_util:
-                        self.kb_util.log_info(f"Starting check_protein_existence for protein: {protein_id}")
-                else:
-                    workspace_client = Workspace(self.callback_url)
-            except Exception as e:
-                logger.error(f"Failed to setup workspace client: {e}")
-                workspace_client = Workspace(self.callback_url)
-            
-            # Inline workspace name extraction
-            try:
-                if ctx.get('provenance') and len(ctx['provenance']) > 0:
-                    workspace_name = ctx['provenance'][0].get('ws_name')
-                else:
-                    workspace_name = ctx.get('ws_name')
-            except Exception:
-                workspace_name = None
-            
-            # Simple existence check (demo implementation)
-            existence_result = {
-                'exists': True,  # Demo: assume protein exists
-                'family_id': 'demo_family',
-                'metadata': {'source': 'demo', 'protein_id': protein_id}
-            }
-            
-            result_data = {
-                'protein_id': protein_id,
-                'exists': existence_result.get('exists', False),
-                'family_id': existence_result.get('family_id', 'unknown'),
-                'metadata': existence_result.get('metadata', {}),
-                'check_timestamp': time.time()
-            }
-            
-            # Generate demo embedding if requested
-            embedding_ref = None
-            if generate_embedding and existence_result.get('exists', False):
-                demo_embedding = np.random.rand(1280).tolist()  # Demo embedding
-                embedding_result = {
-                    'embedding': demo_embedding,
-                    'model_name': 'esm2_t6_8M_UR50D',
-                    'protein_id': protein_id,
-                    'sequence_length': 100,
-                    'embedding_dim': 1280
-                }
-                
-                # Save embedding to workspace using KBUtilLib
-                try:
-                    if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                        embedding_ref = self.kb_util.save_workspace_object(
-                            workspace_name, f"{protein_id}_embedding",
-                            'KBaseProteinQueryModule.ProteinEmbedding', embedding_result)
-                    else:
-                        # Fallback to direct workspace client usage
-                        if workspace_client and workspace_name:
-                            result = workspace_client.save_objects({
-                            'workspace': workspace_name,
-                            'objects': [{
-                                'name': f"{protein_id}_embedding",
-                                'type': 'KBaseProteinQueryModule.ProteinEmbedding',
-                                'data': embedding_result
-                            }]
-                            })
-                            embedding_ref = result[0][6]  # Get the reference
-                        else:
-                            embedding_ref = None
-                except Exception as e:
-                    logger.error(f"Failed to save embedding to workspace: {e}")
-                    embedding_ref = None
-                
-                result_data['embedding_ref'] = embedding_ref
-                result_data['embedding'] = embedding_result.get('embedding', [])
-                result_data['model_name'] = embedding_result.get('model_name', 'esm2_t6_8M_UR50D')
-            
-            # Save result to workspace using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                    result_ref = self.kb_util.save_workspace_object(
-                        workspace_name, f"{protein_id}_existence_check",
-                        'KBaseProteinQueryModule.ProteinExistenceResult', result_data)
-                else:
-                    # Fallback to direct workspace client usage
-                    if workspace_client and workspace_name:
-                        result = workspace_client.save_objects({
-                'workspace': workspace_name,
-                'objects': [{
-                    'name': f"{protein_id}_existence_check",
-                    'type': 'KBaseProteinQueryModule.ProteinExistenceResult',
-                    'data': result_data
-                }]
-                        })
-                        result_ref = result[0][6]  # Get the reference
-                    else:
-                        result_ref = None
-            except Exception as e:
-                logger.error(f"Failed to save workspace object: {e}")
-                result_ref = None
-            
-            # Create report using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'create_report'):
-                    report_info = self.kb_util.create_report(workspace_name, {
-                        'message': f'Protein existence check completed for {protein_id}. Exists: {result_data["exists"]}',
-                        'objects_created': [{'ref': result_ref, 'description': 'Protein existence result'}] if result_ref else [],
-                        'workspace_name': workspace_name,
-                        'report_object_name': f"{protein_id}_existence_report"
-                    })
-                    # Handle mock objects by converting to dict if needed
-                    if hasattr(report_info, '__dict__'):
-                        report_info = {
-                            'name': getattr(report_info, 'name', f"{protein_id}_existence_report"),
-                            'ref': getattr(report_info, 'ref', 'mock_report_ref')
-                        }
-                else:
-                    # Fallback to direct report client usage
-                    report_client = KBaseReport(self.callback_url)
-                    report_info = report_client.create_extended_report({
-                        'message': f'Protein existence check completed for {protein_id}. Exists: {result_data["exists"]}',
-                        'objects_created': [{'ref': result_ref, 'description': 'Protein existence result'}] if result_ref else [],
-                        'workspace_name': workspace_name,
-                        'report_object_name': f"{protein_id}_existence_report"
-                    })
-            except Exception as e:
-                logger.error(f"Failed to create KBase report: {e}")
-                report_info = {
-                    'name': f"{protein_id}_existence_report",
-                    'ref': 'error_report_ref'
-                }
-            
-            output = {
-                'report_name': report_info['name'],
-                'report_ref': report_info['ref'],
-                'exists': 1 if result_data['exists'] else 0,
-                'family_id': result_data['family_id'],
-                'metadata': result_data['metadata'],
-                'input_parameters': params,
-                'start_time': start_time,
-                'summary': f'Protein {protein_id} exists: {result_data["exists"]}',
-                'protein_existence_result_ref': result_ref or '',
-                'embedding_result_ref': embedding_ref or ''
-            }
-            
-        except Exception as e:
-            logger.error(f"Protein existence check failed: {e}")
-            raise
-        #END check_protein_existence
-
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method check_protein_existence return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
+        raise NotImplementedError("Legacy endpoint removed. Use run_protein_query_analysis.")
 
     def generate_protein_embedding(self, ctx, params):
-        """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "GenerateProteinEmbeddingResults"
-           (Generate protein embeddings from direct sequence input. Creates
-           embeddings using ESM-2 model for downstream analysis.) ->
-           structure: parameter "report_name" of String, parameter
-           "report_ref" of String, parameter "embedding_result_ref" of
-           String, parameter "summary" of String, parameter
-           "input_parameters" of mapping from String to unspecified object,
-           parameter "start_time" of Double, parameter "embedding_norm" of
-           Double, parameter "sequence_length" of Long, parameter
-           "embedding_dim" of Long
-        """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN generate_protein_embedding
-        try:
-            start_time = time.time()
-            
-            input_type = params.get('input_type', 'sequence')
-            input_data = params.get('input_data')
-            model_name = params.get('model_name', 'esm2_t6_8M_UR50D')
-            
-            if not input_data:
-                raise ValueError("input_data parameter is required")
-            
-            # Setup workspace client using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'get_workspace_client'):
-                    workspace_client = self.kb_util.get_workspace_client()
-                else:
-                    workspace_client = Workspace(self.callback_url)
-            except Exception as e:
-                logger.error(f"Failed to setup workspace client: {e}")
-                workspace_client = Workspace(self.callback_url)
-            
-            # Inline workspace name extraction
-            try:
-                if ctx.get('provenance') and len(ctx['provenance']) > 0:
-                    workspace_name = ctx['provenance'][0].get('ws_name')
-                else:
-                    workspace_name = ctx.get('ws_name')
-            except Exception:
-                workspace_name = None
-            
-            # Generate demo embedding
-            if input_type == 'sequence':
-                sequence_length = len(input_data)
-                demo_embedding = np.random.rand(1280).tolist()  # Demo embedding
-                input_id = f"seq_{hash(input_data) % 10000}"
-            else:
-                raise ValueError(f"Unsupported input_type: {input_type}")
-            
-            embedding_result = {
-                'embedding': demo_embedding,
-                'model_name': model_name,
-                'protein_id': input_id,
-                'sequence_length': sequence_length,
-                'embedding_dim': 1280,
-                'input_source': 'direct_sequence',
-                'pooling_method': 'mean',
-                'generation_timestamp': time.time()
-            }
-            
-            # Save embedding to workspace using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                    result_ref = self.kb_util.save_workspace_object(
-                        workspace_name, f"{input_id}_embedding",
-                        'KBaseProteinQueryModule.ProteinEmbedding', embedding_result)
-                else:
-                    # Fallback to direct workspace client usage
-                    if workspace_client and workspace_name:
-                        result = workspace_client.save_objects({
-                'workspace': workspace_name,
-                'objects': [{
-                    'name': f"{input_id}_embedding",
-                    'type': 'KBaseProteinQueryModule.ProteinEmbedding',
-                    'data': embedding_result
-                }]
-                        })
-                        result_ref = result[0][6]  # Get the reference
-                    else:
-                        result_ref = None
-            except Exception as e:
-                logger.error(f"Failed to save embedding to workspace: {e}")
-                result_ref = None
-            
-            # Create report using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'create_report'):
-                    report_info = self.kb_util.create_report(workspace_name, {
-                        'message': f'Generated protein embedding for {input_id} using {model_name}',
-                        'objects_created': [{'ref': result_ref, 'description': 'Protein embedding'}] if result_ref else [],
-                        'workspace_name': workspace_name,
-                        'report_object_name': f"{input_id}_embedding_report"
-                    })
-                    # Handle mock objects by converting to dict if needed
-                    if hasattr(report_info, '__dict__'):
-                        report_info = {
-                            'name': getattr(report_info, 'name', f"{input_id}_embedding_report"),
-                            'ref': getattr(report_info, 'ref', 'mock_report_ref')
-                        }
-                else:
-                    # Fallback to direct report client usage
-                    report_client = KBaseReport(self.callback_url)
-                    report_info = report_client.create_extended_report({
-                        'message': f'Generated protein embedding for {input_id} using {model_name}',
-                        'objects_created': [{'ref': result_ref, 'description': 'Protein embedding'}] if result_ref else [],
-                        'workspace_name': workspace_name,
-                        'report_object_name': f"{input_id}_embedding_report"
-                    })
-            except Exception as e:
-                logger.error(f"Failed to create KBase report: {e}")
-                report_info = {
-                    'name': f"{input_id}_embedding_report",
-                    'ref': 'error_report_ref'
-                }
-            
-            output = {
-                'report_name': report_info['name'],
-                'report_ref': report_info['ref'],
-                'embedding_result_ref': result_ref or '',
-                'summary': f'Generated embedding for {input_id} (dim: {len(embedding_result["embedding"])})',
-                'input_parameters': params,
-                'start_time': start_time,
-                'embedding_norm': float(np.linalg.norm(demo_embedding)),
-                'sequence_length': embedding_result.get('sequence_length', 0),
-                'embedding_dim': len(embedding_result.get('embedding', []))
-            }
-            
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {e}")
-            raise
-        #END generate_protein_embedding
-
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method generate_protein_embedding return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
+        raise NotImplementedError("Legacy endpoint removed. Use run_protein_query_analysis.")
 
     def assign_family_fast(self, ctx, params):
-        """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "AssignFamilyFastResults" (Assign a
-           protein embedding to a family using similarity to family
-           centroids. Uses binary Hamming distance for fast family
-           assignment.) -> structure: parameter "family_id" of String,
-           parameter "confidence" of Double, parameter "eigenprotein_id" of
-           String, parameter "input_parameters" of mapping from String to
-           unspecified object, parameter "start_time" of Double, parameter
-           "family_assignment_result_ref" of String
-        """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN assign_family_fast
-        try:
-            start_time = time.time()
-            
-            embedding_ref = params.get('embedding_ref')
-            protein_id = params.get('protein_id', 'unknown')
-            
-            if not embedding_ref:
-                raise ValueError("embedding_ref parameter is required")
-            
-            # Setup workspace client using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'get_workspace_client'):
-                    workspace_client = self.kb_util.get_workspace_client()
-                else:
-                    workspace_client = Workspace(self.callback_url)
-            except Exception as e:
-                logger.error(f"Failed to setup workspace client: {e}")
-                workspace_client = Workspace(self.callback_url)
-            
-            # Inline workspace name extraction
-            try:
-                if ctx.get('provenance') and len(ctx['provenance']) > 0:
-                    workspace_name = ctx['provenance'][0].get('ws_name', 'test_workspace')
-                else:
-                    workspace_name = ctx.get('ws_name', 'test_workspace')
-            except Exception:
-                workspace_name = 'test_workspace'
-            
-            if not workspace_client:
-                raise RuntimeError("Workspace client required for family assignment")
-            
-            # Demo family assignment
-            family_id = 'demo_family'
-            confidence = 0.85
-            
-            result_data = {
-                'protein_id': protein_id,
-                'family_id': family_id,
-                'confidence': confidence,
-                'embedding_ref': embedding_ref,
-                'assignment_timestamp': time.time()
-            }
-            
-            # Inline workspace object saving
-            try:
-                if workspace_client and workspace_name:
-                    result = workspace_client.save_objects({
-                'workspace': workspace_name,
-                'objects': [{
-                    'name': f"{protein_id}_family_assignment",
-                    'type': 'KBaseProteinQueryModule.FamilyAssignmentResult',
-                    'data': result_data
-                }]
-                    })
-                    result_ref = result[0][6]  # Get the reference
-                else:
-                    result_ref = None
-            except Exception as e:
-                logger.error(f"Failed to save workspace object: {e}")
-                result_ref = None
-            
-            output = {
-                'family_id': family_id,
-                'confidence': confidence,
-                'eigenprotein_id': protein_id,
-                'input_parameters': params,
-                'start_time': start_time,
-                'family_assignment_result_ref': result_ref or ''
-            }
-            
-        except Exception as e:
-            logger.error(f"Family assignment failed: {e}")
-            raise
-        #END assign_family_fast
-
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method assign_family_fast return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
+        raise NotImplementedError("Legacy endpoint removed. Use run_protein_query_analysis.")
 
     def find_top_matches_from_embedding(self, ctx, params):
-        """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "FindTopMatchesFromEmbeddingResults" (Find
-           top matches for a given protein embedding within a family. Uses
-           FAISS IVF float index for efficient similarity search.) ->
-           structure: parameter "matches" of list of mapping from String to
-           unspecified object, parameter "summary" of String, parameter
-           "input_parameters" of mapping from String to unspecified object,
-           parameter "start_time" of Double, parameter "family_id" of String,
-           parameter "top_n" of Long, parameter "similarity_stats" of mapping
-           from String to Double, parameter "similarity_search_result_ref" of
-           String
-        """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN find_top_matches_from_embedding
-        try:
-            start_time = time.time()
-            
-            embedding_ref = params.get('embedding_ref')
-            protein_id = params.get('protein_id', 'unknown')
-            max_matches = params.get('max_matches', 10)
-            
-            if not embedding_ref:
-                raise ValueError("embedding_ref parameter is required")
-            
-            # Setup workspace client using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'get_workspace_client'):
-                    workspace_client = self.kb_util.get_workspace_client()
-                else:
-                    workspace_client = Workspace(self.callback_url)
-            except Exception as e:
-                logger.error(f"Failed to setup workspace client: {e}")
-                workspace_client = Workspace(self.callback_url)
-            
-            # Inline workspace name extraction
-            try:
-                if ctx.get('provenance') and len(ctx['provenance']) > 0:
-                    workspace_name = ctx['provenance'][0].get('ws_name', 'test_workspace')
-                else:
-                    workspace_name = ctx.get('ws_name', 'test_workspace')
-            except Exception:
-                workspace_name = 'test_workspace'
-            
-            if not workspace_client:
-                raise RuntimeError("Workspace client required for similarity search")
-            
-            # Generate demo matches
-            family_id = 'demo_family'
-            matches = []
-            for i in range(min(max_matches, 5)):
-                matches.append({
-                    'protein_id': f'match_{i+1}',
-                    'similarity_score': 0.9 - (i * 0.1),
-                    'family_id': family_id,
-                    'metadata': {'source': 'demo_data', 'rank': i + 1}
-                })
-            
-            similarity_stats = {
-                'mean_similarity': 0.75,
-                'max_similarity': 0.9,
-                'min_similarity': 0.5,
-                'total_matches': len(matches)
-            }
-            
-            result_data = {
-                'protein_id': protein_id,
-                'family_id': family_id,
-                'matches': matches,
-                'similarity_stats': similarity_stats,
-                'search_timestamp': time.time()
-            }
-            
-            # Inline workspace object saving
-            try:
-                if workspace_client and workspace_name:
-                    result = workspace_client.save_objects({
-                        'workspace': workspace_name,
-                        'objects': [{
-                            'name': f"{protein_id}_similarity_search",
-                            'type': 'KBaseProteinQueryModule.SimilaritySearchResult',
-                            'data': result_data
-                        }]
-                    })
-                    result_ref = result[0][6]  # Get the reference
-                else:
-                    result_ref = None
-            except Exception as e:
-                logger.error(f"Failed to save workspace object: {e}")
-                result_ref = None
-            
-            output = {
-                'matches': matches,
-                'summary': f'Found {len(matches)} matches for {protein_id}',
-                'input_parameters': params,
-                'start_time': start_time,
-                'family_id': family_id,
-                'top_n': len(matches),
-                'similarity_stats': similarity_stats,
-                'similarity_search_result_ref': result_ref or ''
-            }
-            
-        except Exception as e:
-            logger.error(f"Similarity search failed: {e}")
-            raise
-        #END find_top_matches_from_embedding
-
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method find_top_matches_from_embedding return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
+        raise NotImplementedError("Legacy endpoint removed. Use run_protein_query_analysis.")
 
     def summarize_and_visualize_results(self, ctx, params):
-        """
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "SummarizeAndVisualizeResultsResults"
-           (Summarize and visualize protein network analysis results.
-           Generates comprehensive HTML reports with network visualization.)
-           -> structure: parameter "report_name" of String, parameter
-           "report_ref" of String, parameter "input_parameters" of mapping
-           from String to unspecified object, parameter "start_time" of
-           Double, parameter "output_dir" of String, parameter "summary" of
-           String, parameter "html_report_path" of String, parameter
-           "sequence_analysis_ref" of String
-        """
-        # ctx is the context object
-        # return variables are: output
-        #BEGIN summarize_and_visualize_results
-        try:
-            start_time = time.time()
-            
-            result_refs = params.get('result_refs', [])
-            output_name = params.get('output_name', 'protein_analysis')
-            
-            if not result_refs:
-                raise ValueError("result_refs parameter is required")
-            
-            # Setup workspace client using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'get_workspace_client'):
-                    workspace_client = self.kb_util.get_workspace_client()
-                else:
-                    workspace_client = Workspace(self.callback_url)
-            except Exception as e:
-                logger.error(f"Failed to setup workspace client: {e}")
-                workspace_client = Workspace(self.callback_url)
-            
-            # Inline workspace name extraction
-            try:
-                if ctx.get('provenance') and len(ctx['provenance']) > 0:
-                    workspace_name = ctx['provenance'][0].get('ws_name', 'test_workspace')
-                else:
-                    workspace_name = ctx.get('ws_name', 'test_workspace')
-            except Exception:
-                workspace_name = 'test_workspace'
-            
-            if not workspace_client:
-                raise RuntimeError("Workspace client required for summarization")
-            
-            # Get results from workspace
-            results = []
-            for ref in result_refs:
-                try:
-                    result_data = workspace_client.get_objects2({
-                        'objects': [{'ref': ref}]
-                    })['data'][0]['data']
-                    results.append(result_data)
-                except Exception as e:
-                    logger.warning(f"Could not retrieve result {ref}: {e}")
-                    
-                    # Create summary data
-                    summary_data = {
-                        'total_results': len(results),
-                        'analysis_timestamp': time.time(),
-                        'result_types': [r.get('type', 'unknown') for r in results]
-                    }
-            
-            # Inline workspace object saving
-            try:
-                if workspace_client and workspace_name:
-                    result = workspace_client.save_objects({
-                'workspace': workspace_name,
-                'objects': [{
-                    'name': f"{output_name}_summary",
-                    'type': 'KBaseProteinQueryModule.AnalysisSummary',
-                    'data': summary_data
-                }]
-                    })
-                    summary_ref = result[0][6]  # Get the reference
-                else:
-                    summary_ref = None
-            except Exception as e:
-                logger.error(f"Failed to save workspace object: {e}")
-                summary_ref = None
-            
-            # Inline report creation
-            try:
-                report_client = KBaseReport(self.callback_url)
-                report_info = report_client.create_extended_report({
-                    'message': f'Generated summary and visualization for {len(results)} results',
-                    'objects_created': [{'ref': summary_ref, 'description': 'Analysis summary'}] if summary_ref else [],
-                    'workspace_name': workspace_name,
-                    'report_object_name': f"{output_name}_summary_report",
-                    'html_links': [],
-                    'file_links': [],
-                    'direct_html_link_index': 0
-                })
-            except Exception as e:
-                logger.error(f"Failed to create KBase report: {e}")
-                report_info = {
-                    'name': f"{output_name}_summary_report",
-                    'ref': 'error_report_ref'
-                }
-            
-            output = {
-                'report_name': report_info['name'],
-                'report_ref': report_info['ref'],
-                'analysis_result_ref': summary_ref or f'summary_{int(time.time())}',
-                'input_parameters': params,
-                'start_time': start_time,
-                'output_directory': self.shared_folder,
-                'general_info_dir': self.shared_folder,
-                'network_analysis_dir': self.shared_folder,
-                'sequence_analysis_dir': self.shared_folder,
-                'embeddings_file_path': f'{self.shared_folder}/embeddings.csv',
-                'top_proteins_csv_path': f'{self.shared_folder}/top_proteins.csv',
-                'protein_count': len(results),
-                'stages_completed': ['summarization', 'visualization'],
-                'summary': f'Generated summary and visualization for {len(results)} results',
-                'html_report_path': 'report.html',
-                'sequence_analysis_ref': summary_ref or ''
-            }
-            
-        except Exception as e:
-            logger.error(f"Summarization failed: {e}")
-            raise
-        #END summarize_and_visualize_results
-
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method summarize_and_visualize_results return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
+        raise NotImplementedError("Legacy endpoint removed. Use run_protein_query_analysis.")
 
     def run_protein_query_analysis(self, ctx, params):
         """
@@ -902,6 +218,9 @@ Contact: https://kbase.us/contact-us/
         # return variables are: output
         #BEGIN run_protein_query_analysis
         start_time = time.time()
+        # Initialize safe defaults for exception paths
+        analysis_name = (params or {}).get('analysis_name') or 'protein_analysis'
+        workspace_name = (params or {}).get('workspace_name')
         try:
             try:
                 workspace_name = params.get('workspace_name') or (
@@ -951,6 +270,15 @@ Contact: https://kbase.us/contact-us/
                 if not workspace_object:
                     raise ValueError("Workspace object is required when input_type is 'workspace_object'")
                 input_kwargs['workspace_object_ref'] = workspace_object
+            elif input_type == 'direct_sequences':
+                # Backward compatibility: map to new schema
+                sequences = params.get('direct_sequences')
+                if not sequences:
+                    raise ValueError("direct_sequences requires sequence input")
+                if isinstance(sequences, str):
+                    sequences = [sequences]
+                input_kwargs['input_proteins'] = sequences
+                input_type = 'protein_input'
                 
             else:
                 raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids, workspace_object")
@@ -960,9 +288,8 @@ Contact: https://kbase.us/contact-us/
             if not analysis_name:
                 raise ValueError("analysis_name is required")
             
-            enabled_stages = params.get('enabled_stages') or [
-                'input_validation','data_extraction','embedding_generation','family_assignment','similarity_search','sequence_analysis','network_analysis','bioinformatics_analysis','report_generation','visualization','data_export'
-            ]
+            # Stage selection is now managed by the orchestrator/config. Do not hardcode legacy stage names.
+            enabled_stages = params.get('enabled_stages') or []
             analysis_config = params.get('analysis_config') or {}
             storage_config = params.get('storage_config') or {}
             output_config = params.get('output_config') or {}
@@ -995,46 +322,38 @@ Contact: https://kbase.us/contact-us/
             final = wf_result.final_output or {}
             stages_completed = wf_result.stages_completed or final.get('stages_completed', [])
             
-            # Get workspace objects created by the workflow
-            workspace_objects = final.get('workspace_objects', [])
-            workspace_objects_summary = final.get('workspace_objects_summary', {})
+            # Shock upload info from orchestrator
+            shock_info = final.get('shock', {}) or {}
+            shock_id = shock_info.get('shock_id') or shock_info.get('id') or ''
+            shock_url = shock_info.get('download_url') or ''
 
             # Ensure report fields are always present for Narrative integration
             report_name = final.get('report_name') or final.get('report', {}).get('name') or f"{analysis_name}_report"
             report_ref = final.get('report_ref') or final.get('report', {}).get('ref') or ''
 
-            # Create workspace objects for outputs if no existing ones
-            if not workspace_objects and final.get('output_directory'):
+            # Always create a concise report referencing the Shock archive
+            if not report_ref:
                 try:
-                    # Create a fallback workspace object for outputs
-                    if self.kb_util and hasattr(self.kb_util, 'save_workspace_object'):
-                        output_data = {
-                            'analysis_results': final.get('analysis_results', {}),
-                            'stages_completed': stages_completed,
-                            'protein_count': final.get('protein_count', 0),
-                            'metadata': {
-                                'analysis_name': analysis_name,
-                                'input_type': input_type,
-                                'timestamp': start_time
-                            }
-                        }
-                        
-                        output_ref = self.kb_util.save_workspace_object(
-                            workspace_name, f"{analysis_name}_analysis_outputs",
-                            'KBaseProteinQueryModule.AnalysisOutputs', output_data)
-                        
-                        workspace_objects = [{
-                            'ref': output_ref,
-                            'name': f"{analysis_name}_analysis_outputs",
-                            'type': 'KBaseProteinQueryModule.AnalysisOutputs',
-                            'description': 'Protein analysis outputs and results'
-                        }]
+                    report_client = KBaseReport(self.callback_url)
+                    report_message = final.get('summary') or 'Protein query analysis completed'
+                    if shock_id:
+                        report_message += f"\n\nOutputs archived in Shock (node {shock_id})."
+                    if shock_url:
+                        report_message += f"\nDownload: {shock_url}"
+                    report_info = report_client.create_extended_report({
+                        'message': report_message,
+                        'workspace_name': workspace_name,
+                        'report_object_name': f"{analysis_name}_report",
+                        'objects_created': []
+                    })
+                    report_name = report_info.get('name', report_name)
+                    report_ref = report_info.get('ref', report_ref)
                 except Exception as e:
-                    logger.warning(f"Could not create fallback workspace object: {e}")
+                    logger.warning(f"Failed to create report: {e}")
 
             normalized = {
                 'job_id': final.get('job_id') or wf_result.run_id,
-                'analysis_result_ref': workspace_objects[0]['ref'] if workspace_objects else '',
+                'analysis_result_ref': '',
                 'summary': final.get('summary') or 'Protein query analysis completed',
                 'input_parameters': params,
                 'start_time': start_time,
@@ -1048,30 +367,10 @@ Contact: https://kbase.us/contact-us/
                 'protein_count': final.get('protein_count') or 0,
                 'stages_completed': stages_completed,
                 'report_name': report_name,
-                'report_ref': report_ref
+                'report_ref': report_ref,
+                'shock_id': shock_id,
+                'shock_url': shock_url
             }
-            # Ensure a report exists for Narrative even if workflow didn't produce one
-            if not normalized['report_ref']:
-                try:
-                    report_client = KBaseReport(self.callback_url)
-                    
-                    # Create report message with workspace objects information
-                    report_message = normalized['summary']
-                    if workspace_objects:
-                        report_message += f"\n\nCreated {len(workspace_objects)} workspace objects:\n"
-                        for obj in workspace_objects:
-                            report_message += f"- {obj.get('name', 'Unknown')}: {obj.get('description', 'No description')}\n"
-                    
-                    report_info = report_client.create_extended_report({
-                        'message': report_message,
-                        'workspace_name': workspace_name,
-                        'report_object_name': f"{analysis_name}_report",
-                        'objects_created': workspace_objects  # Include workspace objects in report
-                    })
-                    normalized['report_name'] = report_info.get('name', normalized['report_name'])
-                    normalized['report_ref'] = report_info.get('ref', normalized['report_ref'])
-                except Exception as e:
-                    logger.warning(f"Failed to create fallback report: {e}")
             # Final safety: ensure non-empty placeholders
             if not normalized['report_name']:
                 normalized['report_name'] = f"{analysis_name}_report"
@@ -1108,150 +407,11 @@ Contact: https://kbase.us/contact-us/
                 'summary': f'Analysis failed: {str(e)}',
                 'input_parameters': params,
                 'start_time': start_time,
-                'output_directory': '',  # Don't show internal paths to users
-                'general_info_dir': '',  # Don't show internal paths to users
-                'network_analysis_dir': '',  # Don't show internal paths to users
-                'sequence_analysis_dir': '',  # Don't show internal paths to users
-                'embeddings_file_path': '',  # Don't show internal file paths
-                'top_proteins_csv_path': '',  # Don't show internal file paths
-                'html_report_path': '',  # No HTML error reports
                 'protein_count': 0,
                 'stages_completed': [],
                 'report_name': error_report['name'],
                 'report_ref': error_report['ref']
             }]
-            
-            workspace_name = params.get('workspace_name')
-            input_proteins = params.get('input_proteins', [])
-            analysis_stages = params.get('analysis_stages', ['embedding_generation'])
-            output_report_name = params.get('output_report_name', f'protein_analysis_report_{int(time.time())}')
-            output_data_name = params.get('output_data_name', f'protein_analysis_data_{int(time.time())}')
-            
-            if not input_proteins:
-                raise ValueError("input_proteins parameter is required")
-            
-            if not workspace_name:
-                raise ValueError("workspace_name parameter is required")
-            
-            # Setup workspace client using KBUtilLib
-            try:
-                if self.kb_util and hasattr(self.kb_util, 'get_workspace_client'):
-                    workspace_client = self.kb_util.get_workspace_client()
-                else:
-                    workspace_client = Workspace(self.callback_url)
-            except Exception as e:
-                logger.error(f"Failed to setup workspace client: {e}")
-                workspace_client = Workspace(self.callback_url)
-            
-            if not workspace_client:
-                raise RuntimeError("Could not setup workspace client")
-            
-            # Execute comprehensive analysis pipeline
-            protein_count = len(input_proteins)
-            
-            # Create mock pipeline results for demonstration
-            pipeline_results = {}
-            for stage in analysis_stages:
-                if stage == 'embedding_generation':
-                    pipeline_results[stage] = {
-                        'status': 'completed',
-                        'results': [{'protein_id': protein_id, 'embedding': [0.1] * 1280} for protein_id in input_proteins]
-                    }
-                elif stage == 'family_assignment':
-                    pipeline_results[stage] = {
-                        'status': 'completed',
-                        'results': [{'protein_id': protein_id, 'family_id': f'family_{i}', 'confidence': 0.8} for i, protein_id in enumerate(input_proteins)]
-                    }
-                elif stage == 'similarity_search':
-                    pipeline_results[stage] = {
-                        'status': 'completed',
-                        'results': [{'protein_id': protein_id, 'matches': [{'id': f'match_{i}_{j}', 'similarity': 0.9} for j in range(5)]} for i, protein_id in enumerate(input_proteins)]
-                    }
-                else:
-                    pipeline_results[stage] = {
-                        'status': 'completed',
-                        'results': [{'protein_id': protein_id, 'result': f'mock_{stage}_result'} for protein_id in input_proteins]
-                    }
-            
-            # Create data output directory for CSV and JSON files only (no HTML reports)
-            output_directory = None
-            data_files = []
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            
-            if os.path.exists("test/outputs"):
-                test_output_dir = os.path.join("test", "outputs", f"pipeline_run_{timestamp}")
-                os.makedirs(test_output_dir, exist_ok=True)
-                
-                # Create CSV file
-                csv_content = "rank,protein_id,similarity_score,family,description,source_type,input_protein_index\n"
-                csv_content += f"INPUT,input_protein_1,1.0,Unknown,User input protein,user_input,0\n"
-                csv_content += "1,match_protein_1,0.85,family_1,Similar protein 1,database_match,0\n"
-                csv_content += "2,match_protein_2,0.80,family_1,Similar protein 2,database_match,0\n"
-                
-                csv_path = os.path.join(test_output_dir, "top_proteins_with_metadata.csv")
-                with open(csv_path, 'w') as f:
-                    f.write(csv_content)
-                data_files.append(csv_path)
-                
-                # Create JSON results
-                import json
-                json_data = {
-                    'analysis_id': output_report_name,
-                    'timestamp': timestamp,
-                    'input_proteins': input_proteins,
-                    'analysis_stages': analysis_stages,
-                    'pipeline_results': pipeline_results,
-                    'protein_count': len(input_proteins)
-                }
-                json_path = os.path.join(test_output_dir, "pipeline_results.json")
-                with open(json_path, 'w') as f:
-                    json.dump(json_data, f, indent=2)
-                data_files.append(json_path)
-                
-                output_directory = test_output_dir
-                logger.info(f"Created test output directory: {test_output_dir}")
-                print(f"Generated {len(data_files)} data files in {test_output_dir}")
-            
-            # Create KBase report with data files only (no HTML reports)
-            try:
-                report_client = KBaseReport(self.callback_url)
-                report_info = report_client.create_extended_report({
-                    'message': f'Protein analysis completed for {protein_count} proteins. Analysis stages: {", ".join(analysis_stages)}. Results include CSV data files and comprehensive pipeline results saved as workspace objects.',
-                    'workspace_name': workspace_name,
-                    'report_object_name': output_report_name,
-                    'file_links': [{'path': f, 'name': os.path.basename(f), 'description': f'Analysis data file: {os.path.basename(f)}'} for f in data_files] if data_files else []
-                })
-            except Exception as e:
-                logger.error(f"Failed to create report: {e}")
-                report_info = {'name': output_report_name, 'ref': f'report_{int(time.time())}'}
-            
-            # Set up proper output directory for KBase Narrative integration
-            os.environ['EXPORTS_DIR'] = self.shared_folder
-            os.environ['SCRATCH_DIR'] = self.shared_folder
-            
-            # Update output with directory-based results
-            stages_completed = list(pipeline_results.keys())
-            
-            output = {
-                'report_name': report_info['name'],
-                'report_ref': report_info['ref'],
-                'analysis_result_ref': f'analysis_{int(time.time())}',
-                'summary': f'Completed protein query analysis with {len(stages_completed)} stages. Results saved as workspace objects and data files.',
-                'input_parameters': params,
-                'start_time': start_time,
-                'html_report_path': '',  # No HTML reports
-                'protein_count': protein_count,
-                'stages_completed': stages_completed,
-                'output_directory': output_directory,
-                'general_info_dir': output_directory,
-                'network_analysis_dir': output_directory,
-                'sequence_analysis_dir': output_directory,
-                'job_id': f'job_{int(time.time())}',
-                'embeddings_file_path': csv_path if output_directory else '',
-                'top_proteins_csv_path': csv_path if output_directory else '',
-                'exported_files': data_files if output_directory else []
-            }
-            
         except Exception as e:
             logger.error(f"Protein query analysis failed: {e}")
             # Create error report without HTML

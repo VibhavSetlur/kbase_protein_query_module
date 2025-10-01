@@ -84,14 +84,15 @@ class PublicApiTest(unittest.TestCase):
     def test_run_protein_query_analysis_sequence_input(self):
         params = {
             'workspace_name': self.wsName,
-            'input_type': 'direct_sequences',
-            'direct_sequences': ['M' * 80],
+            'input_type': 'protein_input',
+            'protein_input': ['M' * 80],
             'analysis_name': 'test_analysis',
-            'enabled_stages': ['embedding_generation', 'family_assignment', 'similarity_search', 'report_generation']
+            # No legacy stage names; allow orchestrator defaults
         }
         res = self.impl.run_protein_query_analysis(self.ctx, params)
         out = res[0]
-        self.assertIn('analysis_result_ref', out)
+        # Shock integration fields
+        self.assertIn('shock_id', out)
         self.assertIn('stages_completed', out)
         self.assertIsInstance(out['stages_completed'], list)
 

@@ -1,9 +1,27 @@
 import os
 
+import os
 from lib.kbase_protein_query_module.src.core.workflow_orchestrator import WorkflowOrchestrator
 
 
+class DummyDFU:
+    def __init__(self, *args, **kwargs):
+        pass
+    def file_to_shock(self, params):
+        # Simulate Shock upload
+        assert params.get('pack') == 'zip'
+        path = params.get('file_path')
+        assert path and os.path.isdir(path)
+        return {'shock_id': 'fake_shock_id', 'node_file_name': 'outputs.zip'}
+
+
 def test_orchestrator_runs_minimal_workflow(tmp_path):
+    # Ensure DataFileUtil client resolves to our dummy during test
+    os.environ['SDK_CALLBACK_URL'] = 'http://dummy'
+    import builtins
+    # Monkeypatch import to return DummyDFU when DataFileUtil client is requested
+    import sys
+    sys.modules['installed_clients.DataFileUtilClient'] = type('m', (), {'DataFileUtil': DummyDFU})
     orch = WorkflowOrchestrator(config={})
     input_data = {"input_type": "uniprot_identifiers", "input_data": ["P12345", "Q8N158"]}
 
@@ -19,6 +37,8 @@ def test_orchestrator_runs_minimal_workflow(tmp_path):
     assert result.run_id
     assert isinstance(result.analyses_completed, list)
     assert isinstance(result.analysis_results, dict)
+    # Validate Shock info present
+    assert result.final_output.get('shock', {}).get('shock_id') == 'fake_shock_id'
 
 
 def test_orchestrator_filters_unknown_analyses(tmp_path):

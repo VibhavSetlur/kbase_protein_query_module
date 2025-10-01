@@ -398,16 +398,11 @@ class WorkflowOrchestrator:
                 final_output,
                 description="Final consolidated output from all analyses"
             )
-            
-            # Create workspace objects for all outputs
-            logger.info("Creating workspace objects from analysis results")
-            workspace_objects = self.output_manager.create_workspace_objects(analysis_results)
-            
-            # Add workspace objects info to final output
-            final_output["workspace_objects"] = workspace_objects
-            final_output["workspace_objects_summary"] = self.output_manager.get_workspace_objects_summary()
-            
-            logger.info(f"Created {len(workspace_objects)} workspace objects")
+
+            # Zip and upload entire output directory to Shock
+            logger.info("Uploading outputs to Shock")
+            shock_info = self.output_manager.zip_and_upload_outputs()
+            final_output["shock"] = shock_info
             
             return final_output
             

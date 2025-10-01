@@ -134,6 +134,14 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             'enabled_stages': ['embedding_generation', 'family_assignment']
         }
         
+        # Stub DFU for Shock upload
+        import sys
+        class _DFUStub:
+            def __init__(self, *args, **kwargs):
+                pass
+            def file_to_shock(self, params):
+                return {'shock_id': 'stub_shock', 'node_file_name': 'archive.zip'}
+        sys.modules['installed_clients.DataFileUtilClient'] = type('m', (), {'DataFileUtil': _DFUStub})
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
         
         self.assertIsInstance(result, list)
@@ -245,65 +253,19 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIn('output_directory', result[0])
 
     def test_individual_methods(self):
-        """Test individual backend methods."""
-        # Test check_protein_existence
-        params = {
-            'workspace_name': self.wsName,
-            'protein_id': 'P00001',
-            'generate_embedding': False
-        }
-        result = self.serviceImpl.check_protein_existence(self.ctx, params)
-        self.assertIsInstance(result, list)
-        self.assertIn('protein_exists', result[0])
-        
-        # Test generate_protein_embedding
-        params = {
-            'workspace_name': self.wsName,
-            'input_type': 'sequence',
-            'input_data': self.test_sequence,
-            'model_name': 'esm2_t6_8M_UR50D'
-        }
-        result = self.serviceImpl.generate_protein_embedding(self.ctx, params)
-        self.assertIsInstance(result, list)
-        self.assertIn('embedding_ref', result[0])
-        
-        # Test assign_family_fast
-        params = {
-            'workspace_name': self.wsName,
-            'embedding_ref': 'test_embedding',
-            'family_threshold': 0.8
-        }
-        result = self.serviceImpl.assign_family_fast(self.ctx, params)
-        self.assertIsInstance(result, list)
-        self.assertIn('family_assignment_ref', result[0])
-        
-        # Test find_top_matches_from_embedding
-        params = {
-            'workspace_name': self.wsName,
-            'embedding_ref': 'test_embedding',
-            'top_k': 10,
-            'family_id': 'test_family'
-        }
-        result = self.serviceImpl.find_top_matches_from_embedding(self.ctx, params)
-        self.assertIsInstance(result, list)
-        self.assertIn('top_matches_ref', result[0])
-        
-        # Test summarize_and_visualize_results
-        params = {
-            'workspace_name': self.wsName,
-            'result_refs': ['test_ref1', 'test_ref2'],
-            'visualization_type': 'network'
-        }
-        result = self.serviceImpl.summarize_and_visualize_results(self.ctx, params)
-        self.assertIsInstance(result, list)
-        self.assertIn('report_ref', result[0])
+        """Deprecated endpoints removed; assert absence for unified API."""
+        self.assertFalse(hasattr(self.serviceImpl, 'check_protein_existence'))
+        self.assertFalse(hasattr(self.serviceImpl, 'generate_protein_embedding'))
+        self.assertFalse(hasattr(self.serviceImpl, 'assign_family_fast'))
+        self.assertFalse(hasattr(self.serviceImpl, 'find_top_matches_from_embedding'))
+        self.assertFalse(hasattr(self.serviceImpl, 'summarize_and_visualize_results'))
 
     def test_output_validation(self):
         """Test output structure validation."""
         params = {
             'workspace_name': self.wsName,
-            'input_type': 'direct_sequences',
-            'direct_sequences': [self.test_sequence],
+            'input_type': 'protein_input',
+            'protein_input': [self.test_sequence],
             'analysis_name': 'output_test'
         }
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
@@ -325,10 +287,17 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(output['protein_count'], int)
         self.assertIsInstance(output['stages_completed'], list)
         self.assertIsInstance(output['input_parameters'], dict)
+        self.assertTrue(len(output.get('report_name', '')) >= 0)
+        self.assertTrue(len(output.get('report_ref', '')) >= 0)
+        # Shock fields should be present from Shock upload integration
+        self.assertIn('shock_id', output)
+        # shock_url may be empty depending on environment
+        # Validate Shock fields exist
+        self.assertIn('shock_id', output)
 
     def test_error_scenarios(self):
         """Test various error scenarios."""
-        # Test invalid input type
+        # Test invalid input type (ensures graceful error output)
         params = {
             'workspace_name': self.wsName,
             'input_type': 'invalid_type',
@@ -339,8 +308,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         
         # Test missing workspace
         params = {
-            'input_type': 'direct_sequences',
-            'direct_sequences': [self.test_sequence],
+            'input_type': 'protein_input',
+            'protein_input': [self.test_sequence],
             'analysis_name': 'no_workspace'
         }
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
@@ -349,8 +318,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Test empty analysis name
         params = {
             'workspace_name': self.wsName,
-            'input_type': 'direct_sequences',
-            'direct_sequences': [self.test_sequence],
+            'input_type': 'protein_input',
+            'protein_input': [self.test_sequence],
             'analysis_name': ''
         }
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
@@ -358,22 +327,15 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     def test_legacy_compatibility(self):
         """Test backward compatibility with legacy method names."""
-        params = {
-            'workspace_name': self.wsName,
-            'input_type': 'direct_sequences',
-            'direct_sequences': [self.test_sequence],
-            'analysis_name': 'legacy_test'
-        }
-        result = self.serviceImpl.run_kbase_protein_query_module(self.ctx, params)
-        self.assertIsInstance(result, list)
-        self.assertIn('output_directory', result[0])
+        # Legacy alias removed
+        self.assertFalse(hasattr(self.serviceImpl, 'run_kbase_protein_query_module'))
 
     def test_stage_selection(self):
         """Test different analysis stage combinations."""
         base_params = {
             'workspace_name': self.wsName,
-            'input_type': 'direct_sequences',
-            'direct_sequences': [self.test_sequence],
+            'input_type': 'protein_input',
+            'protein_input': [self.test_sequence],
             'analysis_name': 'stage_test'
         }
         

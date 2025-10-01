@@ -21,6 +21,10 @@ module kbase_protein_query_module {
         string sequence_analysis_dir;
         string embeddings_file_path;
         string top_proteins_csv_path;
+        string report_name;
+        string report_ref;
+        string shock_id;
+        string shock_url;
         /* Additional fields may be populated by orchestrated analyses */
     } ProteinQueryAnalysisResults;
     

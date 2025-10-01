@@ -10,6 +10,7 @@ import json
 import time
 import hashlib
 import logging
+import os
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -68,6 +69,47 @@ class OutputManager:
         self._create_directory_structure()
         
         logger.info(f"OutputManager initialized with root directory: {self.root_dir}")
+
+    def zip_and_upload_outputs(self, callback_url: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Compress the entire output directory and upload it to Shock.
+
+        This uses DataFileUtil.file_to_shock with pack=zip so we don't need a
+        temporary archive on disk. Returns Shock metadata including a direct
+        download URL when possible.
+
+        Args:
+            callback_url: Optional explicit callback URL; defaults to SDK_CALLBACK_URL
+
+        Returns:
+            Dictionary containing Shock upload information.
+        """
+        try:
+            from installed_clients.DataFileUtilClient import DataFileUtil
+        except Exception as e:
+            logger.error(f"DataFileUtil client not available: {e}")
+            raise
+
+        try:
+            cb_url = callback_url or os.environ.get('SDK_CALLBACK_URL')
+            dfu = DataFileUtil(cb_url)
+            upload_params = {
+                'file_path': self.root_dir,
+                'pack': 'zip'
+            }
+            shock_info = dfu.file_to_shock(upload_params)
+
+            # Add a best-effort download URL using SHOCK_URL if set
+            shock_base = os.environ.get('SHOCK_URL')
+            if shock_base and shock_info and isinstance(shock_info, dict) and shock_info.get('shock_id'):
+                base = shock_base.rstrip('/')
+                shock_info['download_url'] = f"{base}/node/{shock_info['shock_id']}?download"
+            shock_info['output_dir'] = self.root_dir
+            logger.info(f"Uploaded outputs to Shock: {shock_info.get('shock_id')}")
+            return shock_info
+        except Exception as e:
+            logger.error(f"Failed to upload outputs to Shock: {e}")
+            raise
     
     def _create_directory_structure(self):
         """Create the standard output directory structure."""
