@@ -9,7 +9,10 @@ It is designed for integration with the KBase protein network analysis pipeline 
 import logging
 from typing import Optional, Union, Any, Dict, Tuple, List
 import numpy as np
-import faiss
+try:
+    import faiss  # type: ignore
+except Exception:  # pragma: no cover
+    faiss = None
 import time
 import os
 

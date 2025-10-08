@@ -7,9 +7,9 @@ generation, and utility functions.
 """
 
 # Import main components
-from .input import DataExtractionStage, InputValidationStage, WorkspaceObjectStage
+from .input import InputManager, WorkspaceObjectProcessor, ProteinSequenceProcessor, UniProtIdsProcessor
 from .analysis import AnalysisManager, get_enabled_analyses
-from .outputs import (
+from .output import (
     OutputManager, ArtifactRecord,
     get_output_config, get_analysis_output_config,
     get_enabled_output_analyses, is_output_enabled_for_analysis
@@ -20,7 +20,7 @@ from .util import (
     HierarchicalIndex, StreamingIndex,
     ProteinStorage, MemoryEfficientLoader,
     ProteinFamilyAssigner, ProteinExistenceChecker,
-    IndexingStrategy
+    IndexingStrategy, FamilyAssignment, SimilaritySearch
 )
 
 __version__ = "1.0.0"
@@ -28,9 +28,10 @@ __author__ = "KBase Team"
 
 __all__ = [
     # Input handling
-    'DataExtractionStage',
-    'InputValidationStage', 
-    'WorkspaceObjectStage',
+    'InputManager',
+    'WorkspaceObjectProcessor',
+    'ProteinSequenceProcessor',
+    'UniProtIdsProcessor',
     
     # Analysis management
     'AnalysisManager',
@@ -57,5 +58,7 @@ __all__ = [
     'MemoryEfficientLoader',
     'ProteinFamilyAssigner',
     'ProteinExistenceChecker',
-    'IndexingStrategy'
+    'IndexingStrategy',
+    'FamilyAssignment',
+    'SimilaritySearch'
 ]

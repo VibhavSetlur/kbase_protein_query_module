@@ -1,53 +1,25 @@
-# Deep Learning & Transformers
-torch>=1.13.0
-transformers>=4.31.0
-sentence-transformers>=2.2.0
-
-# Data Science & Analysis
 numpy>=1.21.0
 pandas>=1.3.0
 scipy>=1.7.3
 scikit-learn>=1.0.2
-
-# Graphs & Networks
 networkx>=2.6.0
-igraph>=0.10.0
-
-# Embedding Indexes
-faiss-cpu>=1.7.0
-
-# Plotting & Visualization
-matplotlib>=3.5.0
-seaborn>=0.11.0
-plotly>=5.0.0
-kaleido>=0.2.1
-bokeh>=2.4.0
-
-# Data Storage & Formats
 h5py>=3.6.0
-
-# Bioinformatics
-biopython>=1.79
-weblogo>=3.7.0
-
-# Statistical Analysis
-statsmodels>=0.13.0
-
-# Web & HTML Generation
-jinja2>=3.0.0
-beautifulsoup4>=4.10.0
-
-# Other
-joblib>=1.1.0
+requests>=2.25.0
 tqdm>=4.62.0
 pyyaml>=6.0
 
-# System monitoring and scalability
-psutil>=5.8.0
+# In-container CPU-safe installs; GPU deps are avoided
+torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+transformers==4.46.3
 
-# Testing
-pytest>=6.0.0
-pytest-cov>=3.0.0 
+# Visualization used by output generation
+plotly>=5.0.0
+matplotlib>=3.5.0
 
-# Safe deletion
-Send2Trash>=1.8.0
+# Optional vector index used by storage/similarity modules
+faiss-cpu>=1.7.0
+
+# Testing (needed for kb-sdk test invocation inside container)
+pytest>=7.0.0
+pytest-mock>=3.10.0
+pytest-cov>=4.0.0

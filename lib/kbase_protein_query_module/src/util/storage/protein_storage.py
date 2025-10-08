@@ -21,6 +21,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Optional FAISS dependency: only required when FAISS-backed paths are executed
+try:
+    import faiss  # type: ignore
+except Exception:  # pragma: no cover
+    faiss = None
+
 class ProteinStorage:
     """
     Advanced storage system for massive protein datasets with hybrid FAISS indexing.
@@ -203,8 +209,6 @@ class ProteinStorage:
         Returns:
             Dict with paths to binary and float indexes
         """
-        import faiss
-        
         if family_id not in self.family_mapping:
             raise ValueError(f"Family {family_id} not found in mapped families")
         

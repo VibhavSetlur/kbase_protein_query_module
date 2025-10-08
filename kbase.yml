@@ -2,7 +2,7 @@ module-name:
     kbase_protein_query_module
 
 module-description:
-    Comprehensive protein analysis pipeline with embedding generation, similarity search, family assignment, network analysis, and enhanced output system. Generates individual HTML reports for each analysis stage, comprehensive CSV files with metadata correlations, and organized downloadable directories for research workflows.
+    KBase Protein Query Module
 
 service-language:
     python

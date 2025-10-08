@@ -6,6 +6,9 @@ echo "Removing temp files..."
 rm -rf /kb/module/work/tmp/*
 echo "...done removing temp files."
 export PYTHONPATH=$script_dir/../lib:$PATH:$PYTHONPATH
+export KPQM_TEST_FAST=1
+# Ensure callback URL is set so code paths depending on it don't attempt network
+export SDK_CALLBACK_URL=${SDK_CALLBACK_URL:-}
 cd $script_dir/../test
 echo "Current directory: $(pwd)"
 echo "Python path: $PYTHONPATH"

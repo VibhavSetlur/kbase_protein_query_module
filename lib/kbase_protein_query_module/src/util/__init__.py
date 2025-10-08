@@ -2,16 +2,18 @@
 Utility module for KBase Protein Query Module.
 
 This module provides various utility functions organized by category including
-embeddings, similarity calculations, storage handling, and other common utilities.
+embeddings, similarity calculations, storage handling, family assignment,
+similarity search, and other common utilities.
 """
 
-from .embeddings import *
-from .similarity import *
-from .storage import *
-from .visualization import *
-from .documentation import *
-from .input_parser import *
-from .safe_delete import *
+from .embeddings import ProteinEmbeddingGenerator
+from .similarity_indexing import HierarchicalIndex, StreamingIndex
+from .storage import (
+    ProteinStorage, MemoryEfficientLoader, 
+    ProteinFamilyAssigner, ProteinExistenceChecker, IndexingStrategy
+)
+from .family_assignment import FamilyAssignment
+from .similarity_search import SimilaritySearch
 
 __all__ = [
     # Embeddings
@@ -28,13 +30,9 @@ __all__ = [
     'ProteinExistenceChecker',
     'IndexingStrategy',
     
-    # Visualization
-    'VisualizationConverter',
+    # Family Assignment
+    'FamilyAssignment',
     
-    # Documentation
-    'DocumentationGenerator',
-    
-    # Input/Output
-    'InputParser',
-    'SafeDelete'
+    # Similarity Search
+    'SimilaritySearch'
 ]

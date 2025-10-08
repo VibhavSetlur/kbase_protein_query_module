@@ -339,12 +339,12 @@ class FAISSIndexingStrategy(IndexingStrategy):
     def __init__(self, config: IndexingConfig):
         super().__init__(config)
         
-        # Try to import FAISS
+        # Try to import FAISS (optional in some environments)
         try:
-            import faiss
+            import faiss  # type: ignore
             self.faiss = faiss
-        except ImportError:
-            raise ImportError("FAISS library is required for FAISSIndexingStrategy")
+        except Exception:
+            self.faiss = None
         
         # FAISS-specific configuration
         self.index_type = config.custom_params.get('index_type', 'IVFFlat') if config.custom_params else 'IVFFlat'

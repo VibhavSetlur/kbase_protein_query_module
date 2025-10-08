@@ -25,8 +25,15 @@ from sklearn.cluster import AgglomerativeClustering
 import json
 import time
 
-from ..base_stage import BaseStage, StageResult
-from ..util.visualization import visualization_converter as _viz
+# Simple result class for compatibility
+class StageResult:
+    def __init__(self, success: bool, data: Any = None, error_message: str = None, 
+                 metadata: Dict[str, Any] = None, artifacts: List[Dict[str, Any]] = None):
+        self.success = success
+        self.data = data
+        self.error_message = error_message
+        self.metadata = metadata or {}
+        self.artifacts = artifacts or []
 
 logger = logging.getLogger(__name__)
 
@@ -145,16 +152,68 @@ def create_kamada_kawai_layout(G, seed=42):
     return pos
 
 
-class NetworkAnalysisStage(BaseStage):
-    """Pipeline stage for network analysis of similarity search results."""
+class NetworkAnalysis:
+    """Network analysis for protein similarity search results."""
+    
+    def analyze(self, proteins: List[Any], **kwargs) -> Dict[str, Any]:
+        """Main analysis method called by AnalysisManager."""
+        try:
+            # Convert proteins to the expected format
+            input_data = {
+                'proteins': proteins,
+                'similarity_results': kwargs.get('similarity_results', []),
+                'analysis_config': kwargs.get('analysis_config', {})
+            }
+            
+            # Run the analysis
+            result = self.run(input_data)
+            
+            # Convert StageResult to dictionary format expected by AnalysisManager
+            return {
+                'success': result.success,
+                'data': result.data,
+                'error_message': result.error_message,
+                'metadata': result.metadata,
+                'artifacts': result.artifacts
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'data': None,
+                'error_message': str(e),
+                'metadata': {},
+                'artifacts': []
+            }
 
     def __init__(self, config: Dict[str, Any] = None):
-        super().__init__(config or {})
+        self.config = config or {}
         self.k_neighbors = self.config.get('k_neighbors', 8)
+        
+        # Initialize util components
+        self.family_assignment = None
+        self.similarity_search = None
+        self.embedding_generator = None
+        self._initialize_utils()
         self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
         self.mutual_knn = self.config.get('mutual_knn', True)
         self.min_network_size = self.config.get('min_network_size', 5)
         self.max_network_size = self.config.get('max_network_size', 100)
+    
+    def _initialize_utils(self):
+        """Initialize utility components."""
+        try:
+            from ...util.family_assignment import FamilyAssignment
+            from ...util.similarity_search import SimilaritySearch
+            from ...util.embeddings import ProteinEmbeddingGenerator
+            
+            self.family_assignment = FamilyAssignment(self.config)
+            self.similarity_search = SimilaritySearch(self.config)
+            self.embedding_generator = ProteinEmbeddingGenerator()
+            
+            logger.info("Network analysis utilities initialized")
+            
+        except Exception as e:
+            logger.warning(f"Could not initialize all utilities: {e}")
 
     def get_stage_name(self) -> str:
         return "network_analysis"

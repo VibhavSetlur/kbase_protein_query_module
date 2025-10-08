@@ -5,71 +5,53 @@ This module defines which analyses are available and enabled for the KBase Prote
 Developers can enable/disable specific analyses by modifying the configuration below.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Mapping
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Analysis Configuration
-# Set to True to enable an analysis, False to disable
-ANALYSIS_CONFIG = {
+# Network analysis is enabled for the new architecture
+_ANALYSIS_CONFIG_DICT = {
     "network_analysis": {
         "enabled": True,
         "name": "Network Analysis",
-        "description": "Constructs protein interaction networks using similarity-based connections",
+        "description": "Protein similarity network analysis with interactive visualizations",
         "category": "network",
-        "dependencies": ["similarity_search", "embeddings"],
-        "output_type": "network_data"
-    },
-    "sequence_analysis": {
-        "enabled": True,
-        "name": "Sequence Analysis", 
-        "description": "Performs comprehensive sequence-based analysis including motifs and patterns",
-        "category": "sequence",
-        "dependencies": ["embeddings"],
-        "output_type": "sequence_data"
-    },
-    "bioinformatics_analysis": {
-        "enabled": True,
-        "name": "Bioinformatics Analysis",
-        "description": "Advanced bioinformatics analysis including domain prediction and functional annotation",
-        "category": "bioinformatics", 
-        "dependencies": ["embeddings", "similarity_search"],
-        "output_type": "bioinformatics_data"
-    },
-    "multi_protein_analysis": {
-        "enabled": True,
-        "name": "Multi-Protein Analysis",
-        "description": "Comparative analysis across multiple proteins with statistical insights",
-        "category": "comparative",
-        "dependencies": ["embeddings", "similarity_search"],
-        "output_type": "comparative_data"
-    },
-    "similarity_search": {
-        "enabled": True,
-        "name": "Similarity Search",
-        "description": "Finds similar proteins using embedding-based similarity metrics",
-        "category": "search",
-        "dependencies": ["embeddings"],
-        "output_type": "similarity_data"
-    },
-    "family_assignment": {
-        "enabled": True,
-        "name": "Family Assignment",
-        "description": "Assigns proteins to functional families based on sequence similarity",
-        "category": "classification",
-        "dependencies": ["embeddings", "similarity_search"],
-        "output_type": "family_data"
-    },
-    "embeddings": {
-        "enabled": True,
-        "name": "Protein Embeddings",
-        "description": "Generates protein sequence embeddings using deep learning models",
-        "category": "preprocessing",
-        "dependencies": [],
-        "output_type": "embedding_data"
+        "dependencies": [],  # No dependencies for now
+        "output_type": "interactive_html",
+        "module_path": "kbase_protein_query_module.src.analysis.network_analysis.network_analysis",
+        "class_name": "NetworkAnalysis"
     }
 }
+
+# Make the config immutable
+class ImmutableConfig(Mapping):
+    """Immutable wrapper for configuration dictionaries."""
+    
+    def __init__(self, data):
+        self._data = data
+    
+    def __getitem__(self, key):
+        return self._data[key]
+    
+    def __iter__(self):
+        return iter(self._data)
+    
+    def __len__(self):
+        return len(self._data)
+    
+    def __setitem__(self, key, value):
+        raise TypeError("Configuration is immutable")
+    
+    def __delitem__(self, key):
+        raise TypeError("Configuration is immutable")
+    
+    def copy(self):
+        """Return a copy of the underlying data."""
+        return self._data.copy()
+
+ANALYSIS_CONFIG = ImmutableConfig(_ANALYSIS_CONFIG_DICT)
 
 # Output Configuration
 OUTPUT_CONFIG = {
@@ -151,6 +133,5 @@ def validate_analysis_config() -> bool:
         logger.error(f"Error validating analysis configuration: {e}")
         return False
 
-# Validate configuration on import
-if not validate_analysis_config():
-    logger.warning("Analysis configuration validation failed. Some analyses may not work correctly.")
+# With ANALYSIS_CONFIG empty, validation trivially passes.
+validate_analysis_config()

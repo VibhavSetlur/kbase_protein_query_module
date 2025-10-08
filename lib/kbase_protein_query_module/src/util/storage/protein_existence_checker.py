@@ -33,7 +33,6 @@ class ProteinExistenceChecker:
         except Exception as e:
             logger.warning(f"Could not initialize CompressedMetadataStorage: {e}")
         
-        # Additional attributes for test compatibility
         self.cache_ttl = cache_ttl
         self.cache: Dict[str, Dict[str, Any]] = {}
 
@@ -64,10 +63,8 @@ class ProteinExistenceChecker:
         # Not found
         return {"exists": False, "protein_id": uniprot_id, "family_id": None, "metadata": None}
 
-    # --- Compatibility helper methods for tests that patch these attributes ---
-    # Back-compat API expected by some tests
     def check_protein_exists_tuple(self, uniprot_id: str) -> tuple:
-        """Check protein existence and return tuple (exists, metadata) for test compatibility."""
+        """Check protein existence and return tuple (exists, metadata)."""
         # Check cache first
         if uniprot_id in self.cache:
             entry = self.cache[uniprot_id]
@@ -90,7 +87,6 @@ class ProteinExistenceChecker:
                 response = requests.get(f"https://www.uniprot.org/uniprot/{uniprot_id}.json")
                 if response.status_code == 200:
                     data = response.json()
-                    # Handle both real API format and test mock format
                     if data:
                         exists = True
                         metadata = {"source": "uniprot", "accession": uniprot_id}
@@ -101,7 +97,6 @@ class ProteinExistenceChecker:
                 # API call failed
                 metadata = {"source": "uniprot", "accession": uniprot_id, "error": str(e)}
         
-        # Always provide metadata for test compatibility
         if not metadata:
             metadata = {"source": "uniprot", "accession": uniprot_id}
         

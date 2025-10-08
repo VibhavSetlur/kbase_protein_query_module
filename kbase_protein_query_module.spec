@@ -1,8 +1,7 @@
 /*
 A KBase module: kbase_protein_query_module
 
-ProteinQueryAnalysis app.
-
+Protein query and analysis module with comprehensive network analysis capabilities.
 */
 
 module kbase_protein_query_module {
@@ -15,17 +14,10 @@ module kbase_protein_query_module {
         float start_time;
         int protein_count;
         list<string> stages_completed;
-        string output_directory;
-        string general_info_dir;
-        string network_analysis_dir;
-        string sequence_analysis_dir;
-        string embeddings_file_path;
-        string top_proteins_csv_path;
         string report_name;
         string report_ref;
         string shock_id;
         string shock_url;
-        /* Additional fields may be populated by orchestrated analyses */
     } ProteinQueryAnalysisResults;
     
     typedef structure {

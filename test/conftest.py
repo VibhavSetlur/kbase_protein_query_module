@@ -1,3 +1,11 @@
+import sys
+import types
+
+# Stub visualization module paths referenced by src.util.__init__
+_vis_stub = types.ModuleType('visualization')
+sys.modules['kbase_protein_query_module.src.util.visualization'] = _vis_stub
+sys.modules['lib.kbase_protein_query_module.src.util.visualization'] = _vis_stub
+
 """
 Test configuration and fixtures for KBase Protein Query Module
 
@@ -23,9 +31,7 @@ if lib_dir not in sys.path:
 # Import core modules for testing (with error handling)
 try:
     from kbase_protein_query_module.src.core import BaseStage, StageResult, PipelineConfig
-    from kbase_protein_query_module.src.stages import (
-        STAGE_REGISTRY, STAGE_DEPENDENCIES, get_stage_class, get_stage_dependencies
-    )
+    
     from kbase_protein_query_module.src.workflows import ProteinQueryWorkflow, WorkflowResult
     CORE_MODULES_AVAILABLE = True
 except ImportError as e:

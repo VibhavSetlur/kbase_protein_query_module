@@ -5,12 +5,14 @@ This module provides comprehensive input handling including data extraction,
 validation, and workspace object management for KBase narrative integration.
 """
 
-from .data_extraction import DataExtractionStage
-from .input_validation import InputValidationStage
-from .workspace_object import WorkspaceObjectStage
+from .input_manager import InputManager
+from .workspace_object import WorkspaceObjectProcessor
+from .protein_sequence import ProteinSequenceProcessor
+from .uniprot_ids import UniProtIdsProcessor
 
 __all__ = [
-    'DataExtractionStage',
-    'InputValidationStage', 
-    'WorkspaceObjectStage'
+    'InputManager',
+    'WorkspaceObjectProcessor',
+    'ProteinSequenceProcessor',
+    'UniProtIdsProcessor'
 ]
