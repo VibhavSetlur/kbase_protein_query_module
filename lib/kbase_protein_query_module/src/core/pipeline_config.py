@@ -133,13 +133,22 @@ class PipelineConfig:
                 logger.error("workspace_object_ref is required for workspace_object input type")
                 return False
             
-            # Check output directory
-            if not os.path.exists(os.path.dirname(self.output_dir)):
+            # Check output directory - validate that parent directory exists or can be created
+            parent_dir = os.path.dirname(self.output_dir)
+            if parent_dir and not os.path.exists(parent_dir):
                 try:
-                    os.makedirs(os.path.dirname(self.output_dir), exist_ok=True)
+                    os.makedirs(parent_dir, exist_ok=True)
                 except Exception as e:
                     logger.error(f"Cannot create output directory: {e}")
                     return False
+            
+            # Check if the output directory path is actually writable
+            try:
+                # Try to create the actual output directory to test write permissions
+                os.makedirs(self.output_dir, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Cannot create or write to output directory: {e}")
+                return False
             
             return True
             

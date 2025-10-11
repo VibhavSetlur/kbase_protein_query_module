@@ -10,11 +10,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Check for optional dependencies
+try:
+    import networkx as nx
+    import sklearn
+    NETWORKX_AVAILABLE = True
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    NETWORKX_AVAILABLE = False
+    SKLEARN_AVAILABLE = False
+
 # Analysis Configuration
-# Network analysis is enabled for the new architecture
+# Network analysis is enabled only if dependencies are available
 _ANALYSIS_CONFIG_DICT = {
     "network_analysis": {
-        "enabled": True,
+        "enabled": NETWORKX_AVAILABLE and SKLEARN_AVAILABLE,
         "name": "Network Analysis",
         "description": "Protein similarity network analysis with interactive visualizations",
         "category": "network",

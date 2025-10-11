@@ -53,7 +53,7 @@ Contact: https://kbase.us/contact-us/
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     ######################################### noqa
-    VERSION = "3.0.0"
+    VERSION = "2.0.0"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
     GIT_COMMIT_HASH = "36203034384319fef4abcbb4d82c8a8e3a07f512"
 
@@ -125,7 +125,7 @@ Contact: https://kbase.us/contact-us/
             if hasattr(self, '_run_workflow') and callable(getattr(self, '_run_workflow')):
                 result = self._run_workflow(workflow)
             else:
-                result = workflow.execute()
+                result = workflow.execute(input_data)
             
             # Check if workflow was successful
             if not result.success:

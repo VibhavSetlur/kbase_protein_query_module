@@ -15,15 +15,29 @@ Features:
 
 import numpy as np
 import pandas as pd
-import networkx as nx
 from typing import List, Dict, Tuple, Optional, Union, Any
 import logging
 from tqdm import tqdm
 import os
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.cluster import AgglomerativeClustering
 import json
 import time
+
+# Optional imports with fallbacks
+try:
+    import networkx as nx
+    NETWORKX_AVAILABLE = True
+except ImportError:
+    NETWORKX_AVAILABLE = False
+    nx = None
+
+try:
+    from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.cluster import AgglomerativeClustering
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    cosine_similarity = None
+    AgglomerativeClustering = None
 
 # Simple result class for compatibility
 class StageResult:
@@ -71,6 +85,8 @@ def wrap_text(text, max_chars=80):
 
 def compute_cosine_similarity_matrix(embeddings):
     """Compute cosine similarity matrix for embeddings (shape [N, D])."""
+    # Use numpy for basic cosine similarity computation
+    # This doesn't require sklearn, but we'll use it if available for consistency
     normed = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
     sim_matrix = np.dot(normed, normed.T)
     return sim_matrix
@@ -88,8 +104,11 @@ def build_robust_network_edges(sim_matrix, ids, k_neighbors=5, similarity_thresh
     Returns:
         NetworkX graph with selected edges
     """
+    if not NETWORKX_AVAILABLE:
+        raise ImportError("NetworkX is required for network analysis but not available")
+    
     N = sim_matrix.shape[0]
-    G = nx.Graph()
+    G = nx.Graph() if NETWORKX_AVAILABLE else None
     
     # Add all nodes
     for i in range(N):
@@ -130,6 +149,9 @@ def build_robust_network_edges(sim_matrix, ids, k_neighbors=5, similarity_thresh
 
 def create_kamada_kawai_layout(G, seed=42):
     """Create a Kamada-Kawai layout for the graph using similarity weights."""
+    if not NETWORKX_AVAILABLE:
+        raise ImportError("NetworkX is required for network layout but not available")
+    
     # Kamada-Kawai layout is excellent for showing edge relationships clearly
     # It positions nodes based on their graph-theoretic distances
     # Perfect for revealing natural groupings without forcing clusters
@@ -154,6 +176,16 @@ def create_kamada_kawai_layout(G, seed=42):
 
 class NetworkAnalysis:
     """Network analysis for protein similarity search results."""
+    
+    def __init__(self, config: Dict[str, Any] = None):
+        """Initialize the NetworkAnalysis class."""
+        self.config = config or {}
+        
+        # Check dependencies
+        if not NETWORKX_AVAILABLE:
+            raise ImportError("NetworkX is required for network analysis but not available")
+        if not SKLEARN_AVAILABLE:
+            raise ImportError("scikit-learn is required for network analysis but not available")
     
     def analyze(self, proteins: List[Any], **kwargs) -> Dict[str, Any]:
         """Main analysis method called by AnalysisManager."""

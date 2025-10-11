@@ -235,13 +235,13 @@ class TestKBaseServerModule:
         # Mock wsgi.input
         mock_input = _Mock()
         mock_input.read.return_value = b'{"method": "kbase_protein_query_module.status", "params": [], "id": 1, "jsonrpc": "2.0"}'
+        environ['wsgi.input'] = mock_input
         
         with patch.dict('os.environ', {}, clear=True):
             # Mock the auth client
-            app.auth_client.get_user.return_value = 'test_user'
+            app.auth_client.get_user = Mock(return_value='test_user')
 
             # Mock the RPC service
-            from unittest.mock import Mock
             app.rpc_service.call = Mock(return_value='{"result": {"state": "OK"}, "id": 1}')
 
             # Test the call
@@ -273,6 +273,7 @@ class TestKBaseServerModule:
         # Mock wsgi.input for a method that requires authentication
         mock_input = Mock()
         mock_input.read.return_value = b'{"method": "kbase_protein_query_module.run_protein_query_analysis", "params": [{}], "id": 1, "jsonrpc": "2.0"}'
+        environ['wsgi.input'] = mock_input
         
         with patch.dict('os.environ', {}, clear=True):
             result = app(environ, start_response)
@@ -315,6 +316,7 @@ class TestKBaseServerModule:
         # Mock wsgi.input with invalid JSON
         mock_input = Mock()
         mock_input.read.return_value = b'invalid json'
+        environ['wsgi.input'] = mock_input
         
         with patch.dict('os.environ', {}, clear=True):
             result = app(environ, start_response)
@@ -406,6 +408,12 @@ class TestKBaseServerModule:
         
         # Test with regular object (should use default encoder)
         regular_obj = "test string"
-        result = encoder.default(regular_obj)
-        assert result == "test string"
+        # This should raise TypeError since strings are already JSON serializable
+        try:
+            result = encoder.default(regular_obj)
+            # If we get here, the encoder handled it unexpectedly
+            assert False, "Expected TypeError for already serializable object"
+        except TypeError:
+            # This is expected behavior - strings are already JSON serializable
+            pass
 

@@ -157,9 +157,10 @@ class TestWorkspaceObjectProcessor:
         """Test getting workspace client without KBase utility."""
         processor = WorkspaceObjectProcessor(test_config)
         
-        # Should raise an error when no kb_util is available
-        with pytest.raises(Exception):
-            processor._get_workspace_client()
+        # Should raise an error when no kb_util is available and no SDK_CALLBACK_URL
+        with patch.dict('os.environ', {}, clear=True):
+            with pytest.raises(RuntimeError, match="SDK_CALLBACK_URL not found"):
+                processor._get_workspace_client()
     
     def test_retrieve_object_data_success(self, test_config, mock_workspace_client):
         """Test successful object data retrieval."""

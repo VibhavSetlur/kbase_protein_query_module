@@ -225,7 +225,9 @@ class TestPipelineConfig:
         )
         
         # Should return False as it cannot create the directory
-        assert config.validate() is False
+        # Mock os.makedirs to raise an exception to simulate permission denied
+        with patch('os.makedirs', side_effect=PermissionError("Permission denied")):
+            assert config.validate() is False
     
     @patch('os.path.exists')
     @patch('os.makedirs')
@@ -241,7 +243,10 @@ class TestPipelineConfig:
         result = config.validate()
         
         assert result is True
-        mock_makedirs.assert_called_once_with('/tmp', exist_ok=True)
+        # Should be called twice: once for parent dir and once for output dir
+        assert mock_makedirs.call_count == 2
+        mock_makedirs.assert_any_call('/tmp', exist_ok=True)
+        mock_makedirs.assert_any_call('/tmp/test_output', exist_ok=True)
     
     @patch('os.path.exists')
     @patch('os.makedirs')

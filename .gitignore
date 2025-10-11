@@ -33,6 +33,7 @@ data/temp/
 *.log
 *.tmp
 *.temp
+*.coverage
 
 # Python
 __pycache__/
