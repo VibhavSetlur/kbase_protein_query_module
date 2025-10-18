@@ -94,7 +94,7 @@ class KBWSUtils(SharedEnvUtils):
         elif version == "appdev":
             return "https://appdev.kbase.us/services"
         elif version == "ci":
-            return "https://ci.kbase.us/services"
+            return "https://appdev.kbase.us/services"
         else:
             self.log_critical("Unknown workspace version: " + version)
             return "https://kbase.us/services"

@@ -309,22 +309,20 @@ class NetworkAnalysis:
 
             return StageResult(
                 success=True,
-                output_data={'network_analysis': results},
+                data={'network_analysis': results},
                 metadata={
                     'k_neighbors': self.k_neighbors,
                     'similarity_threshold': self.similarity_threshold,
                     'mutual_knn': self.mutual_knn,
                     'execution_time': execution_time
-                },
-                execution_time=execution_time
+                }
             )
         except Exception as e:
             logger.error(f"Network analysis failed: {str(e)}")
             return StageResult(
                 success=False,
-                output_data={},
+                data={},
                 metadata={},
-                execution_time=0.0,
                 error_message=str(e)
             )
 
@@ -437,7 +435,8 @@ class NetworkAnalysis:
         # Save the raw network visualization as standalone HTML
         html_filename = f"network_visualization_{query_protein_id}_{int(time.time())}.html"
         html_path = os.path.join(output_dir, html_filename)
-        html_path = save_plot_html(fig, html_path)
+        # Save the plotly figure as HTML
+        fig.write_html(html_path)
         
         logger.info(f"Network visualization report saved to: {html_path}")
         logger.info(f"CSV data files saved: {csv_files}")

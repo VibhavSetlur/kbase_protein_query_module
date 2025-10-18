@@ -69,6 +69,14 @@ class KBaseAuth(object):
         self._authurl = auth_url
         if not self._authurl:
             self._authurl = self._LOGIN_URL
+        else:
+            # If auth_url is provided but doesn't end with the login endpoint,
+            # append the login endpoint to it
+            if not auth_url.endswith('/api/legacy/KBase/Sessions/Login'):
+                if auth_url.endswith('/'):
+                    self._authurl = auth_url + 'api/legacy/KBase/Sessions/Login'
+                else:
+                    self._authurl = auth_url + '/api/legacy/KBase/Sessions/Login'
         self._cache = TokenCache()
 
     def get_user(self, token):

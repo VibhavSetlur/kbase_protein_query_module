@@ -26,7 +26,7 @@ class AbstractHandle:
         token=None,
         ignore_authrc=False,
         trust_all_ssl_certificates=False,
-        auth_svc="https://ci.kbase.us/services/auth/api/legacy/KBase/Sessions/Login",
+        auth_svc="https://appdev.kbase.us/services/auth/api/legacy/KBase/Sessions/Login",
     ):
         if url is None:
             raise ValueError("A url is required")
