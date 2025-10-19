@@ -21,11 +21,10 @@
       "allow_multiple": false,
       "default_values": ["protein_input"],
       "field_type": "dropdown",
-      "dropdown_options": {
+        "dropdown_options": {
         "options": [
           {"value": "protein_input", "display": "Protein Input"},
-          {"value": "uniprot_ids", "display": "UniProt IDs"},
-          {"value": "workspace_object", "display": "Workspace Object"}
+          {"value": "uniprot_ids", "display": "UniProt IDs"}
         ]
       }
     },
@@ -57,22 +56,6 @@
       "conditional": {
         "control_param": "input_type",
         "control_value": "uniprot_ids"
-      }
-    },
-    {
-      "id": "workspace_object",
-      "optional": true,
-      "advanced": false,
-      "allow_multiple": false,
-      "default_values": [""],
-      "field_type": "text",
-      "text_options": {
-        "valid_ws_types": ["KBaseGenomes.Genome", "KBaseGenomes.GenomeSet", "KBaseGenomes.ProteinSequenceSet"],
-        "validate_as": "workspace_object_name"
-      },
-      "conditional": {
-        "control_param": "input_type",
-        "control_value": "workspace_object"
       }
     },
     {
@@ -111,11 +94,6 @@
           "target_property": "uniprot_ids"
         },
         {
-          "input_parameter": "workspace_object",
-          "target_property": "workspace_object",
-          "target_type_transform": "resolved-ref"
-        },
-        {
           "input_parameter": "analysis_name",
           "target_property": "analysis_name"
         }
@@ -124,14 +102,6 @@
         {
           "service_method_output_path": [0, "analysis_result_ref"],
           "target_property": "analysis_result_ref"
-        },
-        {
-          "service_method_output_path": [0, "job_id"],
-          "target_property": "job_id"
-        },
-        {
-          "narrative_system_variable": "workspace",
-          "target_property": "workspace_name"
         }
       ]
     }

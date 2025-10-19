@@ -35,7 +35,7 @@ class ProteinSequenceProcessor:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.max_sequence_length = self.config.get('max_sequence_length', 10000)
-        self.min_sequence_length = self.config.get('min_sequence_length', 3)
+        self.min_sequence_length = self.config.get('min_sequence_length', 1)
         self.valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -84,8 +84,9 @@ class ProteinSequenceProcessor:
                 if cleaned_sequence and len(cleaned_sequence) >= self.min_sequence_length:
                     record['sequence'] = cleaned_sequence
                     validated_records.append(record)
+                    logger.info(f"Accepted sequence for protein {record['protein_id']}: {len(cleaned_sequence)} amino acids")
                 else:
-                    logger.warning(f"Invalid sequence for protein {record['protein_id']}")
+                    logger.warning(f"Invalid sequence for protein {record['protein_id']}: '{record['sequence']}' -> '{cleaned_sequence}' (length: {len(cleaned_sequence)})")
             
             if not validated_records:
                 raise ValueError("No valid protein sequences found")

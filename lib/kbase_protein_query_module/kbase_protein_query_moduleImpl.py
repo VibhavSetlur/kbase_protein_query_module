@@ -214,14 +214,9 @@ Contact: https://kbase.us/contact-us/
                 raise ValueError("uniprot_ids is required for uniprot_ids type")
             input_data['uniprot_ids'] = uniprot_ids
             
-        elif input_type == 'workspace_object':
-            workspace_object = params.get('workspace_object', '')
-            if not workspace_object:
-                raise ValueError("workspace_object is required for workspace_object type")
-            input_data['workspace_object'] = workspace_object
             
         else:
-            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids, workspace_object")
+            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids")
         
         return input_data
 
@@ -239,7 +234,7 @@ Contact: https://kbase.us/contact-us/
             stage_configs=analysis_config,
             storage_config=storage_config,
             similarity_config=storage_config,
-            output_dir=output_config.get('output_dir', self.shared_folder),
+            output_dir=self._create_output_directory(params.get('analysis_name', 'protein_analysis')),
             workspace_name=workspace_name,
             workspace_url=self.callback_url,
             auth_token=ctx.get('token') if isinstance(ctx, dict) else os.environ.get('KB_AUTH_TOKEN'),
@@ -257,6 +252,14 @@ Contact: https://kbase.us/contact-us/
             config.workspace_client = None
         
         return config
+    
+    def _create_output_directory(self, analysis_name: str) -> str:
+        """Create output directory in container's scratch space following KBase patterns."""
+        # Create a new directory in the container's scratch directory
+        output_dir = os.path.join(self.shared_folder, f"{analysis_name}_output_{int(time.time())}")
+        os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created output directory: {output_dir}")
+        return output_dir
 
     def _create_kbase_report(self, workflow_result, analysis_name: str, workspace_name: str) -> Dict[str, str]:
         """Create KBase report from workflow results."""

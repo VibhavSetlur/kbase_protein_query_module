@@ -173,7 +173,7 @@ MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"""
         """Test sequence validation with too short sequence."""
         processor = ProteinSequenceProcessor(test_config)
         
-        short_sequence = 'MK'  # Too short
+        short_sequence = ''  # Empty sequence - too short
         
         assert processor._validate_sequence(short_sequence) is False
     
