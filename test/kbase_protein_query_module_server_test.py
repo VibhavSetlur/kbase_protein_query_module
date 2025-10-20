@@ -187,13 +187,28 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIn('report_name', out)
         self.assertIn('report_ref', out)
 
-    def test_workspace_object_input(self):
-        """End-to-end: workspace_object input (validates pathway even if object is mocked)."""
+    def test_run_pipeline_protein_sequence_string(self):
+        """End-to-end: protein_input with single string sequence (like MMMM)."""
         params = {
             'workspace_name': self.wsName,
-            'input_type': 'workspace_object',
-            'workspace_object': '1/2/3',
-            'analysis_name': 'ws_obj',
+            'input_type': 'protein_input',
+            'protein_input': 'MMMM',
+            'analysis_name': 'string_seq_analysis',
+            'output_config': {'output_dir': self.test_local_tmp}
+        }
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        out = result[0]
+        self.assertIsInstance(out, dict)
+        self.assertIn('report_name', out)
+        self.assertIn('report_ref', out)
+
+    def test_uniprot_ids_input(self):
+        """End-to-end: uniprot_ids input."""
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'uniprot_ids',
+            'uniprot_ids': self.test_protein_ids,
+            'analysis_name': 'uniprot_test',
             'output_config': {'output_dir': self.test_local_tmp}
         }
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
@@ -226,15 +241,13 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     def test_error_handling(self):
         """Test error handling for invalid parameters."""
-        # Missing workspace_name and required fields
+        # Missing workspace_name and required fields - should raise ValueError
         params = {}
-        res = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertIsInstance(res, list)
-        out = res[0]
-        self.assertEqual(out.get('analysis_result_ref'), 'error')
-        self.assertIn('summary', out)
-        self.assertIn('report_name', out)
-        self.assertIn('report_ref', out)
+        with self.assertRaises(ValueError) as context:
+            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        
+        # Check that the error message is appropriate
+        self.assertIn('workspace_name is required', str(context.exception))
 
     def test_parameter_validation(self):
         """Test parameter validation with unsupported input_type and missing fields."""
@@ -243,14 +256,16 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             'input_type': 'unsupported_type',
             'analysis_name': 'x'
         }
-        res = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertIsInstance(res, list)
-        out = res[0]
-        self.assertEqual(out.get('analysis_result_ref'), 'error')
-        self.assertIn('summary', out)
+        # Now validation errors properly raise exceptions instead of returning error results
+        with self.assertRaises(ValueError) as context:
+            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        
+        # Check that the error message is appropriate
+        self.assertIn('Invalid input_type', str(context.exception))
+        self.assertIn('unsupported_type', str(context.exception))
 
     def test_all_supported_input_types(self):
-        """Test supported input types: protein_input, uniprot_ids, workspace_object."""
+        """Test supported input types: protein_input, uniprot_ids."""
         # protein_input
         params = {
             'workspace_name': self.wsName,
@@ -267,16 +282,6 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             'input_type': 'uniprot_ids',
             'uniprot_ids': self.test_protein_ids,
             'analysis_name': 'ui',
-            'output_config': {'output_dir': self.test_local_tmp}
-        }
-        self.assertIsInstance(self.serviceImpl.run_protein_query_analysis(self.ctx, params), list)
-
-        # workspace_object
-        params = {
-            'workspace_name': self.wsName,
-            'input_type': 'workspace_object',
-            'workspace_object': '1/2/3',
-            'analysis_name': 'wo',
             'output_config': {'output_dir': self.test_local_tmp}
         }
         self.assertIsInstance(self.serviceImpl.run_protein_query_analysis(self.ctx, params), list)
@@ -308,31 +313,36 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     def test_error_scenarios(self):
         """Test various error scenarios."""
-        # Invalid input type
+        # Invalid input type - should raise ValueError
         params = {
             'workspace_name': self.wsName,
             'input_type': 'invalid_type',
             'analysis_name': 'error_test'
         }
-        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertEqual(result[0].get('analysis_result_ref'), 'error')
-        # Missing workspace
+        with self.assertRaises(ValueError) as context:
+            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIn('Invalid input_type', str(context.exception))
+        
+        # Missing workspace - should raise ValueError
         params = {
             'input_type': 'protein_input',
             'protein_input': [self.test_sequence],
             'analysis_name': 'no_workspace'
         }
-        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertEqual(result[0].get('analysis_result_ref'), 'error')
-        # Empty analysis name
+        with self.assertRaises(ValueError) as context:
+            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIn('workspace_name is required', str(context.exception))
+        
+        # Empty analysis name - should raise ValueError
         params = {
             'workspace_name': self.wsName,
             'input_type': 'protein_input',
             'protein_input': [self.test_sequence],
             'analysis_name': ''
         }
-        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertEqual(result[0].get('analysis_result_ref'), 'error')
+        with self.assertRaises(ValueError) as context:
+            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIn('analysis_name cannot be empty', str(context.exception))
 
     def test_legacy_compatibility(self):
         """Legacy alias removed in revamped API."""

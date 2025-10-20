@@ -114,19 +114,12 @@ class TestKBaseStandards:
             'data': 'invalid_data'
         }
         
-        result = service_instance.run_protein_query_analysis(mock_ctx, invalid_params)
+        # Should raise ValueError for invalid parameters
+        with pytest.raises(ValueError) as exc_info:
+            service_instance.run_protein_query_analysis(mock_ctx, invalid_params)
         
-        # Should return error in proper format
-        assert isinstance(result, list), "Error result should be a list"
-        assert len(result) > 0, "Error result should be non-empty"
-        assert isinstance(result[0], dict), "Error result should be a dict"
-        
-        # Check for error indicators
-        error_result = result[0]
-        assert error_result.get('analysis_result_ref') == 'error', "Error result should have analysis_result_ref='error'"
-        assert 'summary' in error_result, "Error result should have summary"
-        assert 'report_name' in error_result, "Error result should have report_name"
-        assert 'report_ref' in error_result, "Error result should have report_ref"
+        # Check that the error message is appropriate
+        assert 'workspace_name is required' in str(exc_info.value)
     
     def test_parameter_validation_compliance(self):
         """Test that parameter validation follows KBase standards."""
@@ -136,22 +129,21 @@ class TestKBaseStandards:
         # Create service instance
         service_instance = kbase_protein_query_module({})
         
-        # Test missing required parameters
+        # Test missing required parameters - should raise ValueError
         missing_params = {}
-        result = service_instance.run_protein_query_analysis(mock_ctx, missing_params)
+        with pytest.raises(ValueError) as exc_info:
+            service_instance.run_protein_query_analysis(mock_ctx, missing_params)
+        assert 'workspace_name is required' in str(exc_info.value)
         
-        assert isinstance(result, list), "Should return list even with missing params"
-        assert result[0].get('analysis_result_ref') == 'error', "Should return error for missing params"
-        
-        # Test empty parameters
+        # Test empty parameters - should raise ValueError
         empty_params = {
             'workspace_name': '',
             'input_type': '',
             'analysis_name': ''
         }
-        result = service_instance.run_protein_query_analysis(mock_ctx, empty_params)
-        
-        assert result[0].get('analysis_result_ref') == 'error', "Should return error for empty params"
+        with pytest.raises(ValueError) as exc_info:
+            service_instance.run_protein_query_analysis(mock_ctx, empty_params)
+        assert 'workspace_name is required' in str(exc_info.value)
     
     def test_workspace_integration_compliance(self):
         """Test that workspace integration follows KBase standards."""

@@ -25,6 +25,15 @@ module kbase_protein_query_module {
         string summary;
     } GetAvailableAnalysesResults;
     
+    typedef structure {
+        string state;
+        string message;
+        string version;
+        string git_url;
+        string git_commit_hash;
+    } StatusResults;
+    
     funcdef run_protein_query_analysis(mapping<string, UnspecifiedObject> params) returns (ProteinQueryAnalysisResults output) authentication required;
     funcdef get_available_analyses() returns (GetAvailableAnalysesResults output) authentication required;
+    funcdef status() returns (StatusResults output) authentication required;
 };

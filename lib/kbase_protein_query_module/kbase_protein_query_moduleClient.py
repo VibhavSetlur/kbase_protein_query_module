@@ -21,29 +21,23 @@ class kbase_protein_query_module(object):
     """
     A KBase module: kbase_protein_query_module
 
-    This module provides comprehensive protein query analysis capabilities using UniProt IDs as the canonical identifier:
+    This module provides comprehensive protein query analysis capabilities using a modern,
+    modular architecture with no backward compatibility:
 
-    COMPREHENSIVE ANALYSIS WORKFLOW:
-    1. CheckProteinExistence: Verify protein exists using UniProt ID, optionally generate embedding
-    2. GenerateProteinEmbeddings: Create embeddings from sequence input or protein check results
-    3. AssignProteinFamily: Assign proteins to families using similarity to centroids
-    4. FindTopMatches: Perform similarity search within families
-    5. SummarizeAndVisualize: Generate comprehensive HTML reports with network analysis
-    6. RunProteinQueryAnalysis: Unified pipeline for comprehensive protein analysis
+    ARCHITECTURE:
+    - WorkflowOrchestrator: Central coordinator for all analysis workflows
+    - InputManager: Handles multiple input types (protein sequences, UniProt IDs)
+    - AnalysisManager: Manages analysis execution (network analysis, etc.)
+    - OutputManager: Handles result packaging and KBase integration
+    - Util modules: Reusable components (embeddings, family assignment, similarity search, storage)
 
-    ADVANCED CAPABILITIES:
-    - UniProt ID canonical identifier system (exact match only)
-    - ESM-2 protein language model for embedding generation
-    - Efficient FAISS-based similarity search and clustering
-    - Family assignment using binary centroid similarity
-    - Comprehensive metadata storage and retrieval
-    - HTML report generation with network visualization
-    - Workspace object management for downstream analysis
-    - Bioinformatics integration with protein databases
-    - Network analysis and protein relationship mapping
-    - Advanced similarity metrics and statistical analysis
-    - Modular pipeline architecture with configurable stages
-    - Real-time performance monitoring and error handling
+    KEY FEATURES:
+    - No backward compatibility - clean, modern architecture
+    - Modular design with clear separation of concerns
+    - Multiple input type support with unified processing
+    - Comprehensive network analysis with interactive visualizations
+    - KBase workspace integration with Shock storage
+    - Configurable analysis pipelines
 
     Authors: Vibhav Setlur
     Contact: https://kbase.us/contact-us/
@@ -63,88 +57,6 @@ class kbase_protein_query_module(object):
             trust_all_ssl_certificates=trust_all_ssl_certificates,
             auth_svc=auth_svc)
 
-    def check_protein_existence(self, params, context=None):
-        """
-        Check if a protein exists in the storage system using UniProt ID and create a
-        workspace object with the result. Input: UniProt ID (e.g., P00001, P12345)
-        Output: Existence status, family assignment, metadata, optional embedding
-        
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "CheckProteinExistenceResults" -> structure: 
-           parameter "report_name" of String, parameter "report_ref" of String, 
-           parameter "exists" of Long, parameter "family_id" of String, 
-           parameter "metadata" of mapping from String to unspecified object, 
-           parameter "input_parameters" of mapping from String to unspecified object, 
-           parameter "start_time" of Double, parameter "summary" of String, 
-           parameter "protein_existence_result_ref" of String, parameter 
-           "embedding_result_ref" of String
-        """
-        return self._client.call_method('kbase_protein_query_module.check_protein_existence',
-                                        [params], self._service_ver, context)
-
-    def generate_protein_embedding(self, params, context=None):
-        """
-        Generate protein embeddings from direct sequence input. Creates
-        embeddings using ESM-2 model for downstream analysis.
-        
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "GenerateProteinEmbeddingResults" -> structure: 
-           parameter "report_name" of String, parameter "report_ref" of String, 
-           parameter "embedding_result_ref" of String, parameter "summary" of String, 
-           parameter "input_parameters" of mapping from String to unspecified object, 
-           parameter "start_time" of Double, parameter "embedding_norm" of Double, 
-           parameter "sequence_length" of Long, parameter "embedding_dim" of Long
-        """
-        return self._client.call_method('kbase_protein_query_module.generate_protein_embedding',
-                                        [params], self._service_ver, context)
-
-    def assign_family_fast(self, params, context=None):
-        """
-        Assign a protein embedding to a family using similarity to family
-        centroids. Uses binary Hamming distance for fast family assignment.
-        
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "AssignFamilyFastResults" -> structure: 
-           parameter "family_id" of String, parameter "confidence" of Double, 
-           parameter "eigenprotein_id" of String, parameter "input_parameters" of 
-           mapping from String to unspecified object, parameter "start_time" of Double, 
-           parameter "family_assignment_result_ref" of String
-        """
-        return self._client.call_method('kbase_protein_query_module.assign_family_fast',
-                                        [params], self._service_ver, context)
-
-    def find_top_matches_from_embedding(self, params, context=None):
-        """
-        Find top matches for a given protein embedding within a family. Uses
-        FAISS IVF float index for efficient similarity search.
-        
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "FindTopMatchesFromEmbeddingResults" -> structure: 
-           parameter "matches" of list of mapping from String to unspecified object, 
-           parameter "summary" of String, parameter "input_parameters" of mapping from 
-           String to unspecified object, parameter "start_time" of Double, 
-           parameter "family_id" of String, parameter "top_n" of Long, 
-           parameter "similarity_stats" of mapping from String to Double, 
-           parameter "similarity_search_result_ref" of String
-        """
-        return self._client.call_method('kbase_protein_query_module.find_top_matches_from_embedding',
-                                        [params], self._service_ver, context)
-
-    def summarize_and_visualize_results(self, params, context=None):
-        """
-        Summarize and visualize protein network analysis results.
-        Generates comprehensive HTML reports with network visualization.
-        
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "SummarizeAndVisualizeResultsResults" -> structure: 
-           parameter "report_name" of String, parameter "report_ref" of String, 
-           parameter "input_parameters" of mapping from String to unspecified object, 
-           parameter "start_time" of Double, parameter "output_dir" of String, 
-           parameter "summary" of String, parameter "html_report_path" of String, 
-           parameter "sequence_analysis_ref" of String
-        """
-        return self._client.call_method('kbase_protein_query_module.summarize_and_visualize_results',
-                                        [params], self._service_ver, context)
 
     def run_protein_query_analysis(self, params, context=None):
         """
@@ -155,31 +67,35 @@ class kbase_protein_query_module(object):
         
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "ProteinQueryAnalysisResults" -> structure: 
+           parameter "job_id" of String, parameter "analysis_result_ref" of String, 
+           parameter "summary" of String, parameter "input_parameters" of mapping from 
+           String to unspecified object, parameter "start_time" of Float, 
+           parameter "protein_count" of Int, parameter "stages_completed" of list of String, 
            parameter "report_name" of String, parameter "report_ref" of String, 
-           parameter "analysis_result_ref" of String, parameter "summary" of String, 
-           parameter "input_parameters" of mapping from String to unspecified object, 
-           parameter "start_time" of Double, parameter "html_report_path" of String, 
-           parameter "protein_count" of Long, parameter "stages_completed" of list of String
+           parameter "shock_id" of String, parameter "shock_url" of String
         """
         return self._client.call_method('kbase_protein_query_module.run_protein_query_analysis',
                                         [params], self._service_ver, context)
 
-    def run_kbase_protein_query_module(self, params, context=None):
+    def get_available_analyses(self, context=None):
         """
-        Backward-compatibility entrypoint for legacy applications.
-        Dispatches to run_protein_query_analysis with minimal defaults.
+        Return the registry of enabled analyses for front-end discovery.
         
-        :param params: instance of mapping from String to unspecified object
-        :returns: instance of type "ProteinQueryAnalysisResults"
+        :returns: instance of type "GetAvailableAnalysesResults" -> structure: 
+           parameter "available_analyses" of mapping from String to unspecified object, 
+           parameter "summary" of String
         """
-        return self._client.call_method('kbase_protein_query_module.run_kbase_protein_query_module',
-                                        [params], self._service_ver, context)
+        return self._client.call_method('kbase_protein_query_module.get_available_analyses',
+                                        [], self._service_ver, context)
 
     def status(self, context=None):
         """
-        Get the status of the service.
+        Return module health and version information for KBase runtime.
         
-        :returns: instance of mapping from String to String
+        :returns: instance of type "StatusResults" -> structure: 
+           parameter "state" of String, parameter "message" of String, 
+           parameter "version" of String, parameter "git_url" of String, 
+           parameter "git_commit_hash" of String
         """
         return self._client.call_method('kbase_protein_query_module.status',
                                         [], self._service_ver, context)

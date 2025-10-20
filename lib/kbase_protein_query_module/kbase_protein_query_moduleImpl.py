@@ -25,26 +25,7 @@ class kbase_protein_query_module:
     Module Description:
     A KBase module: kbase_protein_query_module
 
-This module provides comprehensive protein query analysis capabilities using a modern,
-modular architecture with no backward compatibility:
-
-ARCHITECTURE:
-- WorkflowOrchestrator: Central coordinator for all analysis workflows
-- InputManager: Handles multiple input types (protein sequences, UniProt IDs, workspace objects)
-- AnalysisManager: Manages analysis execution (network analysis, etc.)
-- OutputManager: Handles result packaging and KBase integration
-- Util modules: Reusable components (embeddings, family assignment, similarity search, storage)
-
-KEY FEATURES:
-- No backward compatibility - clean, modern architecture
-- Modular design with clear separation of concerns
-- Multiple input type support with unified processing
-- Comprehensive network analysis with interactive visualizations
-- KBase workspace integration with Shock storage
-- Configurable analysis pipelines
-
-Authors: Vibhav Setlur
-Contact: https://kbase.us/contact-us/
+Protein query and analysis module with comprehensive network analysis capabilities.
     '''
 
     ######## WARNING FOR GEVENT USERS ####### noqa
@@ -55,11 +36,13 @@ Contact: https://kbase.us/contact-us/
     ######################################### noqa
     VERSION = "2.0.0"
     GIT_URL = "https://github.com/VibhavSetlur/kbase_protein_query_module.git"
-    GIT_COMMIT_HASH = "36203034384319fef4abcbb4d82c8a8e3a07f512"
+    GIT_COMMIT_HASH = "5898726743862cb2bf4084ca7990e1c4e337d463"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
 
+    # config contains contents of config file in a hash or None if it couldn't
+    # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
         self.config = config or {}
@@ -82,50 +65,53 @@ Contact: https://kbase.us/contact-us/
             self.kb_util = None
         
         #END_CONSTRUCTOR
+        pass
 
-    @staticmethod
-    def run_protein_query_analysis(ctx, params):
+
+    def run_protein_query_analysis(self, ctx, params):
         """
-        Execute the protein query workflow and return a standardized KBase result.
-
-        - Validates required params (workspace_name, analysis_name and input block)
-        - Runs the modular workflow orchestrator
-        - Always returns a single-element list of dicts, per KBase conventions
-
-        :param params: mapping of inputs including workspace, input_type, etc.
-        :returns: list with a single result dict for KBase UI integration
+        :param params: instance of mapping from String to unspecified object
+        :returns: instance of type "ProteinQueryAnalysisResults" ->
+           structure: parameter "job_id" of String, parameter
+           "analysis_result_ref" of String, parameter "summary" of String,
+           parameter "input_parameters" of mapping from String to unspecified
+           object, parameter "start_time" of Float, parameter
+           "protein_count" of Int, parameter "stages_completed" of list of
+           String, parameter "report_name" of String, parameter "report_ref"
+           of String, parameter "shock_id" of String, parameter "shock_url"
+           of String
         """
         # ctx is the context object
         # return variables are: output
         #BEGIN run_protein_query_analysis
         start_time = time.time()
-        self = kbase_protein_query_module({})
+        
+        # Extract workspace information
+        workspace_name = params.get('workspace_name')
+        if not workspace_name:
+            raise ValueError("workspace_name is required")
+
+        # Extract analysis name
+        analysis_name = params.get('analysis_name', 'protein_analysis')
+        if not analysis_name or analysis_name.strip() == '':
+            raise ValueError("analysis_name cannot be empty")
+        
+        # Validate input parameters early to catch errors before workflow execution
+        # This MUST be outside the try-catch block so validation errors raise exceptions
+        self._validate_input_parameters(params)
         
         try:
-            # Extract workspace information
-            # Tests require that a missing workspace_name parameter is treated as an error
-            workspace_name = params.get('workspace_name')
-            if not workspace_name:
-                raise ValueError("workspace_name is required")
-
-            # Extract analysis name
-            analysis_name = params.get('analysis_name', 'protein_analysis')
-            if not analysis_name or analysis_name.strip() == '':
-                raise ValueError("analysis_name cannot be empty")
-            
-            # Prepare input data for the workflow orchestrator
-            input_data = self._prepare_input_data(params)
             
             # Create pipeline configuration
             pipeline_config = self._create_pipeline_config(params, workspace_name, ctx)
             
-            # Execute workflow through orchestrator
+            # Execute workflow through orchestrator with raw input data
             workflow = WorkflowOrchestrator(config=pipeline_config, kb_util=self.kb_util)
             # Test hook: allow compliance tests to patch the underlying call
             if hasattr(self, '_run_workflow') and callable(getattr(self, '_run_workflow')):
                 result = self._run_workflow(workflow)
             else:
-                result = workflow.execute(input_data)
+                result = workflow.execute(params)
             
             # Check if workflow was successful
             if not result.success:
@@ -135,39 +121,37 @@ Contact: https://kbase.us/contact-us/
                 except Exception:
                     report_info = {'name': f"{analysis_name}_error_report", 'ref': 'error_report_ref'}
                 
-                return [{
+                output = {
                     'job_id': f'error_{int(time.time())}',
                     'analysis_result_ref': 'error',
                     'summary': f'Analysis failed: {result.error_message}',
                     'input_parameters': params,
-                    'start_time': start_time,
+                    'start_time': float(start_time),
                     'protein_count': 0,
                     'stages_completed': [],
                     'report_name': report_info['name'],
                     'report_ref': report_info['ref'],
                     'shock_id': 'stub_shock',
                     'shock_url': ''
-                }]
-            
-            # Create KBase report
-            report_info = self._create_kbase_report(result, analysis_name, workspace_name)
-            
-            # Return standardized results
-            output = {
-                'job_id': result.run_id,
-                'analysis_result_ref': '',
-                'summary': result.final_output.get('summary', 'Analysis completed successfully'),
-                'input_parameters': params,
-                'start_time': start_time,
-                'protein_count': result.final_output.get('protein_count', 0),
-                'stages_completed': result.analyses_completed,
-                'report_name': report_info['name'],
-                'report_ref': report_info['ref'],
-                'shock_id': result.final_output.get('shock', {}).get('shock_id', '') or 'stub_shock',
-                'shock_url': result.final_output.get('shock', {}).get('download_url', '')
-            }
-            
-            return [output]
+                }
+            else:
+                # Create KBase report
+                report_info = self._create_kbase_report(result, analysis_name, workspace_name)
+                
+                # Return standardized results
+                output = {
+                    'job_id': result.run_id,
+                    'analysis_result_ref': 'success',
+                    'summary': result.final_output.get('summary', 'Analysis completed successfully'),
+                    'input_parameters': params,
+                    'start_time': float(start_time),
+                    'protein_count': result.final_output.get('protein_count', 0),
+                    'stages_completed': result.analyses_completed,
+                    'report_name': report_info['name'],
+                    'report_ref': report_info['ref'],
+                    'shock_id': result.final_output.get('shock', {}).get('shock_id', '') or 'stub_shock',
+                    'shock_url': result.final_output.get('shock', {}).get('download_url', '')
+                }
             
         except Exception as e:
             logger.error(f"Protein query analysis failed: {e}")
@@ -182,145 +166,34 @@ Contact: https://kbase.us/contact-us/
             except Exception:
                 report_info = {'name': f"{safe_analysis_name}_error_report", 'ref': 'error_report_ref'}
             
-            return [{
+            output = {
                 'job_id': f'error_{int(time.time())}',
                 'analysis_result_ref': 'error',
                 'summary': f'Analysis failed: {str(e)}',
                 'input_parameters': params,
-                'start_time': start_time,
+                'start_time': float(start_time),
                 'protein_count': 0,
                 'stages_completed': [],
                 'report_name': report_info['name'],
                 'report_ref': report_info['ref'],
                 'shock_id': 'stub_shock',
                 'shock_url': ''
-            }]
+            }
+        
         #END run_protein_query_analysis
 
-    def _prepare_input_data(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare input data from parameters for the workflow orchestrator."""
-        input_type = params.get('input_type', 'protein_input')
-        input_data = {'input_type': input_type}
-        
-        if input_type == 'protein_input':
-            protein_input = params.get('protein_input', '')
-            if not protein_input:
-                raise ValueError("protein_input is required for protein_input type")
-            input_data['protein_input'] = protein_input
-            
-        elif input_type == 'uniprot_ids':
-            uniprot_ids = params.get('uniprot_ids', [])
-            if not uniprot_ids:
-                raise ValueError("uniprot_ids is required for uniprot_ids type")
-            input_data['uniprot_ids'] = uniprot_ids
-            
-            
-        else:
-            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids")
-        
-        return input_data
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method run_protein_query_analysis return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
 
-    def _create_pipeline_config(self, params: Dict[str, Any], workspace_name: str, ctx: Dict[str, Any]) -> PipelineConfig:
-        """Create pipeline configuration from parameters."""
-        # Extract configuration parameters
-        analysis_config = params.get('analysis_config', {})
-        storage_config = params.get('storage_config', {})
-        output_config = params.get('output_config', {})
-        
-        # Create pipeline config
-        config = PipelineConfig(
-            input_type=params.get('input_type', 'protein_input'),
-            enabled_stages=params.get('enabled_stages', ['input_processing', 'analysis', 'output_generation']),
-            stage_configs=analysis_config,
-            storage_config=storage_config,
-            similarity_config=storage_config,
-            output_dir=self._create_output_directory(params.get('analysis_name', 'protein_analysis')),
-            workspace_name=workspace_name,
-            workspace_url=self.callback_url,
-            auth_token=ctx.get('token') if isinstance(ctx, dict) else os.environ.get('KB_AUTH_TOKEN'),
-            generate_html_report=output_config.get('generate_html_report', True),
-            generate_network_visualization=output_config.get('generate_network_visualization', True),
-            selected_analyses=params.get('selected_analyses', None),
-            analysis_config=analysis_config
-        )
-        
-        # Set workspace client
-        try:
-            workspace_client = self.kb_util.get_workspace_client() if self.kb_util else Workspace(self.callback_url)
-            config.workspace_client = workspace_client
-        except Exception:
-            config.workspace_client = None
-        
-        return config
-    
-    def _create_output_directory(self, analysis_name: str) -> str:
-        """Create output directory in container's scratch space following KBase patterns."""
-        # Create a new directory in the container's scratch directory
-        output_dir = os.path.join(self.shared_folder, f"{analysis_name}_output_{int(time.time())}")
-        os.makedirs(output_dir, exist_ok=True)
-        logger.info(f"Created output directory: {output_dir}")
-        return output_dir
-
-    def _create_kbase_report(self, workflow_result, analysis_name: str, workspace_name: str) -> Dict[str, str]:
-        """Create KBase report from workflow results."""
-        try:
-            report_client = KBaseReport(self.callback_url)
-            
-            # Create report message
-            report_message = workflow_result.final_output.get('summary', 'Analysis completed successfully')
-            if workflow_result.final_output.get('shock', {}).get('shock_id'):
-                shock_id = workflow_result.final_output['shock']['shock_id']
-                report_message += f"\n\nOutputs archived in Shock (node {shock_id})."
-                if workflow_result.final_output['shock'].get('download_url'):
-                    report_message += f"\nDownload: {workflow_result.final_output['shock']['download_url']}"
-            
-            # Create report
-            report_info = report_client.create_extended_report({
-                'message': report_message,
-                'workspace_name': workspace_name,
-                'report_object_name': f"{analysis_name}_report",
-                'objects_created': []
-            })
-            
-            return {
-                'name': report_info.get('name', f"{analysis_name}_report"),
-                'ref': report_info.get('ref', '')
-            }
-            
-        except Exception as e:
-            logger.warning(f"Failed to create KBase report: {e}")
-            return {
-                'name': f"{analysis_name}_report",
-                'ref': f"report_{analysis_name}"
-            }
-
-    def _create_error_report(self, error_message: str, analysis_name: str, workspace_name: str) -> Dict[str, str]:
-        """Create error report."""
-        try:
-            report_client = KBaseReport(self.callback_url)
-            error_report = report_client.create_extended_report({
-                'message': f'Analysis failed: {error_message}',
-                'objects_created': [],
-                'workspace_name': workspace_name,
-                'report_object_name': f"{analysis_name}_error_report"
-            })
-            return {
-                'name': error_report.get('name', f"{analysis_name}_error_report"),
-                'ref': error_report.get('ref', '')
-            }
-        except Exception as e:
-            logger.error(f"Failed to create error report: {e}")
-            return {
-                'name': f"{analysis_name}_error_report",
-                'ref': f'report_error_{int(time.time())}'
-            }
-
-    @staticmethod
-    def get_available_analyses(ctx):
+    def get_available_analyses(self, ctx):
         """
-        Return the registry of enabled analyses for front-end discovery.
-
-        :returns: list with one dict containing available_analyses and summary
+        :returns: instance of type "GetAvailableAnalysesResults" ->
+           structure: parameter "available_analyses" of mapping from String
+           to unspecified object, parameter "summary" of String
         """
         # ctx is the context object
         # return variables are: output
@@ -360,18 +233,161 @@ Contact: https://kbase.us/contact-us/
         return [output]
         #END get_available_analyses
 
-    @staticmethod
-    def status(ctx):
-        """Return module health and version information for KBase runtime."""
-        #BEGIN_STATUS
-        returnVal = {'state': "OK",
-                     'message': "",
-                     'version': kbase_protein_query_module.VERSION,
-                     'git_url': kbase_protein_query_module.GIT_URL,
-                     'git_commit_hash': kbase_protein_query_module.GIT_COMMIT_HASH}
-        #END_STATUS
-        return [returnVal]
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method get_available_analyses return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
 
-    # Test helper hook; compliance tests may patch this
-    def _run_workflow(self, workflow):  # pragma: no cover
-        return workflow.execute()
+    def status(self, ctx):
+        """
+        :returns: instance of type "StatusResults" -> structure: parameter
+           "state" of String, parameter "message" of String, parameter
+           "version" of String, parameter "git_url" of String, parameter
+           "git_commit_hash" of String
+        """
+        # ctx is the context object
+        # return variables are: output
+        #BEGIN status
+        output = {
+            'state': 'OK',
+            'message': 'Protein Query Module is operational',
+            'version': self.VERSION,
+            'git_url': self.GIT_URL,
+            'git_commit_hash': self.GIT_COMMIT_HASH
+        }
+        #END status
+
+        # At some point might do deeper type checking...
+        if not isinstance(output, dict):
+            raise ValueError('Method status return value ' +
+                             'output is not type dict as required.')
+        # return the results
+        return [output]
+    
+    def _validate_input_parameters(self, params):
+        """Validate input parameters and raise exceptions for invalid inputs."""
+        input_type = params.get('input_type', 'protein_input')
+        
+        if input_type == 'protein_input':
+            protein_input = params.get('protein_input')
+            if not protein_input:
+                raise ValueError("protein_input is required for protein_input type")
+            
+            # Validate protein input is not empty or invalid
+            if isinstance(protein_input, str):
+                if not protein_input.strip():
+                    raise ValueError("protein_input cannot be empty")
+                # Basic validation for protein sequences
+                if len(protein_input.strip()) < 4:  # Minimum reasonable protein length
+                    raise ValueError(f"protein_input '{protein_input}' is too short (minimum 4 amino acids)")
+            elif isinstance(protein_input, list):
+                if not protein_input:
+                    raise ValueError("protein_input list cannot be empty")
+                for i, seq in enumerate(protein_input):
+                    if not seq or not str(seq).strip():
+                        raise ValueError(f"protein_input[{i}] cannot be empty")
+                    if len(str(seq).strip()) < 4:
+                        raise ValueError(f"protein_input[{i}] '{seq}' is too short (minimum 4 amino acids)")
+        
+        elif input_type == 'uniprot_ids':
+            uniprot_ids = params.get('uniprot_ids', [])
+            if not uniprot_ids:
+                raise ValueError("uniprot_ids is required for uniprot_ids input type")
+            if not isinstance(uniprot_ids, list):
+                raise ValueError("uniprot_ids must be a list")
+            if not uniprot_ids:
+                raise ValueError("uniprot_ids list cannot be empty")
+        
+        elif input_type == 'workspace_object':
+            workspace_ref = params.get('workspace_ref')
+            if not workspace_ref:
+                raise ValueError("workspace_ref is required for workspace_object input type")
+        
+        else:
+            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids, workspace_object")
+    
+    def _create_pipeline_config(self, params, workspace_name, ctx):
+        """Create pipeline configuration from parameters."""
+        try:
+            from .src import PipelineConfig
+            
+            config_dict = {
+                'workspace_name': workspace_name,
+                'analysis_name': params.get('analysis_name', 'protein_analysis'),
+                'input_type': params.get('input_type', 'protein_input'),
+                'protein_input': params.get('protein_input'),
+                'uniprot_ids': params.get('uniprot_ids', []),
+                'analysis_stages': params.get('analysis_stages', ['network_analysis']),
+                'config': self.config,
+                'ctx': ctx
+            }
+            
+            return PipelineConfig(config_dict)
+        except Exception as e:
+            logger.error(f"Failed to create pipeline config: {e}")
+            raise
+    
+    def _create_kbase_report(self, result, analysis_name, workspace_name):
+        """Create KBase report from workflow results."""
+        try:
+            if not self.dfu:
+                return {'name': f"{analysis_name}_report", 'ref': 'stub_report_ref'}
+            
+            # Create basic report structure
+            report_data = {
+                'summary': result.final_output.get('summary', 'Analysis completed successfully'),
+                'protein_count': result.final_output.get('protein_count', 0),
+                'stages_completed': result.analyses_completed,
+                'input_parameters': getattr(result, 'input_parameters', {}),
+                'results': result.final_output
+            }
+            
+            # Create report using KBaseReport client
+            report_client = KBaseReport(self.callback_url)
+            report_info = report_client.create({
+                'report': {
+                    'objects_created': [],
+                    'text_message': f"Protein Query Analysis Report for {analysis_name}",
+                    'warnings': [],
+                    'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{report_data['summary']}</p>"
+                },
+                'workspace_name': workspace_name,
+                'report_object_name': f"{analysis_name}_report"
+            })
+            
+            return {
+                'name': report_info['name'],
+                'ref': str(report_info['ref'])
+            }
+        except Exception as e:
+            logger.error(f"Failed to create KBase report: {e}")
+            return {'name': f"{analysis_name}_report", 'ref': 'stub_report_ref'}
+    
+    def _create_error_report(self, error_message, analysis_name, workspace_name):
+        """Create error report."""
+        try:
+            if not self.dfu:
+                return {'name': f"{analysis_name}_error_report", 'ref': 'stub_error_report_ref'}
+            
+            # Create report using KBaseReport client
+            report_client = KBaseReport(self.callback_url)
+            report_info = report_client.create({
+                'report': {
+                    'objects_created': [],
+                    'text_message': f"Error in Protein Query Analysis: {error_message}",
+                    'warnings': [error_message],
+                    'direct_html': f"<h2>Error in Protein Query Analysis</h2><p style='color: red;'>{error_message}</p>"
+                },
+                'workspace_name': workspace_name,
+                'report_object_name': f"{analysis_name}_error_report"
+            })
+            
+            return {
+                'name': report_info['name'],
+                'ref': str(report_info['ref'])
+            }
+        except Exception as e:
+            logger.error(f"Failed to create error report: {e}")
+            return {'name': f"{analysis_name}_error_report", 'ref': 'stub_error_report_ref'}

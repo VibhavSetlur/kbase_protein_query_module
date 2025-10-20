@@ -210,12 +210,17 @@ class TestKBaseServerModule:
             'jsonrpc': '2.0'
         }
         
-        result = service.call_py(ctx, jsondata)
+        # The JSONRPC service raises ServerError exceptions for method errors
+        from jsonrpcbase import ServerError
         
-        assert 'error' in result
-        assert result['error']['code'] == 0  # Unexpected Server Error
-        assert result['error']['name'] == 'Unexpected Server Error'
-        assert 'Test error' in result['error']['message']
+        with pytest.raises(ServerError) as exc_info:
+            service.call_py(ctx, jsondata)
+        
+        # Check the exception details
+        error = exc_info.value
+        assert error.code == -32000  # Server Error
+        assert error.message == 'Server error'
+        assert 'Test error' in error.data
     
     def test_application_call_method(self):
         """Test Application __call__ method (WSGI interface)."""
