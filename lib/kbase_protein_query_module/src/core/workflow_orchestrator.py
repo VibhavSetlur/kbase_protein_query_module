@@ -480,6 +480,10 @@ class WorkflowOrchestrator:
             workspace_name = input_data.get('workspace_name')
             input_dict = input_data
         
+        # Ensure the base output directory exists
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+        
         return self.run_workflow(input_dict, output_dir, workspace_name)
     
     def get_available_analyses(self) -> Dict[str, Dict[str, Any]]:

@@ -58,6 +58,9 @@ class OutputManager:
             "outputs",
             f"{self.run_id}_{self.timestamp}"
         )
+        
+        # Ensure base directory exists before creating subdirectories
+        os.makedirs(self.base_output_dir, exist_ok=True)
         os.makedirs(self.root_dir, exist_ok=True)
         
         # Initialize tracking
