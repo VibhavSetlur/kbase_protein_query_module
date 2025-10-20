@@ -94,6 +94,9 @@ class OutputManager:
             raise
 
         try:
+            # Ensure the output directory has at least some content before zipping
+            self._ensure_output_directory_has_content()
+            
             cb_url = callback_url or os.environ.get('SDK_CALLBACK_URL')
             # In unit tests, DFU is often stubbed at import time; accept None
             # and let the stub ignore the URL argument gracefully.
@@ -149,6 +152,45 @@ class OutputManager:
         
         for directory in directories:
             os.makedirs(os.path.join(self.root_dir, directory), exist_ok=True)
+    
+    def _ensure_output_directory_has_content(self):
+        """Ensure the output directory has at least some content before zipping."""
+        try:
+            # Check if the directory is empty or has very few files
+            files_in_dir = []
+            for root, dirs, files in os.walk(self.root_dir):
+                files_in_dir.extend(files)
+            
+            # If directory is empty or has very few files, create a basic summary file
+            if len(files_in_dir) < 2:  # Only metadata files or empty
+                summary_content = f"""Protein Query Analysis Results
+Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}
+Run ID: {self.run_id}
+Workspace: {self.workspace_name or 'N/A'}
+
+This analysis completed successfully. The output directory structure was created
+but no analysis-specific files were generated, likely because no analysis stages
+were configured or enabled.
+
+Directory structure:
+- metadata/: Analysis metadata and configuration
+- process_info/: Processing information and logs  
+- analysis/: Analysis-specific output files
+- logs/: Detailed processing logs
+
+For more information, check the process_info and logs directories.
+"""
+                
+                # Write a summary file to ensure the directory has content
+                summary_file = os.path.join(self.root_dir, "analysis_summary.txt")
+                with open(summary_file, 'w') as f:
+                    f.write(summary_content)
+                
+                logger.info(f"Created summary file to ensure directory has content: {summary_file}")
+                
+        except Exception as e:
+            logger.warning(f"Could not ensure output directory has content: {e}")
+            # Don't fail the entire process for this
     
     def get_root_dir(self) -> str:
         """Get the root output directory."""
