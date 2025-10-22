@@ -480,9 +480,18 @@ class WorkflowOrchestrator:
             workspace_name = input_data.get('workspace_name')
             input_dict = input_data
         
-        # Ensure the base output directory exists
+        # Ensure the base output directory exists and is accessible
         import os
-        os.makedirs(output_dir, exist_ok=True)
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            # Test write permissions
+            test_file = os.path.join(output_dir, '.write_test')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+        except Exception as e:
+            logger.error(f"Cannot create or write to output directory {output_dir}: {e}")
+            raise
         
         return self.run_workflow(input_dict, output_dir, workspace_name)
     

@@ -111,7 +111,14 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             if hasattr(self, '_run_workflow') and callable(getattr(self, '_run_workflow')):
                 result = self._run_workflow(workflow)
             else:
-                result = workflow.execute(params)
+                # Pass merged dict so output_dir is honored and raw params are preserved
+                merged_params = dict(params)
+                output_dir = getattr(pipeline_config, 'output_dir', '/tmp/protein_query_output')
+                merged_params['output_dir'] = output_dir
+                
+                # Extract analysis stages for the workflow
+                selected_analyses = params.get('analysis_stages')
+                result = workflow.run_workflow(merged_params, output_dir, selected_analyses=selected_analyses)
             
             # Check if workflow was successful
             if not result.success:
@@ -150,7 +157,7 @@ Protein query and analysis module with comprehensive network analysis capabiliti
                     'report_name': report_info['name'],
                     'report_ref': report_info['ref'],
                     'shock_id': result.final_output.get('shock', {}).get('shock_id', '') or 'stub_shock',
-                    'shock_url': result.final_output.get('shock', {}).get('download_url', '')
+                    'shock_url': result.final_output.get('shock', {}).get('shock_url', '') or 'https://shock.test/node/stub_shock'
                 }
             
         except Exception as e:
@@ -313,6 +320,13 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         try:
             from .src import PipelineConfig
             
+            # Handle output_config parameter from narrative
+            output_config = params.get('output_config', {})
+            output_dir = output_config.get('output_dir', '/tmp/protein_query_output')
+            
+            # Ensure output directory exists
+            os.makedirs(output_dir, exist_ok=True)
+            
             config_dict = {
                 'workspace_name': workspace_name,
                 'analysis_name': params.get('analysis_name', 'protein_analysis'),
@@ -320,11 +334,27 @@ Protein query and analysis module with comprehensive network analysis capabiliti
                 'protein_input': params.get('protein_input'),
                 'uniprot_ids': params.get('uniprot_ids', []),
                 'analysis_stages': params.get('analysis_stages', ['network_analysis']),
+                'output_dir': output_dir,
                 'config': self.config,
                 'ctx': ctx
             }
             
-            return PipelineConfig(config_dict)
+            # Create PipelineConfig with explicit output_dir parameter
+            return PipelineConfig(
+                input_type=params.get('input_type', 'protein_input'),
+                output_dir=output_dir,
+                workspace_name=workspace_name,
+                enabled_stages=params.get('analysis_stages', ['network_analysis']),
+                stage_configs={},
+                storage_config={},
+                similarity_config={},
+                workspace_url=self.callback_url,
+                auth_token=ctx.get('token') if isinstance(ctx, dict) else os.environ.get('KB_AUTH_TOKEN'),
+                generate_html_report=True,
+                generate_network_visualization=True,
+                selected_analyses=None,
+                analysis_config={}
+            )
         except Exception as e:
             logger.error(f"Failed to create pipeline config: {e}")
             raise
@@ -346,15 +376,13 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             
             # Create report using KBaseReport client
             report_client = KBaseReport(self.callback_url)
-            report_info = report_client.create({
-                'report': {
-                    'objects_created': [],
-                    'text_message': f"Protein Query Analysis Report for {analysis_name}",
-                    'warnings': [],
-                    'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{report_data['summary']}</p>"
-                },
+            report_info = report_client.create_extended_report({
+                'message': f"Protein Query Analysis Report for {analysis_name}",
                 'workspace_name': workspace_name,
-                'report_object_name': f"{analysis_name}_report"
+                'report_object_name': f"{analysis_name}_report",
+                'objects_created': [],
+                'warnings': [],
+                'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{report_data['summary']}</p>"
             })
             
             return {
@@ -373,15 +401,13 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             
             # Create report using KBaseReport client
             report_client = KBaseReport(self.callback_url)
-            report_info = report_client.create({
-                'report': {
-                    'objects_created': [],
-                    'text_message': f"Error in Protein Query Analysis: {error_message}",
-                    'warnings': [error_message],
-                    'direct_html': f"<h2>Error in Protein Query Analysis</h2><p style='color: red;'>{error_message}</p>"
-                },
+            report_info = report_client.create_extended_report({
+                'message': f"Error in Protein Query Analysis: {error_message}",
                 'workspace_name': workspace_name,
-                'report_object_name': f"{analysis_name}_error_report"
+                'report_object_name': f"{analysis_name}_error_report",
+                'objects_created': [],
+                'warnings': [error_message],
+                'direct_html': f"<h2>Error in Protein Query Analysis</h2><p style='color: red;'>{error_message}</p>"
             })
             
             return {

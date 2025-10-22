@@ -1,3 +1,19 @@
+# Personal
+backup
+.venv
+.venv_kpqm
+.pytest_cache
+.pytest_cache_kpqm
+.pytest_cache_kpqm_server
+.pytest_cache_kpqm_server_test
+.pytest_cache_kpqm_server_test_unit
+.pytest_cache_kpqm_server_test_integration
+.pytest_cache_kpqm_server_test_functional
+.pytest_cache_kpqm_server_test_e2e
+.pytest_cache_kpqm_server_test_kbase
+.pytest_cache_kpqm_server_test_server
+.cursor
+
 # KBase SDK
 test_local
 sdk.cfg

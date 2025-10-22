@@ -94,8 +94,22 @@ class OutputManager:
             raise
 
         try:
-            # Ensure the output directory has at least some content before zipping
+            # Ensure the output directory exists and has content before zipping
+            if not os.path.exists(self.root_dir):
+                logger.warning(f"Output directory does not exist: {self.root_dir}")
+                os.makedirs(self.root_dir, exist_ok=True)
+            
             self._ensure_output_directory_has_content()
+            
+            # Verify the directory exists and is accessible
+            if not os.path.isdir(self.root_dir):
+                raise FileNotFoundError(f"Output directory is not a directory: {self.root_dir}")
+            
+            # Check if directory is empty
+            if not os.listdir(self.root_dir):
+                logger.warning(f"Output directory is empty: {self.root_dir}")
+                # Create a minimal content file
+                self._ensure_output_directory_has_content()
             
             cb_url = callback_url or os.environ.get('SDK_CALLBACK_URL')
             # In unit tests, DFU is often stubbed at import time; accept None

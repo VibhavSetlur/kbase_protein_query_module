@@ -24,21 +24,6 @@ class kbase_protein_query_module(object):
     This module provides comprehensive protein query analysis capabilities using a modern,
     modular architecture with no backward compatibility:
 
-    ARCHITECTURE:
-    - WorkflowOrchestrator: Central coordinator for all analysis workflows
-    - InputManager: Handles multiple input types (protein sequences, UniProt IDs)
-    - AnalysisManager: Manages analysis execution (network analysis, etc.)
-    - OutputManager: Handles result packaging and KBase integration
-    - Util modules: Reusable components (embeddings, family assignment, similarity search, storage)
-
-    KEY FEATURES:
-    - No backward compatibility - clean, modern architecture
-    - Modular design with clear separation of concerns
-    - Multiple input type support with unified processing
-    - Comprehensive network analysis with interactive visualizations
-    - KBase workspace integration with Shock storage
-    - Configurable analysis pipelines
-
     Authors: Vibhav Setlur
     Contact: https://kbase.us/contact-us/
     """
