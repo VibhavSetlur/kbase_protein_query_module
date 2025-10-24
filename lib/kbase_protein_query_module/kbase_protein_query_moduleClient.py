@@ -21,11 +21,7 @@ class kbase_protein_query_module(object):
     """
     A KBase module: kbase_protein_query_module
 
-    This module provides comprehensive protein query analysis capabilities using a modern,
-    modular architecture with no backward compatibility:
-
-    Authors: Vibhav Setlur
-    Contact: https://kbase.us/contact-us/
+    Protein query and analysis module with comprehensive network analysis capabilities.
     """
 
     def __init__(
@@ -45,11 +41,6 @@ class kbase_protein_query_module(object):
 
     def run_protein_query_analysis(self, params, context=None):
         """
-        Unified Protein Query Analysis Pipeline
-        
-        This method provides a single entry point for comprehensive protein analysis,
-        supporting multiple input types and configurable analysis stages.
-        
         :param params: instance of mapping from String to unspecified object
         :returns: instance of type "ProteinQueryAnalysisResults" -> structure: 
            parameter "job_id" of String, parameter "analysis_result_ref" of String, 
@@ -64,8 +55,6 @@ class kbase_protein_query_module(object):
 
     def get_available_analyses(self, context=None):
         """
-        Return the registry of enabled analyses for front-end discovery.
-        
         :returns: instance of type "GetAvailableAnalysesResults" -> structure: 
            parameter "available_analyses" of mapping from String to unspecified object, 
            parameter "summary" of String
@@ -75,8 +64,6 @@ class kbase_protein_query_module(object):
 
     def status(self, context=None):
         """
-        Return module health and version information for KBase runtime.
-        
         :returns: instance of type "StatusResults" -> structure: 
            parameter "state" of String, parameter "message" of String, 
            parameter "version" of String, parameter "git_url" of String, 

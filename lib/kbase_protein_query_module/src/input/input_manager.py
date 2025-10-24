@@ -1,9 +1,7 @@
 """
 Input Manager for KBase Protein Query Module
 
-This module provides centralized input handling for all input types including
-protein sequences, UniProt IDs, and workspace objects. It coordinates between
-different input processors and provides a unified interface.
+Centralized input handling for protein sequences and UniProt IDs.
 """
 
 import logging
@@ -20,7 +18,6 @@ logger = logging.getLogger(__name__)
 @dataclass
 class InputResult:
     """Result container for input processing."""
-    
     success: bool
     proteins: List[Dict[str, Any]]
     workspace_info: Dict[str, Any]
@@ -30,21 +27,10 @@ class InputResult:
     metadata: Dict[str, Any] = None
 
 class InputManager:
-    """
-    Manages all input processing for the protein query module.
-    
-    This class coordinates between different input types and provides
-    a unified interface for processing various input sources.
-    """
+    """Manages all input processing for the protein query module."""
     
     def __init__(self, config: Dict[str, Any], kb_util=None):
-        """
-        Initialize the Input Manager.
-        
-        Args:
-            config: Configuration dictionary
-            kb_util: KBase utility library instance
-        """
+        """Initialize the Input Manager."""
         self.config = config
         self.kb_util = kb_util
         
@@ -53,51 +39,36 @@ class InputManager:
         self.protein_sequence_processor = ProteinSequenceProcessor(config)
         self.uniprot_processor = UniProtIdsProcessor(config)
         
-        # Input type configuration
+        # Configure enabled input types
         self.enabled_input_types = config.get('enabled_input_types', [
-            'protein_input', 'uniprot_ids', 'workspace_object'
+            'protein_input', 'uniprot_ids'
         ])
         
         logger.info("InputManager initialized")
     
     def process_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process input data through the complete input pipeline.
-        
-        Args:
-            input_data: Raw input data from the user
-            
-        Returns:
-            Processed and standardized data for analysis
-        """
+        """Process input data through the complete input pipeline."""
         start_time = time.time()
         
         try:
             logger.info("Starting input processing")
             
-            # Determine input type
             input_type = input_data.get('input_type', 'protein_input')
             
             # Validate input type
             if input_type not in self.enabled_input_types:
                 raise ValueError(f"Input type '{input_type}' is not enabled. Available types: {self.enabled_input_types}")
             
-            # Process based on input type
-            # Important for tests: instantiate processors at call time so that
-            # class-level patches (via unittest.mock.patch) take effect.
-            if input_type == 'workspace_object':
-                result = WorkspaceObjectProcessor(self.config, self.kb_util).process(input_data)
-            elif input_type == 'protein_input':
+            # Route to appropriate processor
+            if input_type == 'protein_input':
                 result = ProteinSequenceProcessor(self.config).process(input_data)
             elif input_type == 'uniprot_ids':
                 result = UniProtIdsProcessor(self.config).process(input_data)
             else:
                 raise ValueError(f"Unsupported input type: {input_type}")
             
-            # Preserve mocked timing if provided by a patched processor in tests
-            processing_time = result.get('processing_time', time.time() - start_time) if isinstance(result, dict) else time.time() - start_time
-            
             # Add processing metadata
+            processing_time = result.get('processing_time', time.time() - start_time) if isinstance(result, dict) else time.time() - start_time
             result['processing_time'] = processing_time
             result['input_type'] = input_type
             
@@ -122,58 +93,27 @@ class InputManager:
     
     
     def get_supported_input_types(self) -> List[str]:
-        """
-        Get list of supported input types.
-        
-        Returns:
-            List of supported input type names
-        """
+        """Get list of supported input types."""
         return self.enabled_input_types.copy()
     
     def is_input_type_enabled(self, input_type: str) -> bool:
-        """
-        Check if an input type is enabled.
-        
-        Args:
-            input_type: Input type to check
-            
-        Returns:
-            True if enabled, False otherwise
-        """
+        """Check if an input type is enabled."""
         return input_type in self.enabled_input_types
     
     def enable_input_type(self, input_type: str):
-        """
-        Enable an input type.
-        
-        Args:
-            input_type: Input type to enable
-        """
+        """Enable an input type."""
         if input_type not in self.enabled_input_types:
             self.enabled_input_types.append(input_type)
             logger.info(f"Enabled input type: {input_type}")
     
     def disable_input_type(self, input_type: str):
-        """
-        Disable an input type.
-        
-        Args:
-            input_type: Input type to disable
-        """
+        """Disable an input type."""
         if input_type in self.enabled_input_types:
             self.enabled_input_types.remove(input_type)
             logger.info(f"Disabled input type: {input_type}")
     
     def validate_input_data(self, input_data: Dict[str, Any]) -> bool:
-        """
-        Validate input data without processing it.
-        
-        Args:
-            input_data: Input data to validate
-            
-        Returns:
-            True if valid, False otherwise
-        """
+        """Validate input data without processing it."""
         try:
             input_type = input_data.get('input_type')
             if not input_type:
@@ -190,9 +130,6 @@ class InputManager:
                 return False
             elif input_type == 'uniprot_ids' and not input_data.get('uniprot_ids'):
                 logger.error("uniprot_ids is required for uniprot_ids type")
-                return False
-            elif input_type == 'workspace_object' and not input_data.get('workspace_object'):
-                logger.error("workspace_object is required for workspace_object type")
                 return False
             
             return True

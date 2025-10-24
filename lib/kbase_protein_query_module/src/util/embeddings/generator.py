@@ -1,8 +1,5 @@
 """
 Protein Embedding Generator Module
-
-This module handles the generation of protein embeddings from amino acid sequences
-using ESM-2 models. It provides efficient batch processing and storage capabilities.
 """
 
 import os
@@ -105,21 +102,10 @@ warnings.filterwarnings("ignore", message="You should probably TRAIN this model"
 logger = logging.getLogger(__name__)
 
 class ProteinEmbeddingGenerator:
-    """
-    Generates protein embeddings using ESM-2 models.
-    
-    This class handles the conversion of protein sequences to high-dimensional
-    embeddings that capture structural and functional information.
-    """
+    """Generates protein embeddings using ESM-2 models."""
     
     def __init__(self, model_name: str = "esm2_t6_8M_UR50D", device: str = "auto"):
-        """
-        Initialize the embedding generator.
-        
-        Args:
-            model_name: Name of the ESM-2 model to use
-            device: Device to run the model on ("auto", "cpu", or "cuda")
-        """
+        """Initialize the embedding generator."""
         self.model_name = model_name
         self.device = device  # Store the original device value
         self.tokenizer = None

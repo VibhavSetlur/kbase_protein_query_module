@@ -1,8 +1,7 @@
 """
 Output Manager for KBase Protein Query Module
 
-This module manages all output generation and organization for the protein query module.
-It coordinates with analysis-specific output handlers and creates organized output directories.
+Handles output generation, file organization, and workspace integration.
 """
 
 import os
@@ -10,7 +9,6 @@ import json
 import time
 import hashlib
 import logging
-import os
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,24 +26,11 @@ class ArtifactRecord:
     checksum_md5: Optional[str] = None
 
 class OutputManager:
-    """
-    Manages output generation and organization for the protein query module.
-    
-    This class coordinates with analysis-specific output handlers and creates
-    organized output directories with proper metadata and provenance tracking.
-    """
+    """Manages output generation and organization for the protein query module."""
     
     def __init__(self, base_output_dir: str, run_id: str, 
                  workspace_name: Optional[str] = None, kb_util=None):
-        """
-        Initialize the Output Manager.
-        
-        Args:
-            base_output_dir: Base directory for all outputs
-            run_id: Unique identifier for this run
-            workspace_name: KBase workspace name if applicable
-            kb_util: KBase utility library instance for workspace operations
-        """
+        """Initialize the Output Manager."""
         self.base_output_dir = base_output_dir
         self.run_id = run_id
         self.workspace_name = workspace_name
@@ -59,16 +44,16 @@ class OutputManager:
             f"{self.run_id}_{self.timestamp}"
         )
         
-        # Ensure base directory exists before creating subdirectories
+        # Ensure directories exist
         os.makedirs(self.base_output_dir, exist_ok=True)
         os.makedirs(self.root_dir, exist_ok=True)
         
-        # Initialize tracking
+        # Initialize tracking structures
         self.artifacts: List[ArtifactRecord] = []
         self.analysis_outputs: Dict[str, Any] = {}
         self.workspace_objects: List[Dict[str, str]] = []  # Track created workspace objects
         
-        # Create subdirectories
+        # Create organized subdirectories
         self._create_directory_structure()
         
         logger.info(f"OutputManager initialized with root directory: {self.root_dir}")

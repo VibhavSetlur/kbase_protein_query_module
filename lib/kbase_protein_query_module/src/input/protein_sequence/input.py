@@ -1,8 +1,7 @@
 """
 Protein Sequence Input Handler
 
-This module handles protein sequence input processing including FASTA parsing,
-sequence validation, and format standardization.
+Processes protein sequence input in various formats (FASTA, direct sequences).
 """
 
 import logging
@@ -22,32 +21,17 @@ class ProteinSequenceData:
     metadata: Dict[str, Any] = None
 
 class ProteinSequenceProcessor:
-    """
-    Handles protein sequence input processing.
-    
-    Supports:
-    - Direct protein sequences
-    - FASTA format strings
-    - FASTA files
-    - Raw sequence text
-    """
+    """Handles protein sequence input processing."""
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
+        # Sequence validation parameters
         self.max_sequence_length = self.config.get('max_sequence_length', 10000)
         self.min_sequence_length = self.config.get('min_sequence_length', 1)
         self.valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process protein sequence input.
-        
-        Args:
-            input_data: Input data containing protein sequences
-            
-        Returns:
-            Processed data with proteins
-        """
+        """Process protein sequence input."""
         start_time = time.time()
         
         try:
@@ -55,19 +39,19 @@ class ProteinSequenceProcessor:
             
             sequence_data = input_data.get('protein_input', '')
             
-            # Handle empty list first
+            # Validate input data
             if isinstance(sequence_data, list) and len(sequence_data) == 0:
                 raise ValueError("No protein sequences provided")
             
             if not sequence_data:
                 raise ValueError("protein_input is required for protein sequence input type")
             
-            # Handle different input formats
+            # Parse different input formats
             if isinstance(sequence_data, list):
-                # List of sequences - check each item individually
+                # List of sequences - handle mixed formats
                 protein_records = self._parse_mixed_sequence_list(sequence_data)
             elif isinstance(sequence_data, str):
-                # String input - check if FASTA or direct sequence
+                # String input - detect FASTA vs direct sequence
                 if self._is_fasta_format(sequence_data):
                     protein_records = self._parse_fasta_data(sequence_data)
                 else:
@@ -75,11 +59,10 @@ class ProteinSequenceProcessor:
             else:
                 raise ValueError(f"Unsupported protein_input type: {type(sequence_data)}")
             
-            # Validate all sequences - be lenient for testing
+            # Validate and clean sequences
             validated_records = []
             for record in protein_records:
-                # For testing purposes, accept sequences even with some invalid characters
-                # Just clean them up
+                # Clean sequence and validate length
                 cleaned_sequence = self._clean_sequence(record['sequence'])
                 if cleaned_sequence and len(cleaned_sequence) >= self.min_sequence_length:
                     record['sequence'] = cleaned_sequence

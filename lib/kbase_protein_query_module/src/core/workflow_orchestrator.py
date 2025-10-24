@@ -1,8 +1,7 @@
 """
 Workflow Orchestrator for KBase Protein Query Module
 
-This module provides a comprehensive, scalable pipeline that integrates all analysis stages
-with proper dependency management and KBase integration using the new modular structure.
+Orchestrates the complete protein analysis pipeline with modular components.
 """
 
 import os
@@ -13,7 +12,7 @@ import gc
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
 
-# Import managers from new structure
+# Import managers from modular structure
 from ..input import InputManager
 from ..analysis import AnalysisManager, get_enabled_analyses
 from ..output import OutputManager
@@ -37,10 +36,9 @@ class WorkflowResult:
 
 class WorkflowOrchestrator:
     """
-    Orchestrates the complete protein query workflow using the new modular structure.
+    Orchestrates the complete protein query workflow using modular components.
     
-    This class coordinates input handling, analysis execution, and output generation
-    through dedicated managers for each component.
+    Coordinates input handling, analysis execution, and output generation.
     """
     
     def __init__(self, config: Optional[Union[Dict[str, Any], PipelineConfig]] = None, kb_util=None):
@@ -48,12 +46,11 @@ class WorkflowOrchestrator:
         Initialize the Workflow Orchestrator.
         
         Args:
-            config: Configuration dictionary or PipelineConfig object for the workflow
+            config: Configuration dictionary or PipelineConfig object
             kb_util: KBase utility library instance
         """
         # Handle both dict and PipelineConfig objects
         if isinstance(config, PipelineConfig):
-            # Convert PipelineConfig to dictionary
             self.config = self._pipeline_config_to_dict(config)
             self.pipeline_config = config
         else:
@@ -63,7 +60,7 @@ class WorkflowOrchestrator:
         self.kb_util = kb_util
         self.run_id = str(uuid.uuid4())[:8]
         
-        # Initialize managers
+        # Initialize component managers (lazy loading)
         self.input_manager = None
         self.analysis_manager = None
         self.output_manager = None
@@ -76,28 +73,7 @@ class WorkflowOrchestrator:
     
     def _pipeline_config_to_dict(self, config: PipelineConfig) -> Dict[str, Any]:
         """Convert PipelineConfig object to dictionary."""
-        import dataclasses
-        
-        if hasattr(config, '__dict__'):
-            return {k: v for k, v in config.__dict__.items() if not k.startswith('_')}
-        elif dataclasses.is_dataclass(config):
-            return dataclasses.asdict(config)
-        else:
-            # Fallback: convert to dict manually
-            return {
-                'input_proteins': getattr(config, 'input_proteins', []),
-                'enabled_stages': getattr(config, 'enabled_stages', []),
-                'stage_configs': getattr(config, 'stage_configs', {}),
-                'storage_config': getattr(config, 'storage_config', {}),
-                'similarity_config': getattr(config, 'similarity_config', {}),
-                'output_dir': getattr(config, 'output_dir', '/tmp'),
-                'workspace_name': getattr(config, 'workspace_name', None),
-                'workspace_client': getattr(config, 'workspace_client', None),
-                'workspace_url': getattr(config, 'workspace_url', None),
-                'auth_token': getattr(config, 'auth_token', None),
-                'generate_html_report': getattr(config, 'generate_html_report', True),
-                'generate_network_visualization': getattr(config, 'generate_network_visualization', True)
-            }
+        return config.to_dict()
     
     def initialize_components(self, output_dir: str, workspace_name: Optional[str] = None):
         """
@@ -220,7 +196,7 @@ class WorkflowOrchestrator:
                     analysis_results[name].get('success') is False or 'error' in analysis_results[name]
                 ))]
             
-            # Generate final outputs
+            # Generate final outputs (automatically includes reports and visualizations)
             final_output = self._generate_final_outputs(analysis_results)
             
             # Calculate execution time; prefer mocked component timings when present

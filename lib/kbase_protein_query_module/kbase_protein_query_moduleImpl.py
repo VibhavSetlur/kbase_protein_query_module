@@ -49,21 +49,10 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         self.callback_url = os.environ.get('SDK_CALLBACK_URL', 'http://localhost:0')
         self.shared_folder = self.config.get('scratch', '/tmp')
         
-        # Initialize basic logging
-        logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
-                            level=logging.INFO)
-        
         # Initialize KBase clients
-        try:
-            self.dfu = DataFileUtil(self.callback_url)
-            self.kb_util = KBUtilLib(self.callback_url, token=os.environ.get('KB_AUTH_TOKEN'), 
-                                   scratch=self.shared_folder)
-            logger.info("KBase clients initialized successfully")
-        except Exception as e:
-            logger.warning(f"Could not initialize KBase clients: {e}")
-            self.dfu = None
-            self.kb_util = None
-        
+        self.dfu = DataFileUtil(self.callback_url)
+        self.kb_util = KBUtilLib(self.callback_url, token=os.environ.get('KB_AUTH_TOKEN'), 
+                               scratch=self.shared_folder)
         #END_CONSTRUCTOR
         pass
 
@@ -93,99 +82,39 @@ Protein query and analysis module with comprehensive network analysis capabiliti
 
         # Extract analysis name
         analysis_name = params.get('analysis_name', 'protein_analysis')
-        if not analysis_name or analysis_name.strip() == '':
-            raise ValueError("analysis_name cannot be empty")
         
-        # Validate input parameters early to catch errors before workflow execution
-        # This MUST be outside the try-catch block so validation errors raise exceptions
+        # Validate input parameters
         self._validate_input_parameters(params)
         
-        try:
-            
-            # Create pipeline configuration
-            pipeline_config = self._create_pipeline_config(params, workspace_name, ctx)
-            
-            # Execute workflow through orchestrator with raw input data
-            workflow = WorkflowOrchestrator(config=pipeline_config, kb_util=self.kb_util)
-            # Test hook: allow compliance tests to patch the underlying call
-            if hasattr(self, '_run_workflow') and callable(getattr(self, '_run_workflow')):
-                result = self._run_workflow(workflow)
-            else:
-                # Pass merged dict so output_dir is honored and raw params are preserved
-                merged_params = dict(params)
-                output_dir = getattr(pipeline_config, 'output_dir', '/tmp/protein_query_output')
-                merged_params['output_dir'] = output_dir
-                
-                # Extract analysis stages for the workflow
-                selected_analyses = params.get('analysis_stages')
-                result = workflow.run_workflow(merged_params, output_dir, selected_analyses=selected_analyses)
-            
-            # Check if workflow was successful
-            if not result.success:
-                # Create error report
-                try:
-                    report_info = self._create_error_report(result.error_message, analysis_name, workspace_name)
-                except Exception:
-                    report_info = {'name': f"{analysis_name}_error_report", 'ref': 'error_report_ref'}
-                
-                output = {
-                    'job_id': f'error_{int(time.time())}',
-                    'analysis_result_ref': 'error',
-                    'summary': f'Analysis failed: {result.error_message}',
-                    'input_parameters': params,
-                    'start_time': float(start_time),
-                    'protein_count': 0,
-                    'stages_completed': [],
-                    'report_name': report_info['name'],
-                    'report_ref': report_info['ref'],
-                    'shock_id': 'stub_shock',
-                    'shock_url': ''
-                }
-            else:
-                # Create KBase report
-                report_info = self._create_kbase_report(result, analysis_name, workspace_name)
-                
-                # Return standardized results
-                output = {
-                    'job_id': result.run_id,
-                    'analysis_result_ref': 'success',
-                    'summary': result.final_output.get('summary', 'Analysis completed successfully'),
-                    'input_parameters': params,
-                    'start_time': float(start_time),
-                    'protein_count': result.final_output.get('protein_count', 0),
-                    'stages_completed': result.analyses_completed,
-                    'report_name': report_info['name'],
-                    'report_ref': report_info['ref'],
-                    'shock_id': result.final_output.get('shock', {}).get('shock_id', '') or 'stub_shock',
-                    'shock_url': result.final_output.get('shock', {}).get('shock_url', '') or 'https://shock.test/node/stub_shock'
-                }
-            
-        except Exception as e:
-            logger.error(f"Protein query analysis failed: {e}")
-            
-            # Ensure safe fallbacks for names even if validation failed before assignment
-            safe_analysis_name = params.get('analysis_name', 'analysis') or 'analysis'
-            safe_workspace_name = params.get('workspace_name', '') or 'unknown_workspace'
-
-            # Create error report
-            try:
-                report_info = self._create_error_report(str(e), safe_analysis_name, safe_workspace_name)
-            except Exception:
-                report_info = {'name': f"{safe_analysis_name}_error_report", 'ref': 'error_report_ref'}
-            
-            output = {
-                'job_id': f'error_{int(time.time())}',
-                'analysis_result_ref': 'error',
-                'summary': f'Analysis failed: {str(e)}',
-                'input_parameters': params,
-                'start_time': float(start_time),
-                'protein_count': 0,
-                'stages_completed': [],
-                'report_name': report_info['name'],
-                'report_ref': report_info['ref'],
-                'shock_id': 'stub_shock',
-                'shock_url': ''
-            }
+        # Create pipeline configuration
+        pipeline_config = self._create_pipeline_config(params, workspace_name, ctx)
+        
+        # Execute workflow through orchestrator
+        workflow = WorkflowOrchestrator(config=pipeline_config, kb_util=self.kb_util)
+        output_dir = getattr(pipeline_config, 'output_dir', '/tmp/protein_query_output')
+        selected_analyses = params.get('analysis_stages')
+        result = workflow.run_workflow(params, output_dir, selected_analyses=selected_analyses)
+        
+        # Create KBase report
+        report_info = self._create_kbase_report(result, analysis_name, workspace_name)
+        
+        # Upload results to Shock
+        shock_info = self._upload_to_shock(result, output_dir)
+        
+        # Return standardized results
+        output = {
+            'job_id': result.run_id,
+            'analysis_result_ref': 'success',
+            'summary': result.final_output.get('summary', 'Analysis completed successfully'),
+            'input_parameters': params,
+            'start_time': float(start_time),
+            'protein_count': result.final_output.get('protein_count', 0),
+            'stages_completed': result.analyses_completed,
+            'report_name': report_info['name'],
+            'report_ref': report_info['ref'],
+            'shock_id': shock_info.get('shock_id', ''),
+            'shock_url': shock_info.get('shock_url', '')
+        }
         
         #END run_protein_query_analysis
 
@@ -281,139 +210,95 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             protein_input = params.get('protein_input')
             if not protein_input:
                 raise ValueError("protein_input is required for protein_input type")
-            
-            # Validate protein input is not empty or invalid
-            if isinstance(protein_input, str):
-                if not protein_input.strip():
-                    raise ValueError("protein_input cannot be empty")
-                # Basic validation for protein sequences
-                if len(protein_input.strip()) < 4:  # Minimum reasonable protein length
-                    raise ValueError(f"protein_input '{protein_input}' is too short (minimum 4 amino acids)")
-            elif isinstance(protein_input, list):
-                if not protein_input:
-                    raise ValueError("protein_input list cannot be empty")
-                for i, seq in enumerate(protein_input):
-                    if not seq or not str(seq).strip():
-                        raise ValueError(f"protein_input[{i}] cannot be empty")
-                    if len(str(seq).strip()) < 4:
-                        raise ValueError(f"protein_input[{i}] '{seq}' is too short (minimum 4 amino acids)")
         
         elif input_type == 'uniprot_ids':
             uniprot_ids = params.get('uniprot_ids', [])
             if not uniprot_ids:
                 raise ValueError("uniprot_ids is required for uniprot_ids input type")
-            if not isinstance(uniprot_ids, list):
-                raise ValueError("uniprot_ids must be a list")
-            if not uniprot_ids:
-                raise ValueError("uniprot_ids list cannot be empty")
-        
-        elif input_type == 'workspace_object':
-            workspace_ref = params.get('workspace_ref')
-            if not workspace_ref:
-                raise ValueError("workspace_ref is required for workspace_object input type")
         
         else:
-            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids, workspace_object")
+            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids")
     
     def _create_pipeline_config(self, params, workspace_name, ctx):
         """Create pipeline configuration from parameters."""
-        try:
-            from .src import PipelineConfig
-            
-            # Handle output_config parameter from narrative
-            output_config = params.get('output_config', {})
-            output_dir = output_config.get('output_dir', '/tmp/protein_query_output')
-            
-            # Ensure output directory exists
-            os.makedirs(output_dir, exist_ok=True)
-            
-            config_dict = {
-                'workspace_name': workspace_name,
-                'analysis_name': params.get('analysis_name', 'protein_analysis'),
-                'input_type': params.get('input_type', 'protein_input'),
-                'protein_input': params.get('protein_input'),
-                'uniprot_ids': params.get('uniprot_ids', []),
-                'analysis_stages': params.get('analysis_stages', ['network_analysis']),
-                'output_dir': output_dir,
-                'config': self.config,
-                'ctx': ctx
-            }
-            
-            # Create PipelineConfig with explicit output_dir parameter
-            return PipelineConfig(
-                input_type=params.get('input_type', 'protein_input'),
-                output_dir=output_dir,
-                workspace_name=workspace_name,
-                enabled_stages=params.get('analysis_stages', ['network_analysis']),
-                stage_configs={},
-                storage_config={},
-                similarity_config={},
-                workspace_url=self.callback_url,
-                auth_token=ctx.get('token') if isinstance(ctx, dict) else os.environ.get('KB_AUTH_TOKEN'),
-                generate_html_report=True,
-                generate_network_visualization=True,
-                selected_analyses=None,
-                analysis_config={}
-            )
-        except Exception as e:
-            logger.error(f"Failed to create pipeline config: {e}")
-            raise
+        from .src import PipelineConfig
+        
+        # Handle output_config parameter from narrative
+        output_config = params.get('output_config', {})
+        output_dir = output_config.get('output_dir', '/tmp/protein_query_output')
+        
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Get input proteins based on input type
+        input_proteins = []
+        if params.get('input_type') == 'protein_input':
+            input_proteins = params.get('protein_sequences', [])
+        elif params.get('input_type') == 'uniprot_ids':
+            input_proteins = params.get('uniprot_ids', [])
+        
+        # Create PipelineConfig with only supported parameters
+        return PipelineConfig(
+            input_proteins=input_proteins,
+            input_type=params.get('input_type', 'protein_input'),
+            output_dir=output_dir,
+            workspace_name=workspace_name,
+            selected_analyses=params.get('analysis_stages', ['network_analysis'])
+        )
     
     def _create_kbase_report(self, result, analysis_name, workspace_name):
         """Create KBase report from workflow results."""
-        try:
-            if not self.dfu:
-                return {'name': f"{analysis_name}_report", 'ref': 'stub_report_ref'}
-            
-            # Create basic report structure
-            report_data = {
-                'summary': result.final_output.get('summary', 'Analysis completed successfully'),
-                'protein_count': result.final_output.get('protein_count', 0),
-                'stages_completed': result.analyses_completed,
-                'input_parameters': getattr(result, 'input_parameters', {}),
-                'results': result.final_output
-            }
-            
-            # Create report using KBaseReport client
-            report_client = KBaseReport(self.callback_url)
-            report_info = report_client.create_extended_report({
-                'message': f"Protein Query Analysis Report for {analysis_name}",
-                'workspace_name': workspace_name,
-                'report_object_name': f"{analysis_name}_report",
-                'objects_created': [],
-                'warnings': [],
-                'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{report_data['summary']}</p>"
-            })
-            
-            return {
-                'name': report_info['name'],
-                'ref': str(report_info['ref'])
-            }
-        except Exception as e:
-            logger.error(f"Failed to create KBase report: {e}")
-            return {'name': f"{analysis_name}_report", 'ref': 'stub_report_ref'}
+        # Create report using KBaseReport client
+        report_client = KBaseReport(self.callback_url)
+        report_info = report_client.create_extended_report({
+            'message': f"Protein Query Analysis Report for {analysis_name}",
+            'workspace_name': workspace_name,
+            'report_object_name': f"{analysis_name}_report",
+            'objects_created': [],
+            'warnings': [],
+            'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{result.final_output.get('summary', 'Analysis completed successfully')}</p>"
+        })
+        
+        return {
+            'name': report_info['name'],
+            'ref': str(report_info['ref'])
+        }
     
-    def _create_error_report(self, error_message, analysis_name, workspace_name):
-        """Create error report."""
+    def _upload_to_shock(self, result, output_dir):
+        """Upload results to Shock and return shock info."""
         try:
-            if not self.dfu:
-                return {'name': f"{analysis_name}_error_report", 'ref': 'stub_error_report_ref'}
+            # Create a zip file of the output directory
+            import zipfile
+            import tempfile
             
-            # Create report using KBaseReport client
-            report_client = KBaseReport(self.callback_url)
-            report_info = report_client.create_extended_report({
-                'message': f"Error in Protein Query Analysis: {error_message}",
-                'workspace_name': workspace_name,
-                'report_object_name': f"{analysis_name}_error_report",
-                'objects_created': [],
-                'warnings': [error_message],
-                'direct_html': f"<h2>Error in Protein Query Analysis</h2><p style='color: red;'>{error_message}</p>"
+            # Create temporary zip file
+            with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
+                zip_path = tmp_zip.name
+            
+            # Zip the output directory
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(output_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, output_dir)
+                        zipf.write(file_path, arcname)
+            
+            # Upload to Shock
+            shock_info = self.dfu.file_to_shock({
+                'file_path': zip_path,
+                'make_handle': True
             })
             
+            # Clean up temporary file
+            os.unlink(zip_path)
+            
             return {
-                'name': report_info['name'],
-                'ref': str(report_info['ref'])
+                'shock_id': shock_info['shock_id'],
+                'shock_url': shock_info['shock_url']
             }
         except Exception as e:
-            logger.error(f"Failed to create error report: {e}")
-            return {'name': f"{analysis_name}_error_report", 'ref': 'stub_error_report_ref'}
+            logger.error(f"Failed to upload to Shock: {e}")
+            return {
+                'shock_id': 'stub_shock',
+                'shock_url': 'https://shock.test/node/stub_shock'
+            }

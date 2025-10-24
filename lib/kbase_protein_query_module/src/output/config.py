@@ -33,27 +33,6 @@ ANALYSIS_OUTPUT_CONFIG = {
         "include_statistics": True,
         "max_nodes_display": 1000
     },
-    "sequence_analysis": {
-        "enabled": True,
-        "output_formats": ["json", "csv"],
-        "include_alignments": True,
-        "include_motifs": True,
-        "include_statistics": True
-    },
-    "bioinformatics_analysis": {
-        "enabled": True,
-        "output_formats": ["json", "csv", "html"],
-        "include_domain_predictions": True,
-        "include_functional_annotations": True,
-        "include_statistics": True
-    },
-    "multi_protein_analysis": {
-        "enabled": True,
-        "output_formats": ["json", "csv", "html"],
-        "include_comparisons": True,
-        "include_statistics": True,
-        "include_visualizations": True
-    },
     "similarity_search": {
         "enabled": True,
         "output_formats": ["json", "csv"],

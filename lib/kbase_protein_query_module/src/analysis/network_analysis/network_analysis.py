@@ -74,25 +74,39 @@ class NetworkAnalysis:
         self.visualizer = NetworkVisualizer(self.config)
     
     def analyze(self, proteins: List[Any], **kwargs) -> Dict[str, Any]:
-        """Main analysis method called by AnalysisManager."""
+        """Main analysis method - runs network analysis for each protein independently."""
         try:
-            # Convert proteins to the expected format
-            input_data = {
-                'proteins': proteins,
-                'similarity_results': kwargs.get('similarity_results', []),
-                'analysis_config': kwargs.get('analysis_config', {})
-            }
+            results = {}
             
-            # Run the analysis
-            result = self.run(input_data)
+            # Process each protein independently for network analysis
+            for i, protein in enumerate(proteins):
+                protein_id = protein.get('protein_id', f'protein_{i}')
+                
+                # Prepare input data for single protein analysis
+                input_data = {
+                    'proteins': [protein],  # Single protein for individual analysis
+                    'similarity_results': kwargs.get('similarity_results', []),
+                    'analysis_config': kwargs.get('analysis_config', {}),
+                    'query_protein_id': protein_id
+                }
+                
+                # Run network analysis for this protein
+                result = self.run(input_data)
+                
+                # Store results for this protein
+                results[protein_id] = {
+                    'success': result.success,
+                    'data': result.data,
+                    'error_message': result.error_message,
+                    'metadata': result.metadata,
+                    'artifacts': result.artifacts
+                }
             
-            # Convert StageResult to dictionary format expected by AnalysisManager
             return {
-                'success': result.success,
-                'data': result.data,
-                'error_message': result.error_message,
-                'metadata': result.metadata,
-                'artifacts': result.artifacts
+                'success': True,
+                'data': results,
+                'metadata': {'total_proteins': len(proteins)},
+                'artifacts': []
             }
         except Exception as e:
             return {
@@ -103,19 +117,6 @@ class NetworkAnalysis:
                 'artifacts': []
             }
 
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-        self.k_neighbors = self.config.get('k_neighbors', 8)
-        
-        # Initialize util components
-        self.family_assignment = None
-        self.similarity_search = None
-        self.embedding_generator = None
-        self._initialize_utils()
-        self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
-        self.mutual_knn = self.config.get('mutual_knn', True)
-        self.min_network_size = self.config.get('min_network_size', 5)
-        self.max_network_size = self.config.get('max_network_size', 100)
     
     def _initialize_utils(self):
         """Initialize utility components."""

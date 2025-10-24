@@ -1,8 +1,7 @@
 """
 UniProt IDs Input Handler
 
-This module handles UniProt ID input processing including validation,
-data retrieval from UniProt API, and format standardization.
+Handles UniProt ID input processing with API integration and validation.
 """
 
 import logging
@@ -25,15 +24,12 @@ class UniProtIdsProcessor:
     """
     Handles UniProt ID input processing.
     
-    Supports:
-    - Single UniProt IDs
-    - Lists of UniProt IDs
-    - UniProt ID validation
-    - Data retrieval from UniProt API
+    Supports single IDs, lists, validation, and API data retrieval.
     """
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
+        # API configuration
         self.max_retries = self.config.get('max_retries', 3)
         self.timeout = self.config.get('timeout', 30)
         self.batch_size = self.config.get('batch_size', 100)

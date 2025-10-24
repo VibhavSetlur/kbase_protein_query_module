@@ -1,7 +1,5 @@
 """
 Family Assignment Module for KBase Protein Query Module
-
-This module assigns proteins to families based on embeddings using FAISS binary centroid search.
 """
 
 import logging
@@ -13,11 +11,7 @@ from typing import Dict, Any, List, Optional, Union
 logger = logging.getLogger(__name__)
 
 class FamilyAssignment:
-    """
-    Assigns proteins to families based on embeddings.
-    
-    Uses FAISS binary centroid search for efficient family assignment.
-    """
+    """Assigns proteins to families based on embeddings."""
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
