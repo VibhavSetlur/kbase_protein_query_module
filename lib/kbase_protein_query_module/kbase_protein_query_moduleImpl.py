@@ -95,11 +95,11 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         selected_analyses = params.get('analysis_stages')
         result = workflow.run_workflow(params, output_dir, selected_analyses=selected_analyses)
         
-        # Create KBase report
-        report_info = self._create_kbase_report(result, analysis_name, workspace_name)
-        
-        # Upload results to Shock
+        # Upload results to Shock first
         shock_info = self._upload_to_shock(result, output_dir)
+        
+        # Create KBase report with file links
+        report_info = self._create_kbase_report(result, analysis_name, workspace_name, shock_info)
         
         # Return standardized results
         output = {
@@ -113,7 +113,7 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
             'shock_id': shock_info.get('shock_id', ''),
-            'shock_url': shock_info.get('shock_url', '')
+            'node_file_name': shock_info.get('node_file_name', ''),
         }
         
         #END run_protein_query_analysis
@@ -246,16 +246,27 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             selected_analyses=params.get('analysis_stages', ['network_analysis'])
         )
     
-    def _create_kbase_report(self, result, analysis_name, workspace_name):
-        """Create KBase report from workflow results."""
+    def _create_kbase_report(self, result, analysis_name, workspace_name, shock_info=None):
+        """Create KBase report from workflow results with file links."""
         # Create report using KBaseReport client
         report_client = KBaseReport(self.callback_url)
+        
+        # Prepare file links if shock_info is provided
+        file_links = []
+        if shock_info and shock_info.get('shock_id'):
+            file_links.append({
+                'shock_id': shock_info['shock_id'],
+                'name': shock_info.get('node_file_name', 'output.zip'),
+                'label': 'Analysis Results'
+            })
+        
         report_info = report_client.create_extended_report({
             'message': f"Protein Query Analysis Report for {analysis_name}",
             'workspace_name': workspace_name,
             'report_object_name': f"{analysis_name}_report",
             'objects_created': [],
             'warnings': [],
+            'file_links': file_links,
             'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{result.final_output.get('summary', 'Analysis completed successfully')}</p>"
         })
         
@@ -265,40 +276,24 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         }
     
     def _upload_to_shock(self, result, output_dir):
-        """Upload results to Shock and return shock info."""
+        """Upload results to Shock using DataFileUtil file_to_shock with pack parameter."""
         try:
-            # Create a zip file of the output directory
-            import zipfile
-            import tempfile
-            
-            # Create temporary zip file
-            with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
-                zip_path = tmp_zip.name
-            
-            # Zip the output directory
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, dirs, files in os.walk(output_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, output_dir)
-                        zipf.write(file_path, arcname)
-            
-            # Upload to Shock
+            # Use DataFileUtil file_to_shock with pack='zip' as per plant_fba example
+            # This follows the exact pattern: dfu.file_to_shock({'file_path': output_dir, 'pack': 'zip'})
             shock_info = self.dfu.file_to_shock({
-                'file_path': zip_path,
-                'make_handle': True
+                'file_path': output_dir,
+                'pack': 'zip'
             })
-            
-            # Clean up temporary file
-            os.unlink(zip_path)
             
             return {
                 'shock_id': shock_info['shock_id'],
-                'shock_url': shock_info['shock_url']
+                'node_file_name': shock_info['node_file_name'],
+                'size': shock_info['size']
             }
         except Exception as e:
             logger.error(f"Failed to upload to Shock: {e}")
             return {
                 'shock_id': 'stub_shock',
-                'shock_url': 'https://shock.test/node/stub_shock'
+                'node_file_name': 'output.zip',
+                'size': '0'
             }
