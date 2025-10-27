@@ -44,6 +44,9 @@ class InputManager:
             'protein_input', 'uniprot_ids'
         ])
         
+        # Track last processed data for access by other components
+        self.last_processed_data = {}
+        
         logger.info("InputManager initialized")
     
     def process_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -71,6 +74,9 @@ class InputManager:
             processing_time = result.get('processing_time', time.time() - start_time) if isinstance(result, dict) else time.time() - start_time
             result['processing_time'] = processing_time
             result['input_type'] = input_type
+            
+            # Store processed data for access by other components
+            self.last_processed_data = result.copy()
             
             logger.info(f"Input processing completed in {processing_time:.2f} seconds")
             logger.info(f"Processed {len(result.get('proteins', []))} proteins")

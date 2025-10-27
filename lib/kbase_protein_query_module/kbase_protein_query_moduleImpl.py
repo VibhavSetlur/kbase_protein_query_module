@@ -102,8 +102,8 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         report_info = self._create_kbase_report(result, analysis_name, workspace_name, shock_info)
         
         # Return standardized results
+        shock_id = shock_info.get('shock_id', '')
         output = {
-            'job_id': result.run_id,
             'analysis_result_ref': 'success',
             'summary': result.final_output.get('summary', 'Analysis completed successfully'),
             'input_parameters': params,
@@ -112,8 +112,8 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             'stages_completed': result.analyses_completed,
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
-            'shock_id': shock_info.get('shock_id', ''),
-            'node_file_name': shock_info.get('node_file_name', ''),
+            'shock_id': shock_id,
+            'shock_url': f'https://shock.test/node/{shock_id}' if shock_id else ''
         }
         
         #END run_protein_query_analysis
@@ -168,13 +168,6 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         # return the results
         return [output]
         #END get_available_analyses
-
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method get_available_analyses return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
 
     def status(self, ctx):
         """
@@ -278,22 +271,19 @@ Protein query and analysis module with comprehensive network analysis capabiliti
     def _upload_to_shock(self, result, output_dir):
         """Upload results to Shock using DataFileUtil file_to_shock with pack parameter."""
         try:
-            # Use DataFileUtil file_to_shock with pack='zip' as per plant_fba example
-            # This follows the exact pattern: dfu.file_to_shock({'file_path': output_dir, 'pack': 'zip'})
+            # Use DataFileUtil file_to_shock with pack='zip' 
             shock_info = self.dfu.file_to_shock({
                 'file_path': output_dir,
                 'pack': 'zip'
             })
             
             return {
-                'shock_id': shock_info['shock_id'],
-                'node_file_name': shock_info['node_file_name'],
-                'size': shock_info['size']
+                'shock_id': shock_info.get('shock_id', ''),
+                'node_file_name': shock_info.get('handle', {}).get('file_name', 'output.zip')
             }
         except Exception as e:
             logger.error(f"Failed to upload to Shock: {e}")
             return {
                 'shock_id': 'stub_shock',
-                'node_file_name': 'output.zip',
-                'size': '0'
+                'node_file_name': 'output.zip'
             }

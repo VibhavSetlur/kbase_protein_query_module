@@ -142,6 +142,9 @@ class WorkflowOrchestrator:
             # Process input data through input manager
             processed_data = self.input_manager.process_input(input_data)
             
+            # Store processed data reference for protein count calculation
+            self.processed_data = processed_data
+            
             # Determine which analyses to run
             analyses_to_run = self._determine_analyses_to_run(selected_analyses)
             
@@ -336,12 +339,20 @@ class WorkflowOrchestrator:
         try:
             logger.info("Generating final outputs")
             
+            # Calculate protein count from processed input data
+            protein_count = 0
+            if hasattr(self, 'processed_data') and isinstance(self.processed_data, dict):
+                proteins = self.processed_data.get('proteins', [])
+                if proteins:
+                    protein_count = len(proteins)
+            
             final_output = {
                 "run_id": self.run_id,
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "analyses_completed": list(analysis_results.keys()),
                 "summary": self._generate_summary(analysis_results),
-                "analysis_results": analysis_results
+                "analysis_results": analysis_results,
+                "protein_count": protein_count
             }
 
             # Include additional fields expected by tests
