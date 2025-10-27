@@ -95,14 +95,13 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         selected_analyses = params.get('analysis_stages')
         result = workflow.run_workflow(params, output_dir, selected_analyses=selected_analyses)
         
-        # Upload results to Shock first
-        shock_info = self._upload_to_shock(result, output_dir)
+        # Upload results to Shock using standard KBase pattern 
+        shock_info = self.dfu.file_to_shock({'file_path': output_dir, 'pack': 'zip'})
         
-        # Create KBase report with file links
+        # Create KBase report with file links 
         report_info = self._create_kbase_report(result, analysis_name, workspace_name, shock_info)
         
-        # Return standardized results
-        shock_id = shock_info.get('shock_id', '')
+        # Return standardized results 
         output = {
             'analysis_result_ref': 'success',
             'summary': result.final_output.get('summary', 'Analysis completed successfully'),
@@ -112,8 +111,8 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             'stages_completed': result.analyses_completed,
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
-            'shock_id': shock_id,
-            'shock_url': f'https://shock.test/node/{shock_id}' if shock_id else ''
+            'shock_id': shock_info.get('shock_id', ''),
+            'shock_url': shock_info.get('shock_url', '')
         }
         
         #END run_protein_query_analysis
@@ -240,20 +239,21 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         )
     
     def _create_kbase_report(self, result, analysis_name, workspace_name, shock_info=None):
-        """Create KBase report from workflow results with file links."""
+        """Create KBase report."""
         # Create report using KBaseReport client
         report_client = KBaseReport(self.callback_url)
         
-        # Prepare file links if shock_info is provided
+        # Prepare file links 
         file_links = []
         if shock_info and shock_info.get('shock_id'):
             file_links.append({
                 'shock_id': shock_info['shock_id'],
-                'name': shock_info.get('node_file_name', 'output.zip'),
+                'name': shock_info.get('handle', {}).get('file_name', 'output.zip'),
                 'label': 'Analysis Results'
             })
         
-        report_info = report_client.create_extended_report({
+        # Create report following KBase documentation exactly
+        report_params = {
             'message': f"Protein Query Analysis Report for {analysis_name}",
             'workspace_name': workspace_name,
             'report_object_name': f"{analysis_name}_report",
@@ -261,29 +261,13 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             'warnings': [],
             'file_links': file_links,
             'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{result.final_output.get('summary', 'Analysis completed successfully')}</p>"
-        })
+        }
         
+        report_info = report_client.create_extended_report(report_params)
+        
+        # Return references 
         return {
             'name': report_info['name'],
-            'ref': str(report_info['ref'])
+            'ref': report_info['ref']
         }
     
-    def _upload_to_shock(self, result, output_dir):
-        """Upload results to Shock using DataFileUtil file_to_shock with pack parameter."""
-        try:
-            # Use DataFileUtil file_to_shock with pack='zip' 
-            shock_info = self.dfu.file_to_shock({
-                'file_path': output_dir,
-                'pack': 'zip'
-            })
-            
-            return {
-                'shock_id': shock_info.get('shock_id', ''),
-                'node_file_name': shock_info.get('handle', {}).get('file_name', 'output.zip')
-            }
-        except Exception as e:
-            logger.error(f"Failed to upload to Shock: {e}")
-            return {
-                'shock_id': 'stub_shock',
-                'node_file_name': 'output.zip'
-            }

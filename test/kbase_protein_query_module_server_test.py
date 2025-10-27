@@ -39,9 +39,12 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         
         cls.dataFileUtil = Mock()
         cls.dataFileUtil.file_to_shock = Mock(return_value={
-            'shock_id': 'stub_shock', 
-            'node_file_name': 'archive.zip', 
-            'shock_url': 'https://shock.stub/node/stub_shock'
+            'shock_id': 'test_shock_id_12345', 
+            'shock_url': 'https://shock.test/node/test_shock_id_12345',
+            'handle': {
+                'file_name': 'output.zip',
+                'id': 'test_handle_id'
+            }
         })
         
         cls.kbUtilLib = Mock()
@@ -83,8 +86,23 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         cls.patches = []
         cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.KBaseReport', return_value=cls.reportClient))
         cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.Workspace', return_value=cls.wsClient))
-        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.DataFileUtil', return_value=cls.dataFileUtil))
+        # Note: DataFileUtil is now mocked at the instance level in setUp() to avoid cross-test contamination
         cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.KBUtilLib', return_value=cls.kbUtilLib))
+        
+        # Mock WorkflowOrchestrator
+        cls.workflow_mock = Mock()
+        cls.workflow_mock.run_workflow.return_value = Mock(
+            final_output={
+                'summary': 'Test analysis completed successfully',
+                'protein_count': 3
+            },
+            analyses_completed=['network_analysis']
+        )
+        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.WorkflowOrchestrator', return_value=cls.workflow_mock))
+        
+        # Mock PipelineConfig
+        cls.pipeline_config_mock = Mock()
+        cls.patches.append(patch('kbase_protein_query_module.kbase_protein_query_moduleImpl.PipelineConfig', return_value=cls.pipeline_config_mock))
         
         # Start all patches
         for p in cls.patches:
@@ -104,6 +122,28 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
 
     def setUp(self):
         self.serviceImpl = kbase_protein_query_module({})
+        # Create a fresh DataFileUtil mock for each test to avoid cross-test contamination
+        self.dataFileUtil = Mock()
+        self.dataFileUtil.file_to_shock = Mock(return_value={
+            'shock_id': 'test_shock_id_12345', 
+            'shock_url': 'https://shock.test/node/test_shock_id_12345',
+            'handle': {
+                'file_name': 'output.zip',
+                'id': 'test_handle_id'
+            }
+        })
+        # Apply the fresh mock to the service instance - this should override any class-level patches
+        self.serviceImpl.dfu = self.dataFileUtil
+        
+        # Reset workflow mock
+        self.workflow_mock.reset_mock()
+        self.workflow_mock.run_workflow.return_value = Mock(
+            final_output={
+                'summary': 'Test analysis completed successfully',
+                'protein_count': 3
+            },
+            analyses_completed=['network_analysis']
+        )
         self.ctx = {
             'token': self.token,
             'provenance': [{'ws_name': self.wsName}]
@@ -124,6 +164,16 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(result[0], dict)
         self.assertEqual(result[0]['state'], 'OK')
         self.assertIn('version', result[0])
+
+    def test_mock_setup_verification(self):
+        """Test that mocks are properly set up for each test."""
+        # Verify DataFileUtil mock is working
+        result = self.dataFileUtil.file_to_shock({'file_path': '/test', 'pack': 'zip'})
+        self.assertEqual(result['shock_id'], 'test_shock_id_12345')
+        self.assertEqual(result['shock_url'], 'https://shock.test/node/test_shock_id_12345')
+        
+        # Verify no side effects are set
+        self.assertIsNone(self.dataFileUtil.file_to_shock.side_effect)
 
     def test_run_protein_query_analysis_uniprot_ids(self):
         """Test workflow with UniProt IDs input."""
@@ -151,6 +201,14 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Validate Shock upload
         self.assertIn('shock_id', out)
         self.assertIn('shock_url', out)
+        self.assertEqual(out['shock_id'], 'test_shock_id_12345')
+        self.assertEqual(out['shock_url'], 'https://shock.test/node/test_shock_id_12345')
+        
+        # Verify DataFileUtil was called correctly
+        self.dataFileUtil.file_to_shock.assert_called_once()
+        call_args = self.dataFileUtil.file_to_shock.call_args[0][0]
+        self.assertEqual(call_args['pack'], 'zip')
+        self.assertIn('file_path', call_args)
 
     def test_run_protein_query_analysis_protein_sequences(self):
         """Test workflow with protein sequences input."""
@@ -178,6 +236,8 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Validate Shock upload
         self.assertIn('shock_id', out)
         self.assertIn('shock_url', out)
+        self.assertEqual(out['shock_id'], 'test_shock_id_12345')
+        self.assertEqual(out['shock_url'], 'https://shock.test/node/test_shock_id_12345')
 
     def test_error_handling_invalid_parameters(self):
         """Test error handling for invalid parameters."""
@@ -204,6 +264,34 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Validate Shock upload information
         self.assertIn('shock_id', out)
         self.assertIn('shock_url', out)
+        self.assertEqual(out['shock_id'], 'test_shock_id_12345')
+        self.assertEqual(out['shock_url'], 'https://shock.test/node/test_shock_id_12345')
+        
+        # Verify DataFileUtil was called with correct parameters
+        self.dataFileUtil.file_to_shock.assert_called_once()
+        call_args = self.dataFileUtil.file_to_shock.call_args[0][0]
+        self.assertEqual(call_args['pack'], 'zip')
+        self.assertIn('file_path', call_args)
+
+    def test_shock_upload_failure_handling(self):
+        """Test that Shock upload failures are handled properly."""
+        # Mock DataFileUtil to raise an exception
+        self.dataFileUtil.file_to_shock.side_effect = Exception("Shock upload failed")
+        
+        params = {
+            'workspace_name': self.wsName,
+            'input_type': 'uniprot_ids',
+            'uniprot_ids': self.test_protein_ids,
+            'analysis_name': 'shock_failure_test',
+            'analysis_stages': ['network_analysis'],
+            'output_config': {'output_dir': self.test_local_tmp}
+        }
+        
+        # This should raise an exception when Shock upload fails
+        with self.assertRaises(Exception) as context:
+            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        self.assertIn("Shock upload failed", str(context.exception))
+
 
 
 if __name__ == '__main__':
