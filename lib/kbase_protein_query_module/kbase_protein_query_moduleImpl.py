@@ -3,6 +3,7 @@
 import os
 import logging
 import time
+import shutil
 from typing import Dict, Any, List, Optional, Union
 
 from installed_clients.KBaseReportClient import KBaseReport
@@ -95,8 +96,18 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         selected_analyses = params.get('analysis_stages')
         result = workflow.run_workflow(params, output_dir, selected_analyses=selected_analyses)
         
-        # Upload results to Shock using standard KBase pattern 
-        shock_info = self.dfu.file_to_shock({'file_path': output_dir, 'pack': 'zip'})
+        # Create a zip archive of the output directory and upload to Shock (align with KBase examples)
+        try:
+            archive_base = os.path.join(self.shared_folder, f"{analysis_name}_results")
+            zip_path = shutil.make_archive(archive_base, 'zip', output_dir)
+            shock_info = self.dfu.file_to_shock({'file_path': zip_path, 'make_handle': 1})
+            if not shock_info or not isinstance(shock_info, dict) or not shock_info.get('shock_id'):
+                logger.warning("DataFileUtil.file_to_shock returned invalid response, creating report without file links")
+                shock_info = None
+        except Exception as e:
+            logger.error(f"Failed to upload results to Shock: {e}")
+            logger.warning("Creating report without file links due to Shock upload failure")
+            shock_info = None
         
         # Create KBase report with file links 
         report_info = self._create_kbase_report(result, analysis_name, workspace_name, shock_info)
@@ -111,8 +122,8 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             'stages_completed': result.analyses_completed,
             'report_name': report_info['name'],
             'report_ref': report_info['ref'],
-            'shock_id': shock_info.get('shock_id', ''),
-            'shock_url': shock_info.get('shock_url', '')
+            'shock_id': shock_info.get('shock_id', '') if isinstance(shock_info, dict) else '',
+            'shock_url': shock_info.get('shock_url', '') if isinstance(shock_info, dict) else ''
         }
         
         #END run_protein_query_analysis
@@ -243,12 +254,19 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         # Create report using KBaseReport client
         report_client = KBaseReport(self.callback_url)
         
-        # Prepare file links 
+        # Prepare file links with proper None checking
         file_links = []
-        if shock_info and shock_info.get('shock_id'):
+        if shock_info and isinstance(shock_info, dict) and shock_info.get('shock_id'):
+            # Safely extract file name with proper None handling
+            handle_info = shock_info.get('handle', {})
+            if isinstance(handle_info, dict):
+                file_name = handle_info.get('file_name', 'output.zip')
+            else:
+                file_name = 'output.zip'
+            
             file_links.append({
                 'shock_id': shock_info['shock_id'],
-                'name': shock_info.get('handle', {}).get('file_name', 'output.zip'),
+                'name': file_name,
                 'label': 'Analysis Results'
             })
         

@@ -168,7 +168,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
     def test_mock_setup_verification(self):
         """Test that mocks are properly set up for each test."""
         # Verify DataFileUtil mock is working
-        result = self.dataFileUtil.file_to_shock({'file_path': '/test', 'pack': 'zip'})
+        result = self.dataFileUtil.file_to_shock({'file_path': '/test.zip', 'make_handle': 1})
         self.assertEqual(result['shock_id'], 'test_shock_id_12345')
         self.assertEqual(result['shock_url'], 'https://shock.test/node/test_shock_id_12345')
         
@@ -207,8 +207,9 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Verify DataFileUtil was called correctly
         self.dataFileUtil.file_to_shock.assert_called_once()
         call_args = self.dataFileUtil.file_to_shock.call_args[0][0]
-        self.assertEqual(call_args['pack'], 'zip')
+        self.assertEqual(call_args.get('make_handle'), 1)
         self.assertIn('file_path', call_args)
+        self.assertTrue(str(call_args['file_path']).endswith('.zip'))
 
     def test_run_protein_query_analysis_protein_sequences(self):
         """Test workflow with protein sequences input."""
@@ -270,8 +271,9 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Verify DataFileUtil was called with correct parameters
         self.dataFileUtil.file_to_shock.assert_called_once()
         call_args = self.dataFileUtil.file_to_shock.call_args[0][0]
-        self.assertEqual(call_args['pack'], 'zip')
+        self.assertEqual(call_args.get('make_handle'), 1)
         self.assertIn('file_path', call_args)
+        self.assertTrue(str(call_args['file_path']).endswith('.zip'))
 
     def test_shock_upload_failure_handling(self):
         """Test that Shock upload failures are handled properly."""
@@ -287,10 +289,25 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
             'output_config': {'output_dir': self.test_local_tmp}
         }
         
-        # This should raise an exception when Shock upload fails
-        with self.assertRaises(Exception) as context:
-            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertIn("Shock upload failed", str(context.exception))
+        # The method should now handle Shock upload failures gracefully
+        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+        out = result[0]
+        
+        # Validate that the analysis still completes successfully
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(out, dict)
+        
+        # Validate required output fields are present
+        required_fields = ['report_name', 'report_ref', 'analysis_result_ref', 'summary', 'start_time', 'stages_completed']
+        for field in required_fields:
+            self.assertIn(field, out, f"Missing required field: {field}")
+        
+        # Validate that shock_id and shock_url are empty strings when upload fails
+        self.assertEqual(out['shock_id'], '')
+        self.assertEqual(out['shock_url'], '')
+        
+        # Verify DataFileUtil was called and failed as expected
+        self.dataFileUtil.file_to_shock.assert_called_once()
 
 
 
