@@ -32,20 +32,6 @@ ANALYSIS_OUTPUT_CONFIG = {
         "include_network_data": True,
         "include_statistics": True,
         "max_nodes_display": 1000
-    },
-    "similarity_search": {
-        "enabled": True,
-        "output_formats": ["json", "csv"],
-        "include_similarity_scores": True,
-        "include_metadata": True,
-        "max_results": 1000
-    },
-    "family_assignment": {
-        "enabled": True,
-        "output_formats": ["json", "csv"],
-        "include_confidence_scores": True,
-        "include_family_metadata": True,
-        "include_statistics": True
     }
 }
 

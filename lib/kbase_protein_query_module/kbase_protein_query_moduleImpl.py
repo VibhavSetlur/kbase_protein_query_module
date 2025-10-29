@@ -98,7 +98,8 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         
         # Create a zip archive of the output directory and upload to Shock (align with KBase examples)
         try:
-            archive_base = os.path.join(self.shared_folder, f"{analysis_name}_results")
+            # Use a stable file name for the narrative link
+            archive_base = os.path.join(self.shared_folder, "output")
             zip_path = shutil.make_archive(archive_base, 'zip', output_dir)
             shock_info = self.dfu.file_to_shock({'file_path': zip_path, 'make_handle': 1})
             if not shock_info or not isinstance(shock_info, dict) or not shock_info.get('shock_id'):
@@ -274,7 +275,7 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         if file_links:
             message += f"Output files: {len(file_links)} file(s) available for download"
         
-        # Create report following KBase documentation exactly
+        # Create report following KBase documentation
         report_params = {
             'message': message,
             'workspace_name': workspace_name,
@@ -282,10 +283,14 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             'objects_created': [],
             'warnings': [],
             'file_links': file_links,
-            'html_links': [],
-            'direct_html_link_index': 0,
-            'html_window_height': 333
         }
+        # Only set HTML fields if we actually add HTML links
+        # Avoids Narrative error "Report not found for index 0"
+        html_links: List[Dict[str, Any]] = []
+        if html_links:
+            report_params['html_links'] = html_links
+            report_params['direct_html_link_index'] = 0
+            report_params['html_window_height'] = 333
         
         report_info = report_client.create_extended_report(report_params)
         

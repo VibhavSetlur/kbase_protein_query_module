@@ -32,7 +32,7 @@ _ANALYSIS_CONFIG_DICT = {
         "name": "Network Analysis",
         "description": "Protein similarity network analysis with interactive visualizations",
         "category": "network",
-        "dependencies": [],  # No dependencies for now
+        "dependencies": ["plotly", "scikit-learn", "networkx", "h5py", "zarr", "tables", "pyarrow", "biopython", "joblib", "tqdm", "pyyaml"],  # No dependencies for now
         "output_type": "interactive_html",
         "module_path": "kbase_protein_query_module.src.analysis.network_analysis.network_analysis",
         "class_name": "NetworkAnalysis"

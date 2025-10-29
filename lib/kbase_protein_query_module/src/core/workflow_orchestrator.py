@@ -295,8 +295,9 @@ class WorkflowOrchestrator:
             # Run analyses through analysis manager
             results = self.analysis_manager.run_multiple_analyses(
                 analysis_names=analyses_to_run,
-                proteins=analysis_data,
+                proteins=analysis_data.get("proteins", []),
                 output_dir=self.output_manager.get_root_dir(),
+                **{k: v for k, v in analysis_data.items() if k != "proteins"},
                 **kwargs
             )
             

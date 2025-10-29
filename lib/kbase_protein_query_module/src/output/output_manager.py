@@ -40,8 +40,7 @@ class OutputManager:
         # Create main output directory structure
         self.root_dir = os.path.join(
             self.base_output_dir,
-            "outputs",
-            f"{self.run_id}_{self.timestamp}"
+            "outputs"
         )
         
         # Ensure directories exist
@@ -155,7 +154,6 @@ class OutputManager:
         """Create the standard output directory structure."""
         directories = [
             "metadata",
-            "process_info", 
             "analysis",
             "logs"
         ]
