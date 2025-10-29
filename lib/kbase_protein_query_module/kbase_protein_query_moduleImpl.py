@@ -112,18 +112,10 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         # Create KBase report with file links 
         report_info = self._create_kbase_report(result, analysis_name, workspace_name, shock_info)
         
-        # Return standardized results 
+        # Return KBase report references for narrative display
         output = {
-            'analysis_result_ref': 'success',
-            'summary': result.final_output.get('summary', 'Analysis completed successfully'),
-            'input_parameters': params,
-            'start_time': float(start_time),
-            'protein_count': result.final_output.get('protein_count', 0),
-            'stages_completed': result.analyses_completed,
             'report_name': report_info['name'],
-            'report_ref': report_info['ref'],
-            'shock_id': shock_info.get('shock_id', '') if isinstance(shock_info, dict) else '',
-            'shock_url': shock_info.get('shock_url', '') if isinstance(shock_info, dict) else ''
+            'report_ref': report_info['ref']
         }
         
         #END run_protein_query_analysis
@@ -270,15 +262,29 @@ Protein query and analysis module with comprehensive network analysis capabiliti
                 'label': 'Analysis Results'
             })
         
+        # Create comprehensive report message
+        summary = result.final_output.get('summary', 'Analysis completed successfully')
+        protein_count = result.final_output.get('protein_count', 0)
+        stages_completed = result.analyses_completed
+        
+        message = f"Protein Query Analysis completed successfully.\n\n"
+        message += f"Summary: {summary}\n"
+        message += f"Proteins processed: {protein_count}\n"
+        message += f"Stages completed: {', '.join(stages_completed)}\n"
+        if file_links:
+            message += f"Output files: {len(file_links)} file(s) available for download"
+        
         # Create report following KBase documentation exactly
         report_params = {
-            'message': f"Protein Query Analysis Report for {analysis_name}",
+            'message': message,
             'workspace_name': workspace_name,
             'report_object_name': f"{analysis_name}_report",
             'objects_created': [],
             'warnings': [],
             'file_links': file_links,
-            'direct_html': f"<h2>Protein Query Analysis Results</h2><p>{result.final_output.get('summary', 'Analysis completed successfully')}</p>"
+            'html_links': [],
+            'direct_html_link_index': 0,
+            'html_window_height': 333
         }
         
         report_info = report_client.create_extended_report(report_params)

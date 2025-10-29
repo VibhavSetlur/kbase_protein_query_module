@@ -193,16 +193,14 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertIsInstance(out, dict)
         
-        # Validate required output fields
-        required_fields = ['report_name', 'report_ref', 'analysis_result_ref', 'summary', 'start_time', 'stages_completed']
+        # Validate required output fields (only report references)
+        required_fields = ['report_name', 'report_ref']
         for field in required_fields:
             self.assertIn(field, out, f"Missing required field: {field}")
         
-        # Validate Shock upload
-        self.assertIn('shock_id', out)
-        self.assertIn('shock_url', out)
-        self.assertEqual(out['shock_id'], 'test_shock_id_12345')
-        self.assertEqual(out['shock_url'], 'https://shock.test/node/test_shock_id_12345')
+        # Validate report references
+        self.assertEqual(out['report_name'], 'test_report')
+        self.assertEqual(out['report_ref'], 'test_report_ref')
         
         # Verify DataFileUtil was called correctly
         self.dataFileUtil.file_to_shock.assert_called_once()
@@ -229,16 +227,14 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertIsInstance(out, dict)
         
-        # Validate required output fields
-        required_fields = ['report_name', 'report_ref', 'analysis_result_ref', 'summary', 'start_time', 'stages_completed']
+        # Validate required output fields (only report references)
+        required_fields = ['report_name', 'report_ref']
         for field in required_fields:
             self.assertIn(field, out, f"Missing required field: {field}")
         
-        # Validate Shock upload
-        self.assertIn('shock_id', out)
-        self.assertIn('shock_url', out)
-        self.assertEqual(out['shock_id'], 'test_shock_id_12345')
-        self.assertEqual(out['shock_url'], 'https://shock.test/node/test_shock_id_12345')
+        # Validate report references
+        self.assertEqual(out['report_name'], 'test_report')
+        self.assertEqual(out['report_ref'], 'test_report_ref')
 
     def test_error_handling_invalid_parameters(self):
         """Test error handling for invalid parameters."""
@@ -262,11 +258,11 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
         out = result[0]
         
-        # Validate Shock upload information
-        self.assertIn('shock_id', out)
-        self.assertIn('shock_url', out)
-        self.assertEqual(out['shock_id'], 'test_shock_id_12345')
-        self.assertEqual(out['shock_url'], 'https://shock.test/node/test_shock_id_12345')
+        # Validate report references
+        self.assertIn('report_name', out)
+        self.assertIn('report_ref', out)
+        self.assertEqual(out['report_name'], 'test_report')
+        self.assertEqual(out['report_ref'], 'test_report_ref')
         
         # Verify DataFileUtil was called with correct parameters
         self.dataFileUtil.file_to_shock.assert_called_once()
@@ -297,14 +293,14 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertIsInstance(out, dict)
         
-        # Validate required output fields are present
-        required_fields = ['report_name', 'report_ref', 'analysis_result_ref', 'summary', 'start_time', 'stages_completed']
+        # Validate required output fields are present (only report references)
+        required_fields = ['report_name', 'report_ref']
         for field in required_fields:
             self.assertIn(field, out, f"Missing required field: {field}")
         
-        # Validate that shock_id and shock_url are empty strings when upload fails
-        self.assertEqual(out['shock_id'], '')
-        self.assertEqual(out['shock_url'], '')
+        # Validate report references
+        self.assertEqual(out['report_name'], 'test_report')
+        self.assertEqual(out['report_ref'], 'test_report_ref')
         
         # Verify DataFileUtil was called and failed as expected
         self.dataFileUtil.file_to_shock.assert_called_once()

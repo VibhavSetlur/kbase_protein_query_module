@@ -7,16 +7,8 @@ Protein query and analysis module with comprehensive network analysis capabiliti
 module kbase_protein_query_module {
     
     typedef structure {
-        string analysis_result_ref;
-        string summary;
-        mapping<string, UnspecifiedObject> input_parameters;
-        float start_time;
-        int protein_count;
-        list<string> stages_completed;
         string report_name;
         string report_ref;
-        string shock_id;
-        string shock_url;
     } ProteinQueryAnalysisResults;
     
     typedef structure {
