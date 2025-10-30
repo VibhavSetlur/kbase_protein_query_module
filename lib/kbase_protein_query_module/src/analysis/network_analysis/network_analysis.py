@@ -82,17 +82,10 @@ class NetworkAnalysis:
         self.k_neighbors = self.config.get('k_neighbors', 10)
         self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
         
-        # Check dependencies; allow test mode to proceed without heavy deps
+        # Determine mode first
         _TEST_MODE = os.environ.get('PYTEST_CURRENT_TEST') is not None or os.environ.get('KPQM_TEST_FAST') == '1'
-        if not _TEST_MODE:
-            if not NETWORKX_AVAILABLE:
-                raise ImportError("NetworkX is required for network analysis but not available")
-            if not SKLEARN_AVAILABLE:
-                raise ImportError("scikit-learn is required for network analysis but not available")
-            if not NETWORK_VIS_AVAILABLE:
-                raise ImportError("NetworkVisualizer dependency is not available")
         
-        # Initialize the network visualizer (lazy import)
+        # Initialize the network visualizer (lazy import) BEFORE enforcing deps
         try:
             if not NETWORK_VIS_AVAILABLE or NetworkVisualizer is None:
                 from .network_visualizer import NetworkVisualizer as _NV  # type: ignore
@@ -101,6 +94,15 @@ class NetworkAnalysis:
         except Exception:
             NETWORK_VIS_AVAILABLE = False
             NetworkVisualizer = None
+        
+        # Check dependencies; allow test mode to proceed without heavy deps
+        if not _TEST_MODE:
+            if not NETWORKX_AVAILABLE:
+                raise ImportError("NetworkX is required for network analysis but not available")
+            if not SKLEARN_AVAILABLE:
+                raise ImportError("scikit-learn is required for network analysis but not available")
+            if not NETWORK_VIS_AVAILABLE:
+                raise ImportError("NetworkVisualizer dependency is not available")
         if NETWORK_VIS_AVAILABLE and NetworkVisualizer is not None:
             self.visualizer = NetworkVisualizer(self.config)
         else:
