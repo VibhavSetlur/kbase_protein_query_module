@@ -39,6 +39,15 @@ except ImportError:
 
 # Import the network visualizer
 from .network_visualizer import NetworkVisualizer
+from ..util.uniprot.api import fetch_metadata
+
+# Storage / search optional imports
+try:
+    from ..util.storage.protein_storage import ProteinStorage
+    from ..util.similarity_search.similarity_search import SimilaritySearch
+    STORAGE_AVAILABLE = True
+except Exception:
+    STORAGE_AVAILABLE = False
 
 # Simple result class for compatibility
 class StageResult:
@@ -89,6 +98,15 @@ class NetworkAnalysis:
                     'analysis_config': kwargs.get('analysis_config', {}),
                     'query_protein_id': protein_id
                 }
+                # Thread through shared prepared data if present (embeddings, metadata, etc.)
+                for key in ['embeddings', 'protein_ids', 'metadata_df', 'query_embedding', 'output_dir']:
+                    if key in kwargs:
+                        # For per-protein outputs, nest under a subdir named by protein_id
+                        if key == 'output_dir':
+                            import os
+                            input_data['output_dir'] = os.path.join(kwargs['output_dir'], protein_id)
+                        else:
+                            input_data[key] = kwargs[key]
                 
                 # Run network analysis for this protein
                 result = self.run(input_data)
@@ -170,18 +188,142 @@ class NetworkAnalysis:
         try:
             start_time = time.time()
             
-            # Handle case where embeddings are not available (e.g., in tests)
-            if 'embeddings' not in input_data:
-                logger.warning("Embeddings not available, creating mock data for network analysis")
-                return self._create_mock_analysis_result(input_data, start_time)
+            # Strict requirement: embeddings must be available; do not perform mock analysis
+            if 'embeddings' not in input_data or input_data.get('embeddings') is None:
+                msg = "Embeddings are required for network analysis; none were provided."
+                logger.error(msg)
+                return StageResult(
+                    success=False,
+                    data={},
+                    metadata={'execution_time': time.time() - start_time},
+                    error_message=msg
+                )
             
-            # Single protein analysis with embeddings
-            embeddings = input_data['embeddings']
-            protein_ids = input_data['protein_ids']
-            metadata_df = input_data['metadata_df']
+            # Single protein analysis with embeddings; optionally expand with top-k neighbors from storage
+            embeddings = input_data.get('embeddings')
+            protein_ids = input_data.get('protein_ids')
+            metadata_df = input_data.get('metadata_df')
             query_embedding = input_data.get('query_embedding')
             query_protein_id = input_data.get('query_protein_id')
             output_dir = input_data.get('output_dir', 'test/outputs')
+
+            # If storage/index available, expand the set to top-k neighbors from the assigned family
+            try:
+                if STORAGE_AVAILABLE and query_embedding is not None:
+                    top_k = int(self.config.get('top_k', 25))
+                    storage = ProteinStorage(base_dir=self.config.get('storage_dir', 'data'))
+                    # Prefer advanced family assignment when centroids exist
+                    try:
+                        fam = storage.assign_family_advanced(query_embedding.astype(np.float32))
+                        family_id = fam.get('family_id', 'unknown')
+                    except Exception:
+                        # Fallback to simple assignment if advanced not available
+                        try:
+                            fam = storage.assign_family(query_embedding.astype(np.float32))
+                            family_id = fam.get('family_id', 'unknown')
+                        except Exception:
+                            family_id = 'unknown'
+                    if family_id != 'unknown':
+                        # Load family embeddings and search neighbors via hierarchical index
+                        sim = SimilaritySearch({'index_dir': self.config.get('index_dir', 'data/indexes'), 'top_k': top_k})
+                        search_res = sim.search_single_protein(query_embedding.astype(np.float32), family_id)
+                        neighbor_ids = search_res.get('similar_proteins', [])
+                        # Retrieve embeddings for neighbor IDs
+                        family_embeddings, family_protein_ids = storage.load_family_embeddings(family_id, check_memory=False)
+                        id_to_idx = {pid: idx for idx, pid in enumerate(family_protein_ids)}
+                        neighbor_vecs = []
+                        resolved_ids = []
+                        for nid in neighbor_ids:
+                            idx = id_to_idx.get(nid)
+                            if idx is not None:
+                                neighbor_vecs.append(family_embeddings[idx])
+                                resolved_ids.append(nid)
+                        # Build arrays including query as the first element
+                        if neighbor_vecs:
+                            emb_stack = [query_embedding.astype(np.float32)] + [np.asarray(v, dtype=np.float32) for v in neighbor_vecs]
+                            embeddings = np.vstack(emb_stack)
+                            protein_ids = [query_protein_id] + resolved_ids
+                            # Refresh metadata from UniProt for the set
+                            meta_rows = fetch_metadata(protein_ids)
+                            import pandas as pd
+                            metadata_df = pd.DataFrame(meta_rows) if meta_rows else pd.DataFrame({'Entry': protein_ids})
+                    else:
+                        # Global search fallback across all mapped families
+                        try:
+                            qn = query_embedding.astype(np.float32)
+                            qn = qn / (np.linalg.norm(qn) + 1e-8)
+                            global_top_k = top_k
+                            heap_ids: list = []
+                            heap_sims: list = []
+                            # Iterate all families available in storage mapping
+                            for fam_id in list(storage.family_mapping.keys()):
+                                try:
+                                    fam_emb, fam_ids = storage.load_family_embeddings(fam_id, check_memory=False)
+                                    # Compute cosine sim with normalized query (embeddings assumed pre-normalized or raw)
+                                    denom = (np.linalg.norm(fam_emb, axis=1) + 1e-8)
+                                    sims = np.dot(fam_emb, qn) / denom
+                                    # Take top local results
+                                    local_idx = np.argsort(sims)[::-1][:global_top_k]
+                                    for li in local_idx:
+                                        simv = float(sims[li])
+                                        pid = fam_ids[li]
+                                        if pid == query_protein_id:
+                                            continue
+                                        heap_ids.append(pid)
+                                        heap_sims.append(simv)
+                                except Exception:
+                                    continue
+                            if heap_ids:
+                                # Select global top_k
+                                order = np.argsort(np.asarray(heap_sims))[::-1][:global_top_k]
+                                sel_ids = [heap_ids[i] for i in order]
+                                # Retrieve embeddings for selected IDs
+                                neighbor_vecs = []
+                                resolved_ids = []
+                                # Build quick lookup by family to avoid reloading everything repeatedly
+                                fam_to_data = {}
+                                for pid in sel_ids:
+                                    fam = getattr(storage, 'protein_family_index', {}).get(pid) if hasattr(storage, 'protein_family_index') else None
+                                    if fam is None:
+                                        # fallback: try mapping via indexes if available
+                                        try:
+                                            from ..util.storage.protein_storage import ProteinIDsIndex  # local import to avoid top-level dependency
+                                            idx = ProteinIDsIndex(base_dir=self.config.get('storage_dir', 'data'))
+                                            fam = idx.get_protein_family(pid)
+                                        except Exception:
+                                            fam = None
+                                    if fam and fam not in fam_to_data:
+                                        try:
+                                            fam_to_data[fam] = storage.load_family_embeddings(fam, check_memory=False)
+                                        except Exception:
+                                            fam_to_data[fam] = (None, [])
+                                for pid in sel_ids:
+                                    fam = None
+                                    try:
+                                        from ..util.storage.protein_storage import ProteinIDsIndex  # local import
+                                        idx = ProteinIDsIndex(base_dir=self.config.get('storage_dir', 'data'))
+                                        fam = idx.get_protein_family(pid)
+                                    except Exception:
+                                        fam = None
+                                    data = fam_to_data.get(fam)
+                                    if data and data[0] is not None:
+                                        fam_emb, fam_ids = data
+                                        id_to_idx = {pp: ii for ii, pp in enumerate(fam_ids)}
+                                        pos = id_to_idx.get(pid)
+                                        if pos is not None:
+                                            neighbor_vecs.append(np.asarray(fam_emb[pos], dtype=np.float32))
+                                            resolved_ids.append(pid)
+                                if neighbor_vecs:
+                                    emb_stack = [query_embedding.astype(np.float32)] + neighbor_vecs
+                                    embeddings = np.vstack(emb_stack)
+                                    protein_ids = [query_protein_id] + resolved_ids
+                                    meta_rows = fetch_metadata(protein_ids)
+                                    import pandas as pd
+                                    metadata_df = pd.DataFrame(meta_rows) if meta_rows else pd.DataFrame({'Entry': protein_ids})
+                        except Exception as ge:
+                            logger.warning(f"Global search fallback failed: {ge}")
+            except Exception as e:
+                logger.warning(f"Storage-based similarity expansion failed; continuing with provided embeddings only: {e}")
 
             # Create interactive network visualization
             visualization_results = self.visualizer.create_interactive_visualization(
@@ -228,34 +370,6 @@ class NetworkAnalysis:
                 metadata={},
                 error_message=str(e)
             )
-
-    def _create_mock_analysis_result(self, input_data: Dict[str, Any], start_time: float) -> StageResult:
-        """Create mock analysis result for testing when embeddings are not available."""
-        proteins = input_data.get('proteins', [])
-        if not proteins:
-            return StageResult(
-                success=False,
-                error_message="No protein data available for network analysis"
-            )
-        
-        # Create mock data for testing
-        n_proteins = len(proteins)
-        protein_ids = [f"protein_{i}" for i in range(n_proteins)]
-        
-        return StageResult(
-            success=True,
-            data={
-                'network_analysis': {
-                    'query_protein_id': protein_ids[0] if protein_ids else 'unknown',
-                    'network_properties': {'num_nodes': n_proteins, 'num_edges': 0, 'density': 0.0},
-                    'network_statistics': {'total_nodes': n_proteins, 'total_edges': 0},
-                    'html_path': 'mock_visualization.html',
-                    'csv_files': {}
-                }
-            },
-            metadata={'execution_time': time.time() - start_time, 'mock_data': True},
-            artifacts=[]
-        )
 
     def _generate_csv_outputs(self, G: nx.Graph, embeddings: np.ndarray, protein_ids: List[str], 
                             metadata_df: pd.DataFrame, query_protein_id: str, output_dir: str) -> Dict[str, str]:

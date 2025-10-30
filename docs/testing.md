@@ -16,66 +16,26 @@ test/
 
 ## Running Tests
 
-### Basic Commands
 
-```bash
-# Run all tests
-pytest
-
-# Run with verbose output
-pytest -v
-
-# Run specific test file
-pytest test/unit_tests/core/test_workflow_orchestrator.py
-
-# Run specific test class
-pytest test/unit_tests/core/test_workflow_orchestrator.py::TestWorkflowOrchestrator
-
-# Run specific test method
-pytest test/unit_tests/core/test_workflow_orchestrator.py::TestWorkflowOrchestrator::test_orchestrator_initialization
-```
-
-### Test Categories
-
-```bash
-# Run core component tests
-pytest test/unit_tests/core/
-
-# Run analysis tests
-pytest test/unit_tests/analysis/
-
-# Run utility tests
-pytest test/unit_tests/util/
-
-# Run integration tests
-pytest test/integration_tests/
-```
-
-### Coverage Testing
-
-```bash
-# Run tests with coverage
-pytest --cov=src --cov-report=html
-
-# Generate coverage report
-pytest --cov=src --cov-report=term-missing
-
-# Coverage for specific modules
-pytest --cov=src.core --cov-report=html
-```
 
 ## KBase Integration Testing
 
 ### Using kb-sdk
 
+Run server tests through the KBase SDK to align with KBase documentation and conventions.
+
 ```bash
-# Run full KBase validation
+# Run full KBase validation and server tests
 kb-sdk test
 
-# Run specific validation steps
+# Run specific steps as needed
 kb-sdk validate
 kb-sdk build
 ```
+
+Environment notes:
+- Ensure `KB_AUTH_TOKEN`, `KB_WORKSPACE_URL`, and `SDK_CALLBACK_URL` are set when running in environments that require them.
+- Tests mock KBase clients (`Workspace`, `KBaseReport`, `DataFileUtil`) to keep execution deterministic.
 
 ## Test Types
 

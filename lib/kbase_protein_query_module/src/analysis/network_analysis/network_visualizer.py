@@ -104,8 +104,27 @@ class NetworkVisualizer:
         # Create layout
         pos = self._create_layout(G)
         
+        # Precompute similarity-to-query for hover if query is present
+        similarity_to_query = {}
+        try:
+            if query_embedding is not None:
+                qe = query_embedding.astype(np.float32)
+                if qe.ndim > 1:
+                    qe = qe.reshape(-1)
+                qe = qe / (np.linalg.norm(qe) + 1e-8)
+                normed = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
+                sims = np.dot(normed, qe)
+                for pid, sim in zip(protein_ids, sims):
+                    try:
+                        similarity_to_query[pid] = float(sim)
+                    except Exception:
+                        similarity_to_query[pid] = 0.0
+        except Exception:
+            # If any failure, leave similarities empty; hover will default
+            similarity_to_query = {}
+
         # Create visualization
-        fig = self._create_plotly_figure(G, pos, protein_ids, metadata_dict, query_protein_id)
+        fig = self._create_plotly_figure(G, pos, protein_ids, metadata_dict, query_protein_id, similarity_to_query)
         
         # Save visualization
         html_path = self._save_visualization(fig, query_protein_id, output_dir)
@@ -238,7 +257,7 @@ class NetworkVisualizer:
         return pos
     
     def _create_plotly_figure(self, G: nx.Graph, pos: Dict, protein_ids: List[str], 
-                            metadata_dict: Dict, query_protein_id: str) -> go.Figure:
+                            metadata_dict: Dict, query_protein_id: str, similarity_to_query: Dict[str, float]) -> go.Figure:
         """Create the Plotly interactive network figure."""
         # Prepare data for visualization
         node_x, node_y = [], []
@@ -306,7 +325,7 @@ class NetworkVisualizer:
                 component_size,                               # 8: Component Size
                 node_degree,                                  # 9: Node Degree
                 is_query,                                     # 10: Is Query Protein
-                1.0 if is_query else 0.0                     # 11: Similarity to Query (placeholder)
+                (1.0 if is_query else float(similarity_to_query.get(node, 0.0)))  # 11: Similarity to Query
             ])
             
             # Assign colors and symbols
@@ -357,6 +376,7 @@ class NetworkVisualizer:
                 "<b>EC Number:</b> %{customdata[3]}<br>"
                 "<b>Family:</b> %{customdata[5]}<br>"
                 "<b>Reviewed:</b> %{customdata[6]}<br>"
+                "<b>Similarity to Query:</b> %{customdata[11]:.3f}<br>"
                 "<b>Component:</b> %{customdata[7]} (Size: %{customdata[8]})<br>"
                 "<b>Degree:</b> %{customdata[9]}<br>"
                 "<b>Type:</b> %{marker.symbol}<br>"

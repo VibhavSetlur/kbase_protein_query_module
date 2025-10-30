@@ -324,6 +324,147 @@ class WorkflowOrchestrator:
             "workspace_info": processed_data.get("workspace_info", {}),
             "config": self.config
         }
+        # Augment with embeddings and metadata so downstream stages do not fall back to mock
+        try:
+            # Initialize process log
+            if not hasattr(self, '_process_log'):
+                self._process_log = []
+            proteins = analysis_data["proteins"] or []
+            if proteins:
+                import numpy as np
+                import pandas as pd
+                from ..util.embeddings.generator import ProteinEmbeddingGenerator
+                from ..util.uniprot.api import fetch_sequences, fetch_metadata, fetch_sequence_and_metadata
+                from ..util.storage.protein_storage import ProteinStorage, ProteinIDsIndex
+                # Derive IDs and sequences
+                ids: list = []
+                seqs: list = []
+                missing_seq_ids: list = []
+                storage_embeddings: dict = {}
+                storage_ids: list = []
+                fetched_metadata_rows: list = []
+                ids_index = None
+                try:
+                    ids_index = ProteinIDsIndex(base_dir=self.config.get('storage_dir', 'data'))
+                except Exception:
+                    ids_index = None
+                storage = None
+                try:
+                    storage = ProteinStorage(base_dir=self.config.get('storage_dir', 'data'))
+                except Exception:
+                    storage = None
+                for i, p in enumerate(proteins):
+                    pid = p.get('protein_id') or p.get('uniprot_id') or f'protein_{i}'
+                    ids.append(pid)
+                    seq = p.get('sequence')
+                    if isinstance(seq, str) and len(seq.strip()) >= 3:
+                        # Raw sequence provided; we will compute embedding
+                        seqs.append(seq.strip())
+                        self._process_log.append({
+                            'event': 'sequence_input',
+                            'protein_id': pid,
+                            'detail': 'Raw sequence provided'
+                        })
+                    else:
+                        # No sequence provided; try fast existence check in storage
+                        seqs.append(None)
+                        if ids_index is not None and storage is not None:
+                            idx_hit = ids_index.search_protein(pid)
+                            fam_id = ids_index.get_protein_family(pid) if idx_hit else None
+                            if fam_id:
+                                try:
+                                    fam_emb, fam_ids = storage.load_family_embeddings(fam_id, check_memory=False)
+                                    id_to_idx = {ppid: kk for kk, ppid in enumerate(fam_ids)}
+                                    pos = id_to_idx.get(pid)
+                                    if pos is not None:
+                                        storage_embeddings[pid] = np.asarray(fam_emb[pos], dtype=np.float32)
+                                        storage_ids.append(pid)
+                                        self._process_log.append({
+                                            'event': 'embedding_from_storage',
+                                            'protein_id': pid,
+                                            'family_id': fam_id,
+                                            'detail': 'Found in storage and reused embedding'
+                                        })
+                                        continue
+                                except Exception:
+                                    pass
+                        # Not found in storage; mark for API fetch
+                        missing_seq_ids.append(pid)
+                        self._process_log.append({
+                            'event': 'sequence_missing',
+                            'protein_id': pid,
+                            'detail': 'Will fetch from UniProt'
+                        })
+                # Fill missing sequences (and metadata) from UniProt when possible
+                if missing_seq_ids:
+                    for miss_id in missing_seq_ids:
+                        try:
+                            s, md = fetch_sequence_and_metadata(miss_id)
+                            fetched_metadata_rows.append(md or {'Entry': miss_id})
+                            # place sequence into seqs aligned by ids
+                            for j, pid in enumerate(ids):
+                                if pid == miss_id and seqs[j] is None and isinstance(s, str) and len(s) >= 3:
+                                    seqs[j] = s
+                                    self._process_log.append({
+                                         'event': 'sequence_fetched',
+                                         'protein_id': miss_id,
+                                         'detail': 'Fetched from UniProt'
+                                     })
+                        except Exception:
+                            fetched_metadata_rows.append({'Entry': miss_id})
+                            self._process_log.append({
+                                'event': 'sequence_fetch_failed',
+                                'protein_id': miss_id,
+                                'detail': 'Failed to fetch from UniProt'
+                            })
+                # Build computed embeddings for sequences available
+                compute_ids = []
+                compute_seqs = []
+                for pid, seq in zip(ids, seqs):
+                    if isinstance(seq, str) and len(seq) >= 3 and pid not in storage_embeddings:
+                        compute_ids.append(pid)
+                        compute_seqs.append(seq)
+                computed_embeddings: dict = {}
+                if compute_ids:
+                    generator = ProteinEmbeddingGenerator()
+                    computed_embeddings = generator.generate_embeddings_batch(compute_seqs, compute_ids, batch_size=8)
+                    self._process_log.append({
+                        'event': 'embeddings_computed',
+                        'count': len(compute_ids),
+                        'protein_ids': compute_ids[:50]  # avoid huge logs
+                    })
+                # Combine storage and computed embeddings in original input order (only those present)
+                combined_ids: list = []
+                combined_embs: list = []
+                for pid in ids:
+                    emb = storage_embeddings.get(pid) or computed_embeddings.get(pid)
+                    if emb is not None:
+                        combined_ids.append(pid)
+                        combined_embs.append(emb)
+                if combined_embs:
+                    analysis_data["embeddings"] = np.vstack([np.asarray(e, dtype=np.float32) for e in combined_embs])
+                    analysis_data["protein_ids"] = combined_ids
+                    # Build metadata: start with batch fetch for combined_ids; overlay any fetched rows
+                    base_meta_rows = fetch_metadata(combined_ids) or []
+                    # Overlay: ensure each Entry exists, fill missing with N/A
+                    entry_to_meta = {row.get('Entry'): row for row in base_meta_rows if isinstance(row, dict)}
+                    for row in fetched_metadata_rows:
+                        if isinstance(row, dict) and row.get('Entry'):
+                            entry_to_meta[row['Entry']] = {**{'Entry': row['Entry']}, **row}
+                    # Ensure every id has a metadata row
+                    final_meta_rows: list = []
+                    for pid in combined_ids:
+                        r = entry_to_meta.get(pid) or {'Entry': pid}
+                        final_meta_rows.append(r)
+                    metadata_df = pd.DataFrame(final_meta_rows)
+                    analysis_data["metadata_df"] = metadata_df
+                    # Choose first as default query
+                    analysis_data["query_embedding"] = np.asarray(combined_embs[0], dtype=np.float32)
+                    analysis_data["query_protein_id"] = combined_ids[0]
+                    # Per-protein output dir root; stages create subdirs
+                    analysis_data["output_dir"] = self.output_manager.get_analysis_dir("network_analysis")
+        except Exception as e:
+            logger.warning(f"Failed to prepare embeddings/metadata for analysis: {e}")
         
         return analysis_data
     
@@ -419,11 +560,13 @@ class WorkflowOrchestrator:
             result: Final workflow result
         """
         try:
-            # Save metadata
+            # Save metadata (including process log if available)
+            process_log = getattr(self, '_process_log', None)
             self.output_manager.save_metadata(
                 config=self.config,
                 analyses_run=result.analyses_completed,
-                summary=result.final_output.get("summary", "")
+                summary=result.final_output.get("summary", ""),
+                process_log=process_log
             )
             
             # Save process info

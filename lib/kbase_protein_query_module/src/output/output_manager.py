@@ -441,7 +441,7 @@ For more information, check the process_info and logs directories.
         return saved_files
     
     def save_metadata(self, config: Dict[str, Any], analyses_run: List[str], 
-                     summary: str = "") -> str:
+                     summary: str = "", process_log: Optional[List[Dict[str, Any]]] = None) -> str:
         """
         Save metadata about the run.
         
@@ -463,6 +463,8 @@ For more information, check the process_info and logs directories.
             "total_artifacts": len(self.artifacts),
             "analysis_outputs": self.analysis_outputs
         }
+        if process_log is not None:
+            metadata["process_log"] = process_log
         
         return self.write_json(
             "metadata",

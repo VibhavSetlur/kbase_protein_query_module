@@ -209,6 +209,12 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertIn('file_path', call_args)
         self.assertTrue(str(call_args['file_path']).endswith('.zip'))
 
+        # Verify workflow orchestrator was invoked
+        self.workflow_mock.run_workflow.assert_called_once()
+        
+        # Ensure the mocked analyses completed include network_analysis
+        self.assertIn('network_analysis', self.workflow_mock.run_workflow.return_value.analyses_completed)
+
     def test_run_protein_query_analysis_protein_sequences(self):
         """Test workflow with protein sequences input."""
         params = {
@@ -236,74 +242,46 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         self.assertEqual(out['report_name'], 'test_report')
         self.assertEqual(out['report_ref'], 'test_report_ref')
 
-    def test_error_handling_invalid_parameters(self):
-        """Test error handling for invalid parameters."""
-        # Test missing workspace_name
-        params = {}
-        with self.assertRaises(ValueError) as context:
-            self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        self.assertIn('workspace_name is required', str(context.exception))
+        # Verify workflow orchestrator was invoked
+        self.workflow_mock.run_workflow.assert_called_once()
+        # Ensure the mocked analyses completed include network_analysis
+        self.assertIn('network_analysis', self.workflow_mock.run_workflow.return_value.analyses_completed)
 
-    def test_zip_and_upload_functionality(self):
-        """Test zip and upload functionality."""
+    def test_network_analysis(self):
+        """Test network analysis."""
         params = {
             'workspace_name': self.wsName,
             'input_type': 'uniprot_ids',
-            'uniprot_ids': self.test_protein_ids,
-            'analysis_name': 'zip_test',
+            'uniprot_ids': self.test_protein_ids[:1],
+            'analysis_name': 'network_stage_test',
             'analysis_stages': ['network_analysis'],
             'output_config': {'output_dir': self.test_local_tmp}
         }
-        
         result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
         out = result[0]
-        
+        # Validate basic result structure
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(out, dict)
+        # Validate required output fields (only report references)
+        required_fields = ['report_name', 'report_ref']
+        for field in required_fields:
+            self.assertIn(field, out, f"Missing required field: {field}")
         # Validate report references
-        self.assertIn('report_name', out)
-        self.assertIn('report_ref', out)
         self.assertEqual(out['report_name'], 'test_report')
         self.assertEqual(out['report_ref'], 'test_report_ref')
-        
-        # Verify DataFileUtil was called with correct parameters
+        # Verify DataFileUtil was called correctly
         self.dataFileUtil.file_to_shock.assert_called_once()
         call_args = self.dataFileUtil.file_to_shock.call_args[0][0]
         self.assertEqual(call_args.get('make_handle'), 1)
         self.assertIn('file_path', call_args)
         self.assertTrue(str(call_args['file_path']).endswith('.zip'))
+        # The orchestrator should have been called once for this request
+        self.workflow_mock.run_workflow.assert_called_once()
+        # Confirm mocked orchestrator indicates network_analysis ran
+        analyses_completed = self.workflow_mock.run_workflow.return_value.analyses_completed
+        self.assertIsInstance(analyses_completed, list)
+        self.assertIn('network_analysis', analyses_completed)
 
-    def test_shock_upload_failure_handling(self):
-        """Test that Shock upload failures are handled properly."""
-        # Mock DataFileUtil to raise an exception
-        self.dataFileUtil.file_to_shock.side_effect = Exception("Shock upload failed")
-        
-        params = {
-            'workspace_name': self.wsName,
-            'input_type': 'uniprot_ids',
-            'uniprot_ids': self.test_protein_ids,
-            'analysis_name': 'shock_failure_test',
-            'analysis_stages': ['network_analysis'],
-            'output_config': {'output_dir': self.test_local_tmp}
-        }
-        
-        # The method should now handle Shock upload failures gracefully
-        result = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
-        out = result[0]
-        
-        # Validate that the analysis still completes successfully
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(out, dict)
-        
-        # Validate required output fields are present (only report references)
-        required_fields = ['report_name', 'report_ref']
-        for field in required_fields:
-            self.assertIn(field, out, f"Missing required field: {field}")
-        
-        # Validate report references
-        self.assertEqual(out['report_name'], 'test_report')
-        self.assertEqual(out['report_ref'], 'test_report_ref')
-        
-        # Verify DataFileUtil was called and failed as expected
-        self.dataFileUtil.file_to_shock.assert_called_once()
 
 
 

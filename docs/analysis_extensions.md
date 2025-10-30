@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add new analysis types by creating a module, registering it, adding output handlers, and writing tests.
+Add new analysis types by creating a module, registering it, adding output handlers, and writing tests. Keep tests concise, professional, and aligned with `kb-sdk test`.
 
 ## Step-by-Step Guide
 
@@ -175,7 +175,7 @@ class YourAnalysisOutput:
 
 ### 4. Write Tests
 
-Create comprehensive tests:
+Create minimal and focused tests:
 
 ```python
 # test/unit_tests/analysis/test_your_analysis.py
@@ -203,6 +203,25 @@ class TestYourAnalysis:
             assert result["proteins_analyzed"] == 2
             assert "results" in result
             assert "output_files" in result
+### 5. Add a server-side analysis test method
+
+Add a minimal per-analysis test in `test/kbase_protein_query_module_server_test.py`:
+
+```python
+def test_your_analysis(self):
+    params = {
+        'workspace_name': self.wsName,
+        'input_type': 'uniprot_ids',
+        'uniprot_ids': ['P12345'],
+        'analysis_name': 'your_analysis_test',
+        'analysis_stages': ['your_analysis'],
+        'output_config': {'output_dir': self.test_local_tmp}
+    }
+    _ = self.serviceImpl.run_protein_query_analysis(self.ctx, params)
+    self.workflow_mock.run_workflow.assert_called_once()
+    self.assertIn('your_analysis', self.workflow_mock.run_workflow.return_value.analyses_completed)
+```
+
     
     def test_validate_input(self):
         assert self.analysis.validate_input(self.sample_proteins) is True
