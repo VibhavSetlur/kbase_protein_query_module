@@ -5,7 +5,7 @@
   "tooltip": "Protein query analysis pipeline",
   "header": "Protein Query Analysis",
   "description": "Protein query analysis pipeline",
-  "categories": ["annotation", "sequence analysis"],
+  "categories": ["protein"],
   "icon": "protein",
   "screenshots": [],
   "contact": "help@kbase.us",
@@ -19,17 +19,17 @@
       "optional": false,
       "advanced": false,
       "allow_multiple": false,
-      "default_values": ["protein_input"],
+      "default_values": ["protein_sequence"],
       "field_type": "dropdown",
         "dropdown_options": {
         "options": [
-          {"value": "protein_input", "display": "Protein Input"},
-          {"value": "uniprot_ids", "display": "UniProt IDs"}
+          {"value": "protein_sequence", "display": "Protein Sequence"},
+          {"value": "uniprot_id", "display": "UniProt ID"}
         ]
       }
     },
     {
-      "id": "protein_input",
+      "id": "protein_sequence",
       "optional": true,
       "advanced": false,
       "allow_multiple": false,
@@ -40,11 +40,11 @@
       },
       "conditional": {
         "control_param": "input_type",
-        "control_value": "protein_input"
+        "control_value": "protein_sequence"
       }
     },
     {
-      "id": "uniprot_ids",
+      "id": "uniprot_id",
       "optional": true,
       "advanced": false,
       "allow_multiple": true,
@@ -55,7 +55,7 @@
       },
       "conditional": {
         "control_param": "input_type",
-        "control_value": "uniprot_ids"
+        "control_value": "uniprot_id"
       }
     },
     {
@@ -86,12 +86,12 @@
           "target_property": "input_type"
         },
         {
-          "input_parameter": "protein_input",
-          "target_property": "protein_input"
+          "input_parameter": "protein_sequence",
+          "target_property": "protein_sequence"
         },
         {
-          "input_parameter": "uniprot_ids",
-          "target_property": "uniprot_ids"
+          "input_parameter": "uniprot_id",
+          "target_property": "uniprot_id"
         },
         {
           "input_parameter": "analysis_name",

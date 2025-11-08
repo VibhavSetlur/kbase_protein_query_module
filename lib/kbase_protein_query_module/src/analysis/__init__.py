@@ -7,18 +7,10 @@ analysis types including network analysis, sequence analysis, and bioinformatics
 
 from .analysis_manager import AnalysisManager
 from .config import (
-    get_enabled_analyses,
-    get_analysis_by_category,
-    is_analysis_enabled,
-    get_analysis_dependencies,
-    validate_analysis_config
+    get_enabled_analyses
 )
 
 __all__ = [
     'AnalysisManager',
-    'get_enabled_analyses',
-    'get_analysis_by_category', 
-    'is_analysis_enabled',
-    'get_analysis_dependencies',
-    'validate_analysis_config'
+    'get_enabled_analyses'
 ]

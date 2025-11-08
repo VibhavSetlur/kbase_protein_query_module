@@ -1,33 +1,18 @@
 """
 Protein Sequence Input Handler
-
-Processes protein sequence input in various formats (FASTA, direct sequences).
 """
 
 import logging
-import re
 import time
-from typing import Dict, Any, List, Optional, Union
-from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class ProteinSequenceData:
-    """Container for protein sequence data."""
-    protein_id: str
-    sequence: str
-    source: str = "protein_sequence"
-    metadata: Dict[str, Any] = None
 
 class ProteinSequenceProcessor:
     """Handles protein sequence input processing."""
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        # Sequence validation parameters
-        self.max_sequence_length = self.config.get('max_sequence_length', 10000)
-        self.min_sequence_length = self.config.get('min_sequence_length', 1)
         self.valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -37,232 +22,88 @@ class ProteinSequenceProcessor:
         try:
             logger.info("Processing protein sequence input")
             
-            sequence_data = input_data.get('protein_input', '')
+            sequence = input_data.get('protein_sequence', '')
+            if not sequence:
+                raise ValueError("No protein sequence provided")
             
-            # Validate input data
-            if isinstance(sequence_data, list) and len(sequence_data) == 0:
-                raise ValueError("No protein sequences provided")
+            # Parse and validate
+            proteins = self._parse(sequence)
             
-            if not sequence_data:
-                raise ValueError("protein_input is required for protein sequence input type")
-            
-            # Parse different input formats
-            if isinstance(sequence_data, list):
-                # List of sequences - handle mixed formats
-                protein_records = self._parse_mixed_sequence_list(sequence_data)
-            elif isinstance(sequence_data, str):
-                # String input - detect FASTA vs direct sequence
-                if self._is_fasta_format(sequence_data):
-                    protein_records = self._parse_fasta_data(sequence_data)
-                else:
-                    protein_records = self._parse_direct_sequence(sequence_data)
-            else:
-                raise ValueError(f"Unsupported protein_input type: {type(sequence_data)}")
-            
-            # Validate and clean sequences
-            validated_records = []
-            for record in protein_records:
-                # Clean sequence and validate length
-                cleaned_sequence = self._clean_sequence(record['sequence'])
-                if cleaned_sequence and len(cleaned_sequence) >= self.min_sequence_length:
-                    record['sequence'] = cleaned_sequence
-                    validated_records.append(record)
-                    logger.info(f"Accepted sequence for protein {record['protein_id']}: {len(cleaned_sequence)} amino acids")
-                else:
-                    logger.warning(f"Invalid sequence for protein {record['protein_id']}: '{record['sequence']}' -> '{cleaned_sequence}' (length: {len(cleaned_sequence)})")
-            
-            if not validated_records:
+            if not proteins:
                 raise ValueError("No valid protein sequences found")
             
             processing_time = time.time() - start_time
+            logger.info(f"Processed {len(proteins)} protein sequences")
             
-            result = {
+            return {
                 'success': True,
-                'input_type': 'protein_input',
-                'proteins': validated_records,
-                'workspace_info': {},
-                'processing_time': processing_time,
-                'metadata': {
-                    'total_sequences': len(protein_records),
-                    'valid_sequences': len(validated_records),
-                    'invalid_sequences': len(protein_records) - len(validated_records),
-                    'processing_time': processing_time,
-                    'source': 'protein_sequence'
-                }
+                'proteins': proteins,
+                'processing_time': processing_time
             }
-            
-            logger.info(f"Processed {len(validated_records)} valid protein sequences")
-            return result
             
         except Exception as e:
             processing_time = time.time() - start_time
             logger.error(f"Protein sequence processing failed: {e}")
-            
             return {
                 'success': False,
-                'input_type': 'protein_input',
                 'proteins': [],
-                'workspace_info': {},
-                'error_message': str(e),
                 'processing_time': processing_time,
-                'metadata': {
-                    'error': str(e),
-                    'processing_time': processing_time
-                }
+                'error_message': str(e)
             }
     
-    def _is_fasta_format(self, sequence_data: str) -> bool:
-        """Check if the data is in FASTA format."""
-        lines = sequence_data.strip().split('\n')
-        if not lines:
-            return False
+    def _parse(self, sequence: str) -> List[Dict[str, Any]]:
+        """Parse protein sequence."""
+        proteins = []
         
-        # Check if first line starts with '>'
-        first_line = lines[0].strip()
-        if not first_line.startswith('>'):
-            return False
-        
-        # Must have at least one sequence line after header
-        if len(lines) < 2:
-            return False
+        # Check if FASTA format
+        if sequence.strip().startswith('>'):
+            # FASTA format
+            lines = sequence.strip().split('\n')
+            current_id = None
+            current_seq = []
             
-        # Check if there's at least one non-empty sequence line
-        for line in lines[1:]:
-            if line.strip() and not line.strip().startswith('>'):
-                return True
-        
-        return False
-    
-    def _parse_fasta_data(self, fasta_data: str) -> List[Dict[str, Any]]:
-        """Parse FASTA format data."""
-        protein_records = []
-        lines = fasta_data.strip().split('\n')
-        
-        current_id = None
-        current_sequence = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
+            for line in lines:
+                line = line.strip()
+                if line.startswith('>'):
+                    if current_id and current_seq:
+                        proteins.append(self._create_protein(current_id, ''.join(current_seq)))
+                    current_id = line[1:].strip()
+                    current_seq = []
+                elif line:
+                    current_seq.append(line)
             
-            if line.startswith('>'):
-                # Save previous record
-                if current_id and current_sequence:
-                    protein_records.append({
-                        'protein_id': current_id,
-                        'sequence': ''.join(current_sequence),
-                        'source': 'fasta',
-                        'metadata': {
-                            'format': 'fasta',
-                            'description': current_id
-                        }
-                    })
-                
-                # Start new record
-                current_id = line[1:].strip()
-                current_sequence = []
-            else:
-                # Sequence line
-                current_sequence.append(line)
+            if current_id and current_seq:
+                proteins.append(self._create_protein(current_id, ''.join(current_seq)))
+        else:
+            # Direct sequence
+            cleaned = self._clean(sequence)
+            if cleaned:
+                proteins.append(self._create_protein('protein_1', cleaned))
         
-        # Save last record
-        if current_id and current_sequence:
-            protein_records.append({
-                'protein_id': current_id,
-                'sequence': ''.join(current_sequence),
-                'source': 'fasta',
-                'metadata': {
-                    'format': 'fasta',
-                    'description': current_id
-                }
-            })
-        
-        return protein_records
+        return proteins
     
-    def _parse_sequence_list(self, sequence_list: List[str]) -> List[Dict[str, Any]]:
-        """Parse a list of protein sequences."""
-        protein_records = []
-        
-        for i, sequence in enumerate(sequence_list):
-            if isinstance(sequence, str) and sequence.strip():
-                protein_records.append({
-                    'protein_id': f"protein_{i+1}",
-                    'sequence': sequence.strip(),
-                    'source': 'protein_sequence'
-                })
-        
-        return protein_records
+    def _create_protein(self, protein_id: str, sequence: str) -> Dict[str, Any]:
+        """Create protein record."""
+        return {
+            'protein_id': protein_id,
+            'sequence': sequence,
+            'source': 'protein_sequence'
+        }
     
-    def _parse_mixed_sequence_list(self, sequence_list: List[str]) -> List[Dict[str, Any]]:
-        """Parse a list that may contain both direct sequences and FASTA strings."""
-        protein_records = []
-        
-        for i, item in enumerate(sequence_list):
-            if isinstance(item, str) and item.strip():
-                if self._is_fasta_format(item):
-                    # Parse as FASTA
-                    fasta_records = self._parse_fasta_data(item)
-                    protein_records.extend(fasta_records)
-                else:
-                    # Parse as direct sequence
-                    protein_records.append({
-                        'protein_id': f"protein_{i+1}",
-                        'sequence': item.strip(),
-                        'source': 'protein_sequence'
-                    })
-        
-        return protein_records
-    
-    def _parse_direct_sequence(self, sequence_data: str) -> List[Dict[str, Any]]:
-        """Parse direct sequence data."""
-        # Split by newlines and treat each line as a separate sequence
-        sequences = [seq.strip() for seq in sequence_data.split('\n') if seq.strip()]
-        
-        protein_records = []
-        for i, sequence in enumerate(sequences):
-            protein_records.append({
-                'protein_id': f"protein_{i+1}",
-                'sequence': sequence,
-                'source': 'protein_sequence',
-                'metadata': {
-                    'format': 'direct',
-                    'line_number': i + 1
-                }
-            })
-        
-        return protein_records
-    
-    def _validate_sequence(self, sequence: str) -> bool:
-        """Validate protein sequence."""
-        if not sequence:
-            return False
-        
-        sequence = sequence.strip().upper()
-        
-        # Check length
-        if len(sequence) < self.min_sequence_length:
-            logger.warning(f"Sequence too short: {len(sequence)} < {self.min_sequence_length}")
-            return False
-        
-        if len(sequence) > self.max_sequence_length:
-            logger.warning(f"Sequence too long: {len(sequence)} > {self.max_sequence_length}")
-            return False
-        
-        # Check for valid amino acids
-        invalid_chars = set(sequence) - self.valid_amino_acids
-        if invalid_chars:
-            logger.warning(f"Invalid amino acid characters: {invalid_chars}")
-            return False
-        
-        return True
-    
-    def _clean_sequence(self, sequence: str) -> str:
-        """Clean protein sequence by removing invalid characters."""
-        if not sequence:
-            return ""
-        
-        sequence = sequence.strip().upper()
-        # Keep only valid amino acids
-        cleaned = ''.join(char for char in sequence if char in self.valid_amino_acids)
+    def _clean(self, sequence: str) -> str:
+        """Clean and validate protein sequence."""
+        cleaned = ''.join(char for char in sequence.upper() if char in self.valid_amino_acids)
         return cleaned
+    
+    def standardize_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Standardize input_data format."""
+        input_type = input_data.get('input_type', 'protein_sequence')
+        
+        standardized = {
+            'input_type': input_type,
+            'protein_sequence': input_data.get('protein_sequence', ''),
+            'uniprot_id': [],  # Empty for protein_sequence
+            'analysis_name': input_data.get('analysis_name', '')
+        }
+        
+        return standardized

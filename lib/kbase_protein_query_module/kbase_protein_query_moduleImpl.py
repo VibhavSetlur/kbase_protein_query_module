@@ -12,7 +12,8 @@ from installed_clients.DataFileUtilClient import DataFileUtil
 from installed_clients.KBUtilLibClient import KBUtilLib
 
 # Import the new architecture
-from .src import WorkflowOrchestrator, PipelineConfig
+from .src import WorkflowOrchestrator
+from .src.analysis import get_enabled_analyses
 
 logger = logging.getLogger(__name__)
 #END_HEADER
@@ -84,23 +85,39 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         # Extract analysis name
         analysis_name = params.get('analysis_name', 'protein_analysis')
         
-        # Validate input parameters
-        self._validate_input_parameters(params)
+        input_type = params.get('input_type')
+        if not input_type:
+            logger.error("input_type is required")
+            raise ValueError("input_type is required")
         
-        # Create pipeline configuration
-        pipeline_config = self._create_pipeline_config(params, workspace_name, ctx)
+        # Prepare configuration - simple dict, no PipelineConfig class
+        output_config = params.get('output_config', {})
+        output_dir = output_config.get('output_dir', '/tmp/protein_query_output')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Get analyses to run - handle both 'analyses' and 'analysis_stages' parameter names
+        selected_analyses = params.get('analyses') or params.get('analysis_stages') or ['network_analysis']
+        
+        workflow_config = {
+            'output_dir': output_dir,
+            'workspace_name': workspace_name,
+            'selected_analyses': selected_analyses,
+        }
         
         # Execute workflow through orchestrator
-        workflow = WorkflowOrchestrator(config=pipeline_config, kb_util=self.kb_util)
-        output_dir = getattr(pipeline_config, 'output_dir', '/tmp/protein_query_output')
-        selected_analyses = params.get('analysis_stages')
-        result = workflow.run_workflow(params, output_dir, selected_analyses=selected_analyses)
+        workflow = WorkflowOrchestrator(config=workflow_config, kb_util=self.kb_util)
+        result = workflow.run_workflow(
+            input_data=params,
+            output_dir=output_dir,
+            workspace_name=workspace_name,
+            selected_analyses=selected_analyses,
+        )
         
-        # Create a zip archive of the output directory and upload to Shock (align with KBase examples)
+        # Create a zip archive of the output directory and upload to Shock
         try:
-            # Use a stable file name for the narrative link
             archive_base = os.path.join(self.shared_folder, "output")
-            zip_path = shutil.make_archive(archive_base, 'zip', output_dir)
+            dir_to_zip = result.get('output_directory') or output_dir
+            zip_path = shutil.make_archive(archive_base, 'zip', dir_to_zip)
             shock_info = self.dfu.file_to_shock({'file_path': zip_path, 'make_handle': 1})
             if not shock_info or not isinstance(shock_info, dict) or not shock_info.get('shock_id'):
                 logger.warning("DataFileUtil.file_to_shock returned invalid response, creating report without file links")
@@ -129,49 +146,23 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         return [output]
 
     def get_available_analyses(self, ctx):
-        """
-        :returns: instance of type "GetAvailableAnalysesResults" ->
-           structure: parameter "available_analyses" of mapping from String
-           to unspecified object, parameter "summary" of String
-        """
+        """Return enabled analyses in a simple structure for the Narrative/tests."""
         # ctx is the context object
         # return variables are: output
         #BEGIN get_available_analyses
-        
         try:
-            # Import the analysis configuration
-            from .src.analysis import get_enabled_analyses
-            
-            # Get available analyses
-            available_analyses = get_enabled_analyses()
-            
-            # Create summary
-            analysis_count = len(available_analyses)
-            analysis_names = list(available_analyses.keys())
-            summary = f"Found {analysis_count} available analyses: {', '.join(analysis_names)}"
-            
-            output = {
-                'available_analyses': available_analyses,
-                'summary': summary
-            }
-            
-            logger.info(f"Retrieved {analysis_count} available analyses for UI")
-            
+            analyses = list((get_enabled_analyses() or {}).keys())
         except Exception as e:
-            logger.error(f"Error getting available analyses: {e}")
-            output = {
-                'available_analyses': {},
-                'summary': f"Error retrieving available analyses: {str(e)}"
-            }
-        
-        # At some point might do deeper type checking...
-        if not isinstance(output, dict):
-            raise ValueError('Method get_available_analyses return value ' +
-                             'output is not type dict as required.')
-        # return the results
-        return [output]
+            logger.error(f"Failed to retrieve available analyses: {e}")
+            analyses = []
+        output = {"analyses": analyses}
         #END get_available_analyses
 
+        if not isinstance(output, dict):
+            raise ValueError('Method get_available_analyses return value output is not type dict as required.')
+        return [output]
+
+    
     def status(self, ctx):
         """
         :returns: instance of type "StatusResults" -> structure: parameter
@@ -198,50 +189,6 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         # return the results
         return [output]
     
-    def _validate_input_parameters(self, params):
-        """Validate input parameters and raise exceptions for invalid inputs."""
-        input_type = params.get('input_type', 'protein_input')
-        
-        if input_type == 'protein_input':
-            protein_input = params.get('protein_input')
-            if not protein_input:
-                raise ValueError("protein_input is required for protein_input type")
-        
-        elif input_type == 'uniprot_ids':
-            uniprot_ids = params.get('uniprot_ids', [])
-            if not uniprot_ids:
-                raise ValueError("uniprot_ids is required for uniprot_ids input type")
-        
-        else:
-            raise ValueError(f"Invalid input_type: {input_type}. Must be one of: protein_input, uniprot_ids")
-    
-    def _create_pipeline_config(self, params, workspace_name, ctx):
-        """Create pipeline configuration from parameters."""
-        from .src import PipelineConfig
-        
-        # Handle output_config parameter from narrative
-        output_config = params.get('output_config', {})
-        output_dir = output_config.get('output_dir', '/tmp/protein_query_output')
-        
-        # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Get input proteins based on input type
-        input_proteins = []
-        if params.get('input_type') == 'protein_input':
-            input_proteins = params.get('protein_sequences', [])
-        elif params.get('input_type') == 'uniprot_ids':
-            input_proteins = params.get('uniprot_ids', [])
-        
-        # Create PipelineConfig with only supported parameters
-        return PipelineConfig(
-            input_proteins=input_proteins,
-            input_type=params.get('input_type', 'protein_input'),
-            output_dir=output_dir,
-            workspace_name=workspace_name,
-            selected_analyses=params.get('analysis_stages', ['network_analysis'])
-        )
-    
     def _create_kbase_report(self, result, analysis_name, workspace_name, shock_info=None):
         """Create KBase report."""
         # Create report using KBaseReport client
@@ -264,9 +211,9 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             })
         
         # Create comprehensive report message
-        summary = result.final_output.get('summary', 'Analysis completed successfully')
-        protein_count = result.final_output.get('protein_count', 0)
-        stages_completed = result.analyses_completed
+        summary = (result.get('final_output') or {}).get('summary', 'Analysis completed successfully')
+        protein_count = (result.get('final_output') or {}).get('protein_count', 0)
+        stages_completed = result.get('analyses_completed', [])
         
         message = f"Protein Query Analysis completed successfully.\n\n"
         message += f"Summary: {summary}\n"

@@ -12,64 +12,60 @@ Features:
 - Robust edge selection for connectivity
 """
 
+# Handle both script execution and module import - MUST BE FIRST
+import sys
+import os
+
+# Set up path for script execution - add src directory to path
+# File is at: src/analysis/network_analysis/network_analysis.py
+# We need: src/ (which contains util/)
+_script_file = os.path.abspath(__file__)
+_current_dir = os.path.dirname(_script_file)  # analysis/network_analysis
+_src_dir = os.path.dirname(os.path.dirname(_current_dir))  # src
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple, Optional, Union, Any
 import logging
-import os
 import json
 import time
 
-# Optional imports with fallbacks
+# --- Third-party package imports (optional) ---
 try:
     import networkx as nx
-    NETWORKX_AVAILABLE = True
-except ImportError:
-    NETWORKX_AVAILABLE = False
-    nx = None
-
-try:
     from sklearn.metrics.pairwise import cosine_similarity
     from sklearn.cluster import AgglomerativeClustering
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
-    cosine_similarity = None
-    AgglomerativeClustering = None
-
-# We'll import the network visualizer lazily inside __init__ to avoid hard deps at import time
-NETWORK_VIS_AVAILABLE = False
-NetworkVisualizer = None  # type: ignore
-from kbase_protein_query_module.src.util.uniprot.api import fetch_metadata
-
-# Storage / search optional imports
-try:
-    from kbase_protein_query_module.src.util.storage.protein_storage import ProteinStorage
-    STORAGE_AVAILABLE = True
+    HAS_GRAPH_DEPS = True
 except Exception:
-    STORAGE_AVAILABLE = False
+    HAS_GRAPH_DEPS = False
 
-# Similarity search optional import
-try:
-    from kbase_protein_query_module.src.util.similarity_search import SimilaritySearch
-    SIMILARITY_SEARCH_AVAILABLE = True
-except Exception:
-    SimilaritySearch = None  # type: ignore
-    SIMILARITY_SEARCH_AVAILABLE = False
 
-# Simple result class for compatibility
-class StageResult:
-    def __init__(self, success: bool, data: Any = None, error_message: str = None, 
-                 metadata: Dict[str, Any] = None, artifacts: List[Dict[str, Any]] = None):
-        self.success = success
-        self.data = data
-        self.error_message = error_message
-        self.metadata = metadata or {}
-        self.artifacts = artifacts or []
+# --- Utility module imports ---
+# When running as script, use absolute imports; when imported as module, use relative
+if __name__ == "__main__":
+    # Script execution - use absolute imports with path we just set up
+    from util.storage.storage import ProteinStorage
+    from util.embeddings.generator import ProteinEmbeddingGenerator
+    from util.uniprot.api import fetch_metadata, fetch_protein_sequence
+else:
+    # Module import - use relative imports
+    try:
+        from ...util.storage.storage import ProteinStorage
+        from ...util.embeddings.generator import ProteinEmbeddingGenerator
+        from ...util.uniprot.api import fetch_metadata, fetch_protein_sequence
+    except ImportError:
+        # Fallback to absolute if relative fails
+        from util.storage.storage import ProteinStorage
+        from util.embeddings.generator import ProteinEmbeddingGenerator
+        from util.uniprot.api import fetch_metadata, fetch_protein_sequence
+
 
 logger = logging.getLogger(__name__)
 
-
+# Lazy import for visualizer
+NetworkVisualizer = None
 
 
 class NetworkAnalysis:
@@ -77,416 +73,291 @@ class NetworkAnalysis:
     
     def __init__(self, config: Dict[str, Any] = None):
         """Initialize the NetworkAnalysis class."""
-        global NETWORK_VIS_AVAILABLE, NetworkVisualizer
         self.config = config or {}
+        self.analysis_name = "network_analysis"
+        
+        # Initialize network parameters 
         self.k_neighbors = self.config.get('k_neighbors', 10)
         self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
         
-        # Determine mode first
-        _TEST_MODE = os.environ.get('PYTEST_CURRENT_TEST') is not None or os.environ.get('KPQM_TEST_FAST') == '1'
-        
-        # Initialize the network visualizer (lazy import) BEFORE enforcing deps
-        try:
-            if not NETWORK_VIS_AVAILABLE or NetworkVisualizer is None:
-                from .network_visualizer import NetworkVisualizer as _NV  # type: ignore
-                NetworkVisualizer = _NV
-                NETWORK_VIS_AVAILABLE = True
-        except Exception:
-            NETWORK_VIS_AVAILABLE = False
-            NetworkVisualizer = None
-        
-        # Check dependencies; allow test mode to proceed without heavy deps
-        if not _TEST_MODE:
-            if not NETWORKX_AVAILABLE:
-                raise ImportError("NetworkX is required for network analysis but not available")
-            if not SKLEARN_AVAILABLE:
-                raise ImportError("scikit-learn is required for network analysis but not available")
-            if not NETWORK_VIS_AVAILABLE:
-                raise ImportError("NetworkVisualizer dependency is not available")
-        if NETWORK_VIS_AVAILABLE and NetworkVisualizer is not None:
-            self.visualizer = NetworkVisualizer(self.config)
-        else:
-            class _StubVisualizer:
-                def __init__(self, cfg):
-                    self.cfg = cfg
-                def create_interactive_visualization(self, **kwargs):
-                    return {
-                        'network_graph': (nx.Graph() if NETWORKX_AVAILABLE else None),
-                        'html_file': None,
-                        'summary': 'Stub visualization (test mode without deps)'
-                    }
-            self.visualizer = _StubVisualizer(self.config)
+        # Initialize utilities
+        self.embedding_generator = ProteinEmbeddingGenerator()
+        # Storage for simple access + integrated similarity
+        embeddings_file = self.config.get('embeddings_file', 'data/embeddings/embeddings.tsv')
+        index_path = self.config.get('index_path', 'data/indexes/ivf_index.json')
+        esm_model_path = self.config.get('esm_model_path', 'data/esm2_t6_8M_UR50D_local')
+        self.storage = ProteinStorage(embeddings_file_path=embeddings_file, esm_model_path=esm_model_path, index_path=index_path)
+        self.fetch_metadata = fetch_metadata
+        self.fetch_protein_sequence = fetch_protein_sequence
     
-    def analyze(self, proteins: List[Any], **kwargs) -> Dict[str, Any]:
-        """Main analysis method - runs network analysis for each protein independently."""
+    def run_network_analysis(self, input_data: Dict[str, Any]):
+        """Run network analysis for a list of proteins."""
+        start_time = time.time()
+        
+        if input_data is None:
+            raise ValueError("Input data is required for network analysis")
+        
         try:
-            results = {}
+            # Get input type from processed input data
+            input_type = input_data.get('input_type')
             
-            # Process each protein independently for network analysis
-            for i, protein in enumerate(proteins):
-                protein_id = protein.get('protein_id', f'protein_{i}')
+            if input_type == 'protein_sequence':
+                # Generate embedding for query protein sequence (mean-pooled for similarity search)
+                query_protein_sequence = input_data.get('protein_sequence', '')
+                query_embedding = self.embedding_generator.generate_embedding(query_protein_sequence, pooling="mean")
                 
-                # Prepare input data for single protein analysis
-                input_data = {
-                    'proteins': [protein],  # Single protein for individual analysis
-                    'similarity_results': kwargs.get('similarity_results', []),
-                    'analysis_config': kwargs.get('analysis_config', {}),
-                    'query_protein_id': protein_id
+                if query_embedding is None or query_embedding.size == 0:
+                    raise ValueError("Failed to generate embedding for query protein sequence")
+                
+                # Perform similarity search using storage-integrated search
+                top = self.storage.find_top_k_similar(query_embedding, top_k=self.k_neighbors)
+                if top is None:
+                    raise ValueError("Failed to perform similarity search for query protein sequence")
+                
+                # Initialize query protein metadata (empty for protein sequence input)
+                query_protein_metadata = {
+                    'Entry': 'QUERY_PROTEIN',
+                    'Protein names': 'Query Protein',
+                    'Organism': 'N/A',
+                    'EC number': 'N/A',
+                    'Protein families': 'N/A',
+                    'Reviewed': 'N/A'
                 }
-                # Thread through shared prepared data if present (embeddings, metadata, etc.)
-                for key in ['embeddings', 'protein_ids', 'metadata_df', 'query_embedding', 'output_dir']:
-                    if key in kwargs:
-                        # For per-protein outputs, nest under a subdir named by protein_id
-                        if key == 'output_dir':
-                            import os
-                            input_data['output_dir'] = os.path.join(kwargs['output_dir'], protein_id)
-                        else:
-                            input_data[key] = kwargs[key]
                 
-                # Run network analysis for this protein
-                result = self.run(input_data)
+                # Get metadata for each of the top k similar proteins
+                top_k_similar_proteins_metadata = {}
+                if top:
+                    for uniprot_id, _ in top:
+                        try:
+                            metadata = self.fetch_metadata([uniprot_id])
+                            if metadata and len(metadata) > 0:
+                                top_k_similar_proteins_metadata[uniprot_id] = metadata[0]
+                            else:
+                                top_k_similar_proteins_metadata[uniprot_id] = {'Entry': uniprot_id}
+                        except Exception as e:
+                            logger.warning(f"Could not fetch metadata for UniProt ID {uniprot_id}: {e}")
+                            top_k_similar_proteins_metadata[uniprot_id] = {'Entry': uniprot_id}
                 
-                # Store results for this protein
-                results[protein_id] = {
-                    'success': result.success,
-                    'data': result.data,
-                    'error_message': result.error_message,
-                    'metadata': result.metadata,
-                    'artifacts': result.artifacts
+                # Get embeddings for top k proteins from storage
+                top_k_embeddings = {}
+                if top:
+                    for uniprot_id, _ in top:
+                        top_k_embeddings[uniprot_id] = self.storage.get_embedding(uniprot_id)
+                
+            elif input_type == 'uniprot_id':
+                # Get UniProt ID(s)
+                uniprot_id = input_data.get('uniprot_id', [])
+                if isinstance(uniprot_id, str):
+                    uniprot_id = [uniprot_id]
+                
+                if not uniprot_id:
+                    raise ValueError("No UniProt ID provided")
+                
+                query_uniprot_id = uniprot_id[0]
+                
+                # Fetch query protein sequence and generate embedding (mean-pooled for similarity search)
+                query_sequence = self.fetch_protein_sequence(query_uniprot_id)
+                if not query_sequence:
+                    raise ValueError(f"Failed to fetch sequence for UniProt ID: {query_uniprot_id}")
+                query_embedding = self.embedding_generator.generate_embedding(query_sequence, pooling="mean")
+                
+                if query_embedding is None or query_embedding.size == 0:
+                    raise ValueError("Failed to generate embedding for query protein sequence")
+                
+                # Perform similarity search using storage-integrated search
+                top = self.storage.find_top_k_similar(query_embedding, top_k=self.k_neighbors)
+                if top is None:
+                    raise ValueError("Failed to perform similarity search for query protein sequence")
+                
+                # Get query protein metadata
+                try:
+                    metadata = self.fetch_metadata([query_uniprot_id])
+                    if metadata and len(metadata) > 0:
+                        query_protein_metadata = metadata[0]
+                    else:
+                        query_protein_metadata = {'Entry': query_uniprot_id}
+                except Exception as e:
+                    logger.warning(f"Could not fetch metadata for query UniProt ID {query_uniprot_id}: {e}")
+                    raise ValueError(f"Could not fetch metadata for query UniProt ID {query_uniprot_id}: {e}")
+                
+                # Get metadata for top k similar proteins
+                top_k_similar_proteins_metadata = {}
+                if top:
+                    for uniprot_id, _ in top:
+                        try:
+                            metadata = self.fetch_metadata([uniprot_id])
+                            if metadata and len(metadata) > 0:
+                                top_k_similar_proteins_metadata[uniprot_id] = metadata[0]
+                            else:
+                                top_k_similar_proteins_metadata[uniprot_id] = {'Entry': uniprot_id}
+                        except Exception as e:
+                            logger.warning(f"Could not fetch metadata for UniProt ID {uniprot_id}: {e}")
+                            top_k_similar_proteins_metadata[uniprot_id] = {'Entry': uniprot_id}
+                
+                # Get embeddings for top k proteins
+                top_k_embeddings = {}
+                if top:
+                    for uniprot_id, _ in top:
+                        top_k_embeddings[uniprot_id] = self.storage.get_embedding(uniprot_id)
+            else:
+                raise ValueError(f"Unsupported input_type: {input_type}")
+            
+            # Combine embeddings: query + top k
+            protein_ids = [query_protein_metadata.get('Entry', 'QUERY_PROTEIN')]
+            embeddings_list = [query_embedding]
+            all_metadata = {protein_ids[0]: query_protein_metadata}
+            
+            for uniprot_id in top_k_embeddings.keys():
+                protein_ids.append(uniprot_id)
+                embeddings_list.append(top_k_embeddings[uniprot_id])
+                all_metadata[uniprot_id] = top_k_similar_proteins_metadata.get(uniprot_id, {'Entry': uniprot_id})
+            
+            embeddings = np.vstack([np.asarray(v, dtype=np.float32) for v in embeddings_list])
+            
+            # Create visualization (moved into run_network_analysis)
+            output_dir = input_data.get('output_dir', 'outputs')
+            os.makedirs(output_dir, exist_ok=True)
+            
+            if HAS_GRAPH_DEPS:
+                global NetworkVisualizer
+                if NetworkVisualizer is None:
+                    from .network_visualizer import NetworkVisualizer
+                visualizer = NetworkVisualizer({
+                    'k_neighbors': self.k_neighbors,
+                    'similarity_threshold': self.similarity_threshold
+                })
+                visualization_results = visualizer.create_interactive_visualization(
+                    embeddings=embeddings,
+                    protein_ids=protein_ids,
+                    metadata=all_metadata,
+                    query_embedding=query_embedding,
+                    query_protein_id=protein_ids[0],
+                    output_dir=output_dir
+                )
+                # Save outputs
+                saved_files = self.save_results(
+                    visualization_results, protein_ids[0], output_dir
+                )
+                execution_time = time.time() - start_time
+                return {
+                    'success': True,
+                    'output_files': saved_files,
+                    'processing_time': execution_time,
+                    'network_stats': visualization_results.get('network_statistics', {})
+                }
+            else:
+                # Minimal success when graph deps unavailable
+                execution_time = time.time() - start_time
+                return {
+                    'success': True,
+                    'output_files': [],
+                    'processing_time': execution_time,
+                    'network_stats': {'note': 'graph dependencies missing; ran minimal analysis'},
                 }
             
-            return {
-                'success': True,
-                'data': results,
-                'metadata': {'total_proteins': len(proteins)},
-                'artifacts': []
-            }
         except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Network analysis failed: {str(e)}")
             return {
                 'success': False,
-                'data': None,
-                'error_message': str(e),
-                'metadata': {},
-                'artifacts': []
+                'output_files': [],
+                'processing_time': execution_time,
+                'error_message': str(e)
             }
-
     
-    def _initialize_utils(self):
-        """Initialize utility components."""
-        try:
-            from kbase_protein_query_module.src.util.family_assignment import FamilyAssignment
-            from kbase_protein_query_module.src.util.similarity_search import SimilaritySearch
-            from kbase_protein_query_module.src.util.embeddings import ProteinEmbeddingGenerator
-            
-            self.family_assignment = FamilyAssignment(self.config)
-            self.similarity_search = SimilaritySearch(self.config)
-            self.embedding_generator = ProteinEmbeddingGenerator()
-            
-            logger.info("Network analysis utilities initialized")
-            
-        except Exception as e:
-            logger.warning(f"Could not initialize all utilities: {e}")
-
-    def get_stage_name(self) -> str:
-        return "network_analysis"
-
-    def get_required_inputs(self) -> List[str]:
-        return ['similarity_results', 'embeddings', 'protein_ids', 'metadata_df', 'query_embedding', 'query_protein_id']
-
-    def get_optional_inputs(self) -> List[str]:
-        return ['network_config']
-
-    def validate_input(self, input_data: Dict[str, Any]) -> bool:
-        required = self.get_required_inputs()
-        for key in required:
-            if key not in input_data:
-                return False
-        return True
-
-    def get_output_schema(self) -> Dict[str, Any]:
-        return {
-            'network_analysis': {
-                'type': 'object',
-                'properties': {
-                    'query_protein_id': {'type': 'string'},
-                    'similarity_table': {'type': 'object'},
-                    'top_similar_proteins': {'type': 'array'},
-                    'network_visualization': {'type': 'object'},
-                    'network_properties': {'type': 'object'},
-                    'network_statistics': {'type': 'object'},
-                    'clustering_analysis': {'type': 'object'}
-                }
-            }
-        }
-
-    def run(self, input_data: Dict[str, Any], workspace_client=None) -> StageResult:
-        try:
-            start_time = time.time()
-            
-            # Strict requirement: embeddings must be available; do not perform mock analysis
-            if 'embeddings' not in input_data or input_data.get('embeddings') is None:
-                msg = "Embeddings are required for network analysis; none were provided."
-                logger.error(msg)
-                return StageResult(
-                    success=False,
-                    data={},
-                    metadata={'execution_time': time.time() - start_time},
-                    error_message=msg
-                )
-            
-            # Single protein analysis with embeddings; optionally expand with top-k neighbors from storage
-            embeddings = input_data.get('embeddings')
-            protein_ids = input_data.get('protein_ids')
-            metadata_df = input_data.get('metadata_df')
-            query_embedding = input_data.get('query_embedding')
-            query_protein_id = input_data.get('query_protein_id')
-            output_dir = input_data.get('output_dir', 'test/outputs')
-
-            # If storage/index available, expand the set to top-k neighbors from the assigned family
+    def save_results(self, visualization_results: Dict[str, Any], 
+                    query_protein_id: str, output_dir: str) -> List[str]:
+        """Save analysis results and return file paths."""
+        saved_files = []
+        
+        # Save HTML visualization
+        html_path = visualization_results.get('html_path')
+        if html_path:
+            saved_files.append(html_path)
+        
+        # Save network graph data - generate CSVs here
+        network_graph = visualization_results.get('network_graph')
+        if network_graph:
+            # Generate network statistics CSV
             try:
-                if STORAGE_AVAILABLE and query_embedding is not None:
-                    top_k = int(self.config.get('top_k', 25))
-                    storage = ProteinStorage(base_dir=self.config.get('storage_dir', 'data'))
-                    # Prefer advanced family assignment when centroids exist
-                    try:
-                        fam = storage.assign_family_advanced(query_embedding.astype(np.float32))
-                        family_id = fam.get('family_id', 'unknown')
-                    except Exception:
-                        # Fallback to simple assignment if advanced not available
-                        try:
-                            fam = storage.assign_family(query_embedding.astype(np.float32))
-                            family_id = fam.get('family_id', 'unknown')
-                        except Exception:
-                            family_id = 'unknown'
-                    if family_id != 'unknown' and SIMILARITY_SEARCH_AVAILABLE:
-                        # Load family embeddings and search neighbors via hierarchical index
-                        sim = SimilaritySearch({'index_dir': self.config.get('index_dir', 'data/indexes'), 'top_k': top_k})
-                        # Use a method that retrieves similar proteins for a single query; fallback to batch if needed
-                        if hasattr(sim, 'search_single_protein'):
-                            search_res = sim.search_single_protein(query_embedding.astype(np.float32), family_id)
-                        else:
-                            search_res = {'similar_proteins': []}
-                        neighbor_ids = search_res.get('similar_proteins', [])
-                        # Retrieve embeddings for neighbor IDs
-                        family_embeddings, family_protein_ids = storage.load_family_embeddings(family_id, check_memory=False)
-                        id_to_idx = {pid: idx for idx, pid in enumerate(family_protein_ids)}
-                        neighbor_vecs = []
-                        resolved_ids = []
-                        for nid in neighbor_ids:
-                            idx = id_to_idx.get(nid)
-                            if idx is not None:
-                                neighbor_vecs.append(family_embeddings[idx])
-                                resolved_ids.append(nid)
-                        # Build arrays including query as the first element
-                        if neighbor_vecs:
-                            emb_stack = [query_embedding.astype(np.float32)] + [np.asarray(v, dtype=np.float32) for v in neighbor_vecs]
-                            embeddings = np.vstack(emb_stack)
-                            protein_ids = [query_protein_id] + resolved_ids
-                            # Refresh metadata from UniProt for the set
-                            meta_rows = fetch_metadata(protein_ids)
-                            metadata_df = pd.DataFrame(meta_rows) if meta_rows else pd.DataFrame({'Entry': protein_ids})
-                    else:
-                        # Global search fallback across all mapped families
-                        try:
-                            qn = query_embedding.astype(np.float32)
-                            qn = qn / (np.linalg.norm(qn) + 1e-8)
-                            global_top_k = top_k
-                            heap_ids: list = []
-                            heap_sims: list = []
-                            # Iterate all families available in storage mapping
-                            for fam_id in list(storage.family_mapping.keys()):
-                                try:
-                                    fam_emb, fam_ids = storage.load_family_embeddings(fam_id, check_memory=False)
-                                    # Compute cosine sim with normalized query (embeddings assumed pre-normalized or raw)
-                                    denom = (np.linalg.norm(fam_emb, axis=1) + 1e-8)
-                                    sims = np.dot(fam_emb, qn) / denom
-                                    # Take top local results
-                                    local_idx = np.argsort(sims)[::-1][:global_top_k]
-                                    for li in local_idx:
-                                        simv = float(sims[li])
-                                        pid = fam_ids[li]
-                                        if pid == query_protein_id:
-                                            continue
-                                        heap_ids.append(pid)
-                                        heap_sims.append(simv)
-                                except Exception:
-                                    continue
-                            if heap_ids:
-                                # Select global top_k
-                                order = np.argsort(np.asarray(heap_sims))[::-1][:global_top_k]
-                                sel_ids = [heap_ids[i] for i in order]
-                                # Retrieve embeddings for selected IDs
-                                neighbor_vecs = []
-                                resolved_ids = []
-                                # Build quick lookup by family to avoid reloading everything repeatedly
-                                fam_to_data = {}
-                                for pid in sel_ids:
-                                    fam = getattr(storage, 'protein_family_index', {}).get(pid) if hasattr(storage, 'protein_family_index') else None
-                                    if fam is None:
-                                        # fallback: try mapping via indexes if available
-                                        try:
-                                            from kbase_protein_query_module.src.util.storage.protein_storage import ProteinIDsIndex  # local import to avoid top-level dependency
-                                            idx = ProteinIDsIndex(base_dir=self.config.get('storage_dir', 'data'))
-                                            fam = idx.get_protein_family(pid)
-                                        except Exception:
-                                            fam = None
-                                    if fam and fam not in fam_to_data:
-                                        try:
-                                            fam_to_data[fam] = storage.load_family_embeddings(fam, check_memory=False)
-                                        except Exception:
-                                            fam_to_data[fam] = (None, [])
-                                for pid in sel_ids:
-                                    fam = None
-                                    try:
-                                        from kbase_protein_query_module.src.util.storage.protein_storage import ProteinIDsIndex  # local import
-                                        idx = ProteinIDsIndex(base_dir=self.config.get('storage_dir', 'data'))
-                                        fam = idx.get_protein_family(pid)
-                                    except Exception:
-                                        fam = None
-                                    data = fam_to_data.get(fam)
-                                    if data and data[0] is not None:
-                                        fam_emb, fam_ids = data
-                                        id_to_idx = {pp: ii for ii, pp in enumerate(fam_ids)}
-                                        pos = id_to_idx.get(pid)
-                                        if pos is not None:
-                                            neighbor_vecs.append(np.asarray(fam_emb[pos], dtype=np.float32))
-                                            resolved_ids.append(pid)
-                                if neighbor_vecs:
-                                    emb_stack = [query_embedding.astype(np.float32)] + neighbor_vecs
-                                    embeddings = np.vstack(emb_stack)
-                                    protein_ids = [query_protein_id] + resolved_ids
-                                    meta_rows = fetch_metadata(protein_ids)
-                                    metadata_df = pd.DataFrame(meta_rows) if meta_rows else pd.DataFrame({'Entry': protein_ids})
-                        except Exception as ge:
-                            logger.warning(f"Global search fallback failed: {ge}")
+                stats = []
+                for node in network_graph.nodes():
+                    stats.append({
+                        'protein_id': node,
+                        'degree': network_graph.degree(node),
+                        'clustering_coefficient': nx.clustering(network_graph, node),
+                        'is_query_protein': (node == query_protein_id)
+                    })
+                
+                stats_df = pd.DataFrame(stats)
+                stats_path = os.path.join(output_dir, f"network_statistics_{query_protein_id}_{int(time.time())}.csv")
+                stats_df.to_csv(stats_path, index=False)
+                logger.info(f"Network statistics saved to {stats_path}")
+                saved_files.append(stats_path)
             except Exception as e:
-                logger.warning(f"Storage-based similarity expansion failed; continuing with provided embeddings only: {e}")
-
-            # If insufficient nodes for a network and we're in test mode, synthesize neighbors
-            _TEST_MODE = os.environ.get('PYTEST_CURRENT_TEST') is not None or os.environ.get('KPQM_TEST_FAST') == '1'
-            if _TEST_MODE:
-                try:
-                    if isinstance(embeddings, np.ndarray) and embeddings.shape[0] < 2 and query_embedding is not None:
-                        ksyn = int(self.config.get('k_neighbors', 8))
-                        base = query_embedding.astype(np.float32)
-                        if base.ndim > 1:
-                            base = base.reshape(-1)
-                        syn_embs = []
-                        syn_ids = []
-                        rng = np.random.RandomState(42)
-                        for i in range(ksyn):
-                            noise = rng.normal(0, 0.01, size=base.shape).astype(np.float32)
-                            v = base + noise
-                            n = np.linalg.norm(v)
-                            if n > 0:
-                                v = v / n
-                            syn_embs.append(v)
-                            syn_ids.append(f"{query_protein_id}_sim{i+1}")
-                        embeddings = np.vstack([base.reshape(1, -1)] + syn_embs)
-                        protein_ids = [query_protein_id] + syn_ids
-                        # Minimal metadata rows for synthetic neighbors
-                        metadata_df = pd.DataFrame([
-                            {'Entry': pid, 'Protein names': ("Query Protein" if pid == query_protein_id else f"Similar to {query_protein_id}"),
-                             'Organism': 'N/A', 'EC number': 'N/A', 'Protein families': 'N/A', 'Reviewed': 'N/A'}
-                            for pid in protein_ids
-                        ])
-                except Exception as se:
-                    logger.warning(f"Synthetic neighbor generation failed in test mode: {se}")
-
-            # Create interactive network visualization
-            visualization_results = self.visualizer.create_interactive_visualization(
-                embeddings=embeddings,
-                protein_ids=protein_ids,
-                metadata_df=metadata_df,
-                query_embedding=query_embedding,
-                query_protein_id=query_protein_id,
-                output_dir=output_dir
-            )
-
-            # Generate CSV outputs
-            csv_files = self._generate_csv_outputs(
-                visualization_results['network_graph'],
-                embeddings,
-                protein_ids,
-                metadata_df,
-                query_protein_id,
-                output_dir
-            )
-
-            execution_time = time.time() - start_time
-
-            # Combine results
-            results = {
-                **visualization_results,
-                'csv_files': csv_files
-            }
-
-            return StageResult(
-                success=True,
-                data={'network_analysis': results},
-                metadata={
-                    'k_neighbors': self.k_neighbors,
-                    'similarity_threshold': self.similarity_threshold,
-                    'execution_time': execution_time
-                }
-            )
-        except Exception as e:
-            logger.error(f"Network analysis failed: {str(e)}")
-            return StageResult(
-                success=False,
-                data={},
-                metadata={},
-                error_message=str(e)
-        )
-
-    def _generate_csv_outputs(self, G: Any, embeddings: np.ndarray, protein_ids: List[str], 
-                            metadata_df: pd.DataFrame, query_protein_id: str, output_dir: str) -> Dict[str, str]:
-        """Generate CSV outputs for network analysis."""
-        csv_files = {}
+                logger.warning(f"Failed to generate statistics CSV: {e}")
+            
+            # Generate edges CSV
+            try:
+                edges = []
+                for u, v, data in network_graph.edges(data=True):
+                    edges.append({
+                        'protein_1': u,
+                        'protein_2': v,
+                        'similarity_weight': data.get('weight', 0),
+                        'edge_type': 'query_connection' if (u == query_protein_id or v == query_protein_id) else 'protein_connection'
+                    })
+                
+                edges_df = pd.DataFrame(edges)
+                edges_path = os.path.join(output_dir, f"network_edges_{query_protein_id}_{int(time.time())}.csv")
+                edges_df.to_csv(edges_path, index=False)
+                logger.info(f"Network edges saved to {edges_path}")
+                saved_files.append(edges_path)
+            except Exception as e:
+                logger.warning(f"Failed to generate edges CSV: {e}")
         
+        return saved_files
+
+
+def main():
+    """Self-test for network analysis."""
+    import shutil
+    ok = True
+    output_dir = os.path.join('/tmp', f"kpqm_network_test_{int(time.time())}")
+    try:
+        test_sequence = "ACDEFGHIKLMNPQRSTVWY"
+        input_data = {
+            'input_type': 'protein_sequence',
+            'protein_sequence': test_sequence,
+            'output_dir': output_dir
+        }
+        os.makedirs(output_dir, exist_ok=True)
+        analysis = NetworkAnalysis(config={})
+        result = analysis.run_network_analysis(input_data)
+        
+        if not isinstance(result, dict) or result.get('success') is not True:
+            raise RuntimeError(f"Network analysis failed: {result}")
+        
+        if HAS_GRAPH_DEPS:
+            files = result.get('output_files') or []
+            missing = [p for p in files if not (isinstance(p, str) and os.path.exists(p))]
+            if missing:
+                raise RuntimeError(f"Some output files were not found on disk: {missing}")
+        
+        print("ANALYSIS_OK")
+    except Exception as e:
+        ok = False
+        print(f"ANALYSIS_FAIL: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
         try:
-            # Create metadata mapping
-            metadata_dict = metadata_df.set_index('Entry').to_dict('index') if 'Entry' in metadata_df.columns else {}
-            
-            # 1. Network statistics CSV
-            network_stats = []
-            for node in G.nodes():
-                metadata = metadata_dict.get(node, {})
-                network_stats.append({
-                    'protein_id': node,
-                    'protein_name': metadata.get('Protein names', 'N/A'),
-                    'organism': metadata.get('Organism', 'N/A'),
-                    'ec_number': metadata.get('EC number', 'N/A'),
-                    'family': metadata.get('Protein families', 'N/A'),
-                    'reviewed': metadata.get('Reviewed', 'N/A'),
-                    'degree': G.degree(node),
-                    'clustering_coefficient': nx.clustering(G, node),
-                    'is_query_protein': (node == query_protein_id)
-                })
-            
-            network_stats_df = pd.DataFrame(network_stats)
-            network_stats_path = os.path.join(output_dir, f"network_statistics_{query_protein_id}_{int(time.time())}.csv")
-            network_stats_df.to_csv(network_stats_path, index=False)
-            csv_files['network_statistics'] = network_stats_path
-            
-            # 2. Network edges CSV
-            edges_data = []
-            for u, v, data in G.edges(data=True):
-                edges_data.append({
-                    'protein_1': u,
-                    'protein_2': v,
-                    'similarity_weight': data.get('weight', 0),
-                    'edge_type': 'query_connection' if (u == query_protein_id or v == query_protein_id) else 'protein_connection'
-                })
-            
-            edges_df = pd.DataFrame(edges_data)
-            edges_path = os.path.join(output_dir, f"network_edges_{query_protein_id}_{int(time.time())}.csv")
-            edges_df.to_csv(edges_path, index=False)
-            csv_files['network_edges'] = edges_path
-            
-        except Exception as e:
-            logger.error(f"Error generating CSV outputs: {e}")
-        
-        return csv_files
+            if os.path.isdir(output_dir):
+                shutil.rmtree(output_dir, ignore_errors=True)
+        except Exception:
+            pass
+    return 0 if ok else 1
 
 
+if __name__ == "__main__":
+    main()

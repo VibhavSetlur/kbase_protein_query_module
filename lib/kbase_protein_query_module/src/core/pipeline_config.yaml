@@ -1,0 +1,8 @@
+data_dir: ./data
+embeddings_file: ./data/embeddings/embeddings.tsv
+esm_model_path: ./data/esm2_t6_8M_UR50D_local
+index_dir: ./data/indexes/
+random_seed: 1234
+logging: INFO
+
+

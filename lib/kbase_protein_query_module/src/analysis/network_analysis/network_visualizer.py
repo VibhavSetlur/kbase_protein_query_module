@@ -62,7 +62,7 @@ class NetworkVisualizer:
     def create_interactive_visualization(self,
                                        embeddings: np.ndarray,
                                        protein_ids: List[str],
-                                       metadata_df: pd.DataFrame,
+                                       metadata: Union[pd.DataFrame, Dict[str, Dict]],
                                        query_embedding: Optional[np.ndarray] = None,
                                        query_protein_id: Optional[str] = None,
                                        output_dir: str = 'outputs',
@@ -73,7 +73,7 @@ class NetworkVisualizer:
         Args:
             embeddings: Protein embeddings array (N x D)
             protein_ids: List of protein IDs corresponding to embeddings
-            metadata_df: DataFrame containing protein metadata
+            metadata: DataFrame or dict containing protein metadata
             query_embedding: Optional query protein embedding vector
             query_protein_id: Optional query protein ID
             output_dir: Directory to save the visualization
@@ -96,7 +96,7 @@ class NetworkVisualizer:
             query_protein_id = protein_ids[-1] if protein_ids else "unknown"
         
         # Create metadata mapping
-        metadata_dict = self._create_metadata_mapping(metadata_df, id_column)
+        metadata_dict = self._create_metadata_mapping(metadata, id_column)
         
         # Build network
         G = self._build_network(embeddings, protein_ids)
@@ -186,12 +186,17 @@ class NetworkVisualizer:
             protein_ids.append(query_protein_id)
             return embeddings, protein_ids, query_protein_id
     
-    def _create_metadata_mapping(self, metadata_df: pd.DataFrame, id_column: str) -> Dict[str, Dict]:
+    def _create_metadata_mapping(self, metadata: Union[pd.DataFrame, Dict[str, Dict]], id_column: str) -> Dict[str, Dict]:
         """Create mapping from protein IDs to metadata."""
-        if id_column and id_column in metadata_df.columns:
-            return metadata_df.set_index(id_column).to_dict('index')
+        if isinstance(metadata, dict):
+            return metadata
+        elif isinstance(metadata, pd.DataFrame):
+            if id_column and id_column in metadata.columns:
+                return metadata.set_index(id_column).to_dict('index')
+            else:
+                return metadata.to_dict('index')
         else:
-            return metadata_df.to_dict('index')
+            return {}
     
     def _build_network(self, embeddings: np.ndarray, protein_ids: List[str]) -> nx.Graph:
         """Build a network from embeddings using similarity."""

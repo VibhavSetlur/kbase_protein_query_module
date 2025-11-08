@@ -88,27 +88,134 @@ def fetch_metadata(uniprot_ids: List[str]) -> List[Dict[str, str]]:
     return rows
 
 
-def fetch_sequence_and_metadata(uniprot_id: str) -> Tuple[Optional[str], Dict[str, str]]:
-    """Fetch the amino acid sequence and minimal metadata for a single UniProt ID.
 
-    Returns (sequence_or_None, metadata_dict). Metadata dict contains at least 'Entry'.
+def fetch_protein_sequence(uniprot_id: str) -> Optional[str]:
+    """Fetch a single protein sequence by UniProt accession.
+
+    This method is designed for per-protein use (no batching). Call it in a loop
+    from higher-level analyses as needed.
+
+    Args:
+        uniprot_id: UniProt accession ID
+
+    Returns:
+        The amino acid sequence as a single string, or None if not found.
     """
-    sequence: Optional[str] = None
-    metadata: Dict[str, str] = {'Entry': uniprot_id}
-
+    if not uniprot_id:
+        return None
+    
     try:
-        seq_map = fetch_sequences([uniprot_id])
-        sequence = seq_map.get(uniprot_id)
-    except Exception as e:
-        logger.warning(f"Failed fetching sequence for {uniprot_id}: {e}")
+        # Fetch the sequence from UniProt
+        url = f"{UNIPROT_REST}/uniprotkb/{uniprot_id}.fasta"
+        resp = requests.get(url, timeout=10)
+        
+        if resp.status_code == 200 and resp.text:    
+            # Parse the sequence from the response
+            lines = [l.strip() for l in resp.text.splitlines() if l and not l.startswith('>')]
+            return "".join(lines)
+        else:
+            logger.warning(f"UniProt sequence not found for {uniprot_id}: HTTP {resp.status_code}")
+            return None
 
+    except Exception as e:
+        logger.warning(f"Failed fetching UniProt sequence for {uniprot_id}: {e}")
+        return None
+
+def fetch_protein_metadata(uniprot_id: str) -> Dict[str, str]:
+    """Fetch minimal metadata for a single UniProt accession via REST API.
+
+    This method is designed for per-protein use (no batching). Call it in a loop
+    from higher-level analyses as needed.
+
+    Returns a dict with the same keys produced by the batch `fetch_metadata`:
+    'Entry', 'Protein names', 'Organism', 'EC number', 'Protein families', 'Reviewed'.
+    Missing values will be empty strings.
+    """
+    if not uniprot_id:
+        return {}
+
+    # Metadata fields
+    fields = [
+        "accession",
+        "protein_name",
+        "organism_name",
+        "ec",
+        "protein_families",
+        "reviewed"
+    ]
+
+    # Query parameters
+    params = {
+        "query": f"accession:{uniprot_id}",
+        "fields": ",".join(fields),
+        "format": "tsv",
+        "size": 1,
+    }
+    
     try:
-        rows = fetch_metadata([uniprot_id])
-        if rows:
-            metadata.update(rows[0])
-    except Exception as e:
-        logger.warning(f"Failed fetching metadata for {uniprot_id}: {e}")
+        # Fetch the metadata from UniProt
+        url = f"{UNIPROT_REST}/uniprotkb/search"
+        resp = requests.get(url, params=params, timeout=15)
+        
+        if resp.status_code != 200 or not resp.text:
+            logger.warning(f"UniProt metadata query failed for {uniprot_id}: HTTP {resp.status_code}")
+            return {}
+        
+        # Parse the response
+        lines = resp.text.splitlines()
 
-    return sequence, metadata
+        # Check if the response is valid
+        if len(lines) < 2:
+            return {}
+        
+        # Parse the header and columns
+        header = lines[0].split('\t')
+        cols = lines[1].split('\t')
+        rec = dict(zip(header, cols))
+        
+        return {
+            'Entry': rec.get('Accession', ''),
+            'Protein names': rec.get('Protein names', ''),
+            'Organism': rec.get('Organism', ''),
+            'EC number': rec.get('EC number', ''),
+            'Protein families': rec.get('Protein families', ''),
+            'Reviewed': rec.get('Reviewed', ''),
+        }
+
+    except Exception as e:
+        logger.warning(f"Failed fetching UniProt metadata for {uniprot_id}: {e}")
+        return {}
+
+
+def main() -> None:
+    """Test the UniProt API.
+
+    Args:
+        test_id: UniProt accession ID
+
+    Returns:
+        None
+    """
+    # Set the test ID
+    test_id = "P01308"  # Human Insulin precursor (commonly used example)
+
+    # Fetch the sequence
+    seq = fetch_protein_sequence(test_id)
+    assert seq is not None and len(seq) > 0, "Sequence fetch returned empty result"
+
+    # Fetch the metadata
+    meta = fetch_protein_metadata(test_id)
+
+    # Validate the metadata
+    assert isinstance(meta, dict) and meta.get('Entry') in {test_id, ''}, "Metadata fetch returned invalid format"
+
+    print("UniProt self-test passed:")
+    print(f"  ID: {test_id}")
+    print(f"  Sequence length: {len(seq) if seq else 0}")
+    print(f"  Protein names: {meta.get('Protein names', '')}")
+
+
+if __name__ == "__main__":
+    main()
 
 

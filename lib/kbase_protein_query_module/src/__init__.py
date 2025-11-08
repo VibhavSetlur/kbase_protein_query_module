@@ -7,21 +7,13 @@ generation, and utility functions.
 """
 
 # Import main components
-from .input import InputManager, WorkspaceObjectProcessor, ProteinSequenceProcessor, UniProtIdsProcessor
+from .input import InputManager, ProteinSequenceProcessor, UniProtIdProcessor
 from .analysis import AnalysisManager, get_enabled_analyses
-from .output import (
-    OutputManager, ArtifactRecord,
-    get_output_config, get_analysis_output_config,
-    get_enabled_output_analyses, is_output_enabled_for_analysis
-)
-from .core import WorkflowOrchestrator, WorkflowResult, PipelineConfig
-from .util import (
-    ProteinEmbeddingGenerator,
-    HierarchicalIndex, StreamingIndex,
-    ProteinStorage, MemoryEfficientLoader,
-    ProteinFamilyAssigner, ProteinExistenceChecker,
-    IndexingStrategy, FamilyAssignment, SimilaritySearch
-)
+from .output import OutputManager
+from .core import WorkflowOrchestrator
+
+# Utilities are imported directly from submodules where needed
+# No need to import them here - keeps things simple
 
 __version__ = "1.0.0"
 __author__ = "KBase Team"
@@ -29,9 +21,8 @@ __author__ = "KBase Team"
 __all__ = [
     # Input handling
     'InputManager',
-    'WorkspaceObjectProcessor',
     'ProteinSequenceProcessor',
-    'UniProtIdsProcessor',
+    'UniProtIdProcessor',
     
     # Analysis management
     'AnalysisManager',
@@ -39,26 +30,7 @@ __all__ = [
     
     # Output management
     'OutputManager',
-    'ArtifactRecord',
-    'get_output_config',
-    'get_analysis_output_config',
-    'get_enabled_output_analyses',
-    'is_output_enabled_for_analysis',
     
     # Core workflow
     'WorkflowOrchestrator',
-    'WorkflowResult',
-    'PipelineConfig',
-    
-    # Utilities
-    'ProteinEmbeddingGenerator',
-    'HierarchicalIndex',
-    'StreamingIndex',
-    'ProteinStorage',
-    'MemoryEfficientLoader',
-    'ProteinFamilyAssigner',
-    'ProteinExistenceChecker',
-    'IndexingStrategy',
-    'FamilyAssignment',
-    'SimilaritySearch'
 ]

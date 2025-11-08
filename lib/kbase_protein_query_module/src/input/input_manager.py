@@ -6,48 +6,64 @@ Centralized input handling for protein sequences and UniProt IDs.
 
 import logging
 import time
-from typing import Dict, Any, List, Optional, Union
-from dataclasses import dataclass
+import sys
+import os
+from typing import Dict, Any, List, Optional
 
-from .workspace_object.input import WorkspaceObjectProcessor
-from .protein_sequence.input import ProteinSequenceProcessor
-from .uniprot_ids.input import UniProtIdsProcessor
+# Handle both script execution and module import
+if __name__ == "__main__" or __package__ is None:
+    # Add parent directories to path for script execution
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    src_dir = os.path.dirname(current_dir)
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    from input.protein_sequence.input import ProteinSequenceProcessor
+    from input.uniprot_id.input import UniProtIdProcessor
+else:
+    from .protein_sequence.input import ProteinSequenceProcessor
+    from .uniprot_id.input import UniProtIdProcessor
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class InputResult:
-    """Result container for input processing."""
-    success: bool
-    proteins: List[Dict[str, Any]]
-    workspace_info: Dict[str, Any]
-    input_type: str
-    processing_time: float
-    error_message: Optional[str] = None
-    metadata: Dict[str, Any] = None
 
 class InputManager:
     """Manages all input processing for the protein query module."""
     
     def __init__(self, config: Dict[str, Any], kb_util=None):
         """Initialize the Input Manager."""
-        self.config = config
+        self.config = config or {}
         self.kb_util = kb_util
         
-        # Initialize input processors
-        self.workspace_processor = WorkspaceObjectProcessor(config, kb_util)
-        self.protein_sequence_processor = ProteinSequenceProcessor(config)
-        self.uniprot_processor = UniProtIdsProcessor(config)
-        
-        # Configure enabled input types
-        self.enabled_input_types = config.get('enabled_input_types', [
-            'protein_input', 'uniprot_ids'
-        ])
-        
-        # Track last processed data for access by other components
-        self.last_processed_data = {}
-        
         logger.info("InputManager initialized")
+    
+    def normalize_input_params(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize input parameters from test/narrative format to internal format.
+        
+        Handles:
+        - uniprot_ids -> uniprot_id
+        - protein_input -> protein_sequence
+        """
+        normalized = input_data.copy()
+        
+        # Map uniprot_ids to uniprot_id
+        if 'uniprot_ids' in normalized and 'uniprot_id' not in normalized:
+            normalized['uniprot_id'] = normalized.pop('uniprot_ids')
+            if normalized.get('input_type') == 'uniprot_ids':
+                normalized['input_type'] = 'uniprot_id'
+        
+        # Map protein_input to protein_sequence
+        if 'protein_input' in normalized and 'protein_sequence' not in normalized:
+            protein_input = normalized.pop('protein_input')
+            # Handle list or string
+            if isinstance(protein_input, list):
+                # Join multiple sequences or take first
+                normalized['protein_sequence'] = '\n'.join(protein_input) if len(protein_input) > 1 else protein_input[0]
+            else:
+                normalized['protein_sequence'] = protein_input
+            if normalized.get('input_type') == 'protein_input':
+                normalized['input_type'] = 'protein_sequence'
+        
+        return normalized
     
     def process_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process input data through the complete input pipeline."""
@@ -56,32 +72,35 @@ class InputManager:
         try:
             logger.info("Starting input processing")
             
-            input_type = input_data.get('input_type', 'protein_input')
-            
-            # Validate input type
-            if input_type not in self.enabled_input_types:
-                raise ValueError(f"Input type '{input_type}' is not enabled. Available types: {self.enabled_input_types}")
+            # Normalize input parameters first
+            normalized_input = self.normalize_input_params(input_data)
+            input_type = normalized_input.get('input_type', 'protein_sequence')
             
             # Route to appropriate processor
-            if input_type == 'protein_input':
-                result = ProteinSequenceProcessor(self.config).process(input_data)
-            elif input_type == 'uniprot_ids':
-                result = UniProtIdsProcessor(self.config).process(input_data)
+            if input_type == 'protein_sequence':
+                processor = ProteinSequenceProcessor(self.config)
+                result = processor.process(normalized_input)
+                standardized = processor.standardize_input(normalized_input)
+            elif input_type == 'uniprot_id':
+                processor = UniProtIdProcessor(self.config)
+                result = processor.process(normalized_input)
+                standardized = processor.standardize_input(normalized_input)
             else:
                 raise ValueError(f"Unsupported input type: {input_type}")
             
-            # Add processing metadata
-            processing_time = result.get('processing_time', time.time() - start_time) if isinstance(result, dict) else time.time() - start_time
-            result['processing_time'] = processing_time
-            result['input_type'] = input_type
+            # Merge processing result with standardized input
+            output = {
+                **standardized,
+                **result
+            }
             
-            # Store processed data for access by other components
-            self.last_processed_data = result.copy()
+            processing_time = time.time() - start_time
+            output['processing_time'] = processing_time
             
             logger.info(f"Input processing completed in {processing_time:.2f} seconds")
-            logger.info(f"Processed {len(result.get('proteins', []))} proteins")
+            logger.info(f"Processed {len(output.get('proteins', []))} proteins")
             
-            return result
+            return output
             
         except Exception as e:
             processing_time = time.time() - start_time
@@ -89,57 +108,43 @@ class InputManager:
             
             return {
                 'success': False,
-                'proteins': [],
-                'workspace_info': {},
                 'input_type': input_data.get('input_type', 'unknown'),
+                'protein_sequence': '',
+                'uniprot_id': [],
+                'analysis_name': '',
+                'proteins': [],
                 'processing_time': processing_time,
-                'error_message': str(e),
-                'metadata': {}
+                'error_message': str(e)
             }
+
+
+def main() -> int:
+    """
+    Test InputManager.
     
-    
-    def get_supported_input_types(self) -> List[str]:
-        """Get list of supported input types."""
-        return self.enabled_input_types.copy()
-    
-    def is_input_type_enabled(self, input_type: str) -> bool:
-        """Check if an input type is enabled."""
-        return input_type in self.enabled_input_types
-    
-    def enable_input_type(self, input_type: str):
-        """Enable an input type."""
-        if input_type not in self.enabled_input_types:
-            self.enabled_input_types.append(input_type)
-            logger.info(f"Enabled input type: {input_type}")
-    
-    def disable_input_type(self, input_type: str):
-        """Disable an input type."""
-        if input_type in self.enabled_input_types:
-            self.enabled_input_types.remove(input_type)
-            logger.info(f"Disabled input type: {input_type}")
-    
-    def validate_input_data(self, input_data: Dict[str, Any]) -> bool:
-        """Validate input data without processing it."""
-        try:
-            input_type = input_data.get('input_type')
-            if not input_type:
-                logger.error("input_type is required")
-                return False
-            
-            if input_type not in self.enabled_input_types:
-                logger.error(f"Input type '{input_type}' is not enabled")
-                return False
-            
-            # Check required fields based on input type
-            if input_type == 'protein_input' and not input_data.get('protein_input'):
-                logger.error("protein_input is required for protein_input type")
-                return False
-            elif input_type == 'uniprot_ids' and not input_data.get('uniprot_ids'):
-                logger.error("uniprot_ids is required for uniprot_ids type")
-                return False
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Input validation failed: {e}")
-            return False
+    Dependencies:
+    - time
+    - logging
+    - typing
+    - protein_sequence.input
+    - uniprot_id.input
+    """
+    ok = True
+    try:
+        mgr = InputManager(config={})
+        input_data = {
+            'input_type': 'protein_sequence',
+            'protein_sequence': 'ACDEFGHIKLMNPQRSTVWY'
+        }
+        result = mgr.process_input(input_data)
+        if not isinstance(result, dict) or result.get('processing_time') is None:
+            raise RuntimeError('Unexpected result structure from process_input')
+        print("InputManager test: SUCCESS")
+    except Exception as e:
+        ok = False
+        print(f"InputManager test: FAILED - {e}")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

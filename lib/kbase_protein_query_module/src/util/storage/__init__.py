@@ -1,12 +1,7 @@
-from .protein_storage import ProteinStorage, MemoryEfficientLoader
-from .protein_existence_checker import ProteinExistenceChecker
-from .protein_family_assigner import ProteinFamilyAssigner
-from .indexing_strategy import IndexingStrategy
+from .storage import ProteinStorage
+from .similarity_search import SimilaritySearch
 
 __all__ = [
     'ProteinStorage',
-    'MemoryEfficientLoader', 
-    'ProteinExistenceChecker',
-    'ProteinFamilyAssigner',
-    'IndexingStrategy'
+    'SimilaritySearch',
 ]

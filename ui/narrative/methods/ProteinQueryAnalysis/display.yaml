@@ -7,13 +7,13 @@ parameters:
         ui-name: Input Type
         short-hint: Select input type
 
-    protein_input:
-        ui-name: Protein Input
-        short-hint: Protein sequences or FASTA content
+    protein_sequence:
+        ui-name: Protein Sequence
+        short-hint: Single protein sequence (ACDEFGHIKLMNPQRSTVWY)
 
-    uniprot_ids:
-        ui-name: UniProt IDs
-        short-hint: UniProt protein identifiers
+    uniprot_id:
+        ui-name: UniProt ID(s)
+        short-hint: One or more UniProt accession IDs
 
     analysis_name:
         ui-name: Analysis Name
