@@ -33,12 +33,10 @@ class ProteinStorage:
     def __init__(
         self,
         embeddings_file_path: str,
-        esm_model_path: Optional[str] = None,
         index_path: Optional[str] = None,
         config: Optional[dict] = None,
     ) -> None:
         self.embeddings_file_path = embeddings_file_path
-        self.esm_model_path = esm_model_path
         self.index_path = index_path
         self.config = config or {}
 
@@ -173,7 +171,6 @@ def main() -> int:
         
         storage = ProteinStorage(
             embeddings_file_path=embeddings_file,
-            esm_model_path="data/esm2_t6_8M_UR50D_local",
             index_path="data/indexes"
         )
         

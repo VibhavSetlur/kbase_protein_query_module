@@ -1,4 +1,7 @@
 # Personal
+logs/
+test_env/
+work/
 backup
 .venv
 .venv_kpqm

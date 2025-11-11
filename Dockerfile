@@ -24,7 +24,9 @@ RUN chmod -R a+rw /kb/module
 WORKDIR /kb/module
 
 # Install Python dependencies (no cache to keep layers small)
+# Install torch CPU-only first (smaller image size for containers, ~500MB vs ~2GB)
 RUN pip install --upgrade --no-cache-dir pip setuptools wheel \
+ && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch>=2.0.0 \
  && pip install --no-cache-dir -r requirements.txt
 
 RUN make all

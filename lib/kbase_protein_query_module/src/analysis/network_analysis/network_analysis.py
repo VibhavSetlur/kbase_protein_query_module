@@ -85,8 +85,7 @@ class NetworkAnalysis:
         # Storage for simple access + integrated similarity
         embeddings_file = self.config.get('embeddings_file', 'data/embeddings/embeddings.tsv')
         index_path = self.config.get('index_path', 'data/indexes/ivf_index.json')
-        esm_model_path = self.config.get('esm_model_path', 'data/esm2_t6_8M_UR50D_local')
-        self.storage = ProteinStorage(embeddings_file_path=embeddings_file, esm_model_path=esm_model_path, index_path=index_path)
+        self.storage = ProteinStorage(embeddings_file_path=embeddings_file, index_path=index_path)
         self.fetch_metadata = fetch_metadata
         self.fetch_protein_sequence = fetch_protein_sequence
     

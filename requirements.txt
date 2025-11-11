@@ -1,28 +1,31 @@
+# Core dependencies for protein query module
 numpy>=1.21.0
 pandas>=1.3.0
-scipy>=1.7.3
-scikit-learn>=1.0.2
-networkx>=2.6.0
 h5py>=3.6.0
 requests>=2.25.0
 tqdm>=4.62.0
 pyyaml>=6.0
-biopython>=1.79
 jsonrpcbase>=0.2.0
+biopython>=1.79
 
-# In-container CPU-safe installs; GPU deps are avoided
-torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
-transformers==4.46.3
-fair-esm>=2.0.0
+# ESM Model
+torch>=1.13.0
+fair-esm
+transformers>=4.31.0
 
-# Visualization used by output generation
+
+# Network analysis
+networkx>=2.6.0
+scikit-learn>=1.0.2
+
+# Visualization
 plotly>=5.0.0
 matplotlib>=3.5.0
 
-# Optional vector index used by storage/similarity modules
-faiss-cpu>=1.7.0
+# HTTP requests (UniProt API)
+requests>=2.25.0
 
-# Testing (needed for kb-sdk test invocation inside container)
+# Testing (for kb-sdk test)
 pytest>=7.0.0
 pytest-mock>=3.10.0
 pytest-cov>=4.0.0

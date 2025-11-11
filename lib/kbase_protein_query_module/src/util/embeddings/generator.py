@@ -1,8 +1,11 @@
 """
 Protein Embedding Generator Module
 
-Uses ESM-2 models from HuggingFace for reliable embedding generation.
+Uses ESM-2 models from fair-esm package (official Facebook Research implementation).
 Models are automatically downloaded on first use.
+
+Follows official ESM usage patterns from:
+https://github.com/facebookresearch/esm
 """
 
 import os
@@ -12,39 +15,41 @@ import logging
 
 try:
     import torch
-    from transformers import EsmModel, EsmTokenizer
-    HAS_TORCH = True
+    import esm
+    HAS_ESM = True
 except ImportError:
-    HAS_TORCH = False
+    HAS_ESM = False
     torch = None
-    EsmModel = None
-    EsmTokenizer = None
+    esm = None
 
 logger = logging.getLogger(__name__)
 
 class ProteinEmbeddingGenerator:
     """
-    Generates protein embeddings using ESM-2 models from HuggingFace.
+    Generates protein embeddings using ESM-2 models from fair-esm package.
     
-    Uses facebook/esm2-* models which are automatically downloaded on first use.
-    Simple, reliable, and functional.
+    Uses official Facebook Research ESM models.
+    Simple, clean, efficient, and functional.
     """
 
-    def __init__(self, model_name: str = "facebook/esm2_t6_8M_UR50D", device: str = "auto"):
+    def __init__(self, model_name: str = "esm2_t6_8M_UR50D", device: str = "auto"):
         """Initialize the embedding generator.
         
         Args:
-            model_name: HuggingFace model identifier (e.g., "facebook/esm2_t6_8M_UR50D")
+            model_name: ESM model name (e.g., "esm2_t6_8M_UR50D", "esm2_t33_650M_UR50D")
+                       Default is smallest model for fast inference
             device: Device to use ("auto", "cpu", or "cuda")
         """
-        if not HAS_TORCH:
-            raise ImportError("torch and transformers are required for embedding generation")
+        if not HAS_ESM:
+            raise ImportError("torch and esm (fair-esm) are required for embedding generation. Install with: pip install fair-esm")
         
         self.model_name = model_name
         self.device = self._setup_device(device)
         self.model = None
-        self.tokenizer = None
+        self.alphabet = None
+        self.batch_converter = None
         self.embedding_dim: Optional[int] = None
+        self.repr_layer: Optional[int] = None
         
         self._load_model()
     
@@ -55,19 +60,38 @@ class ProteinEmbeddingGenerator:
         return device
     
     def _load_model(self):
-        """Load ESM-2 model from HuggingFace."""
+        """Load ESM-2 model using official fair-esm package."""
         try:
-            # Load tokenizer and model from HuggingFace
-            # Models are automatically downloaded on first use
-            self.tokenizer = EsmTokenizer.from_pretrained(self.model_name)
-            self.model = EsmModel.from_pretrained(self.model_name)
-            self.model.eval()
+            # Map model names to ESM pretrained functions
+            model_map = {
+                "esm2_t6_8M_UR50D": esm.pretrained.esm2_t6_8M_UR50D,
+                "esm2_t12_35M_UR50D": esm.pretrained.esm2_t12_35M_UR50D,
+                "esm2_t30_150M_UR50D": esm.pretrained.esm2_t30_150M_UR50D,
+                "esm2_t33_650M_UR50D": esm.pretrained.esm2_t33_650M_UR50D,
+            }
+            
+            if self.model_name not in model_map:
+                available = ", ".join(model_map.keys())
+                raise ValueError(f"Unknown model name: {self.model_name}. Available models: {available}")
+            
+            # Load model and alphabet
+            logger.info(f"Loading ESM model '{self.model_name}'...")
+            self.model, self.alphabet = model_map[self.model_name]()
+            self.batch_converter = self.alphabet.get_batch_converter()
+            
+            # Move model to device and set to eval mode
             self.model = self.model.to(self.device)
+            self.model.eval()
             
-            # Get embedding dimension from model config
-            self.embedding_dim = self.model.config.hidden_size
+            # Determine representation layer (last layer) and embedding dimension
+            # ESM-2 models: layer count varies by model size
+            # Use the last layer (num_layers) for all models - this is the standard approach
+            self.repr_layer = self.model.num_layers
             
-            logger.info(f"Loaded ESM model '{self.model_name}' on {self.device} with dim {self.embedding_dim}")
+            # Get embedding dimension from model
+            self.embedding_dim = self.model.embed_dim
+            
+            logger.info(f"Loaded ESM model '{self.model_name}' on {self.device} with dim {self.embedding_dim}, layer {self.repr_layer}")
         except Exception as e:
             raise RuntimeError(f"Failed to load ESM model '{self.model_name}': {e}")
     
@@ -88,25 +112,32 @@ class ProteinEmbeddingGenerator:
         
         sequence = self._preprocess_sequence(sequence)
         
-        # Tokenize sequence
-        tokens = self.tokenizer(sequence, return_tensors="pt", max_length=1024, truncation=True, padding=False)
-        tokens = {k: v.to(self.device) for k, v in tokens.items()}
+        # Prepare data for batch converter (single sequence)
+        data = [("protein", sequence)]
+        batch_labels, batch_strs, batch_tokens = self.batch_converter(data)
+        batch_tokens = batch_tokens.to(self.device)
+        
+        # Calculate sequence length (excluding padding)
+        batch_lens = (batch_tokens != self.alphabet.padding_idx).sum(1)
+        tokens_len = batch_lens[0].item()
         
         # Generate embeddings
         with torch.no_grad():
-            outputs = self.model(**tokens)
+            results = self.model(batch_tokens, repr_layers=[self.repr_layer])
         
-        # Extract embeddings - shape: [1, seq_len, hidden_size]
-        embeddings = outputs.last_hidden_state.squeeze(0)  # [seq_len, hidden_size]
+        # Extract token representations - shape: [batch_size, seq_len, hidden_size]
+        token_representations = results["representations"][self.repr_layer]
         
-        # Remove special tokens (CLS at start, EOS/SEP at end)
-        # ESM-2 tokenizer: <cls> sequence <eos>
-        seq_len = embeddings.shape[0]
-        if seq_len >= 2:
-            # Remove first token (CLS) and last token (EOS)
-            residue_embeddings = embeddings[1:seq_len-1].cpu().numpy().astype(np.float32)
+        # Extract sequence representation (exclude padding and special tokens)
+        # Token 0 is beginning-of-sequence token, so first residue is token 1
+        # Last token before padding is end-of-sequence
+        # We want tokens 1 to tokens_len-1 (exclude BOS and EOS)
+        if tokens_len >= 2:
+            # Extract residue embeddings: tokens 1 to tokens_len-1
+            residue_embeddings = token_representations[0, 1:tokens_len-1].cpu().numpy().astype(np.float32)
         else:
-            residue_embeddings = embeddings.cpu().numpy().astype(np.float32)
+            # Very short sequence - use all tokens except padding
+            residue_embeddings = token_representations[0, :tokens_len].cpu().numpy().astype(np.float32)
         
         # Compute mean embedding
         mean_embedding = residue_embeddings.mean(axis=0).astype(np.float32)
@@ -143,14 +174,15 @@ class ProteinEmbeddingGenerator:
         if len(sequence_clean) < 3:
             raise ValueError(f"Sequence too short: minimum 3 amino acids required, got {len(sequence_clean)}")
         
-        # Validate amino acids (allow standard 20 plus common modifications)
+        # Validate amino acids (ESM models expect standard amino acids)
+        # ESM alphabet includes standard 20 amino acids plus special tokens
         valid_aa = set('ACDEFGHIKLMNPQRSTVWY')
         invalid_chars = set(sequence_clean) - valid_aa
         if invalid_chars:
             logger.warning(f"Sequence contains invalid characters: {invalid_chars}. Proceeding anyway.")
         
         return sequence_clean
-    
+
 
 def main():
     """Test the embedding generator."""
@@ -159,7 +191,7 @@ def main():
         test_sequence = "ACDEFGHIKLMNPQRSTVWY"
         
         # Test with default model (smallest, fastest)
-        gen = ProteinEmbeddingGenerator(model_name="facebook/esm2_t6_8M_UR50D", device="cpu")
+        gen = ProteinEmbeddingGenerator(model_name="esm2_t6_8M_UR50D", device="cpu")
         
         # Test preprocessing
         preprocessed = gen._preprocess_sequence(test_sequence)
@@ -172,17 +204,31 @@ def main():
             raise RuntimeError("Generated empty mean embedding")
         if mean_embedding.shape[0] != gen.embedding_dim:
             raise RuntimeError(f"Mean embedding dimension {mean_embedding.shape[0]} != {gen.embedding_dim}")
+        if not isinstance(mean_embedding, np.ndarray):
+            raise RuntimeError(f"Mean embedding is not a numpy array: {type(mean_embedding)}")
         
         # Test full embeddings (no pooling)
         residue_emb, mean_emb = gen.generate_embedding(test_sequence, pooling="none")
         if residue_emb.size == 0 or mean_emb.size == 0:
             raise RuntimeError("Generated empty embeddings")
         if residue_emb.shape[1] != gen.embedding_dim:
-            raise RuntimeError(f"Residue embedding dimension mismatch")
+            raise RuntimeError(f"Residue embedding dimension mismatch: {residue_emb.shape[1]} != {gen.embedding_dim}")
         if mean_emb.shape[0] != gen.embedding_dim:
-            raise RuntimeError(f"Mean embedding dimension mismatch")
+            raise RuntimeError(f"Mean embedding dimension mismatch: {mean_emb.shape[0]} != {gen.embedding_dim}")
         
-        print(f"Embedding generator test: SUCCESS (model={gen.model_name}, dim={gen.embedding_dim})")
+        # Verify mean_emb matches mean-pooled version
+        computed_mean = residue_emb.mean(axis=0)
+        if not np.allclose(mean_emb, computed_mean, atol=1e-5):
+            raise RuntimeError("Mean embedding from 'none' pooling doesn't match computed mean")
+        
+        print(f"Embedding generator test: SUCCESS")
+        print(f"  Model: {gen.model_name}")
+        print(f"  Device: {gen.device}")
+        print(f"  Embedding dim: {gen.embedding_dim}")
+        print(f"  Representation layer: {gen.repr_layer}")
+        print(f"  Sequence length: {len(test_sequence)}")
+        print(f"  Mean embedding shape: {mean_embedding.shape}")
+        print(f"  Residue embedding shape: {residue_emb.shape}")
     except Exception as e:
         ok = False
         print(f"Embedding generator test: FAILED - {e}")

@@ -162,20 +162,38 @@ class WorkflowOrchestrator:
             # 3) Run analyses sequentially and save outputs
             logger.debug(f"Running {len(analyses_to_run)} analyses")
             analysis_results: Dict[str, Any] = {}
+            failed_analyses: List[str] = []
             for analysis_name in analyses_to_run:
                 logger.debug(f"Running analysis: {analysis_name}")
                 result = self.analysis_manager.run_analyses(analysis_name, processed_data, **kwargs)
-                analysis_results[analysis_name] = result
-                logger.debug(f"Analysis {analysis_name} completed")
-                if isinstance(result, dict):
-                    try:
-                        logger.debug(f"Saving output for analysis {analysis_name}")
-                        self.output_manager.save_analysis_output(
-                            analysis_name, result, self.output_manager.get_root_dir()
-                        )
-                    except Exception as e:
-                        logger.error(f"Error saving analysis output for {analysis_name}: {e}", exc_info=True)
-                        raise
+                if result is None:
+                    logger.error(f"Analysis '{analysis_name}' returned None - analysis did not run")
+                    failed_analyses.append(analysis_name)
+                    # Create error result for failed analysis
+                    analysis_results[analysis_name] = {
+                        'success': False,
+                        'error_message': f"Analysis '{analysis_name}' is not available (likely missing dependencies)",
+                        'processing_time': 0.0
+                    }
+                else:
+                    analysis_results[analysis_name] = result
+                    logger.debug(f"Analysis {analysis_name} completed")
+                    if isinstance(result, dict) and result.get('success') is not False:
+                        try:
+                            logger.debug(f"Saving output for analysis {analysis_name}")
+                            self.output_manager.save_analysis_output(
+                                analysis_name, result, self.output_manager.get_root_dir()
+                            )
+                        except Exception as e:
+                            logger.error(f"Error saving analysis output for {analysis_name}: {e}", exc_info=True)
+                            raise
+                    else:
+                        logger.warning(f"Analysis {analysis_name} returned unsuccessful result: {result}")
+            
+            # If any analyses failed to run, log warning
+            if failed_analyses:
+                logger.warning(f"The following analyses failed to run (likely missing dependencies): {failed_analyses}")
+                logger.warning("Required dependencies: transformers (for embeddings), networkx and sklearn (for network analysis)")
 
             # 4) Build final outputs and persist run metadata
             protein_count = int(len((processed_data or {}).get("proteins", []) or []))

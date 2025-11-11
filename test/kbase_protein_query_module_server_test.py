@@ -191,40 +191,79 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         output_dir = os.path.join(self.test_local_tmp, 'outputs')
         self.assertTrue(os.path.exists(output_dir), f"Output directory does not exist: {output_dir}")
         
-        # Verify that analysis output directory exists (if analysis ran)
+        # CRITICAL: Verify that analysis actually ran and created outputs
+        # Check if analysis output directory exists - if not, analysis didn't run
         analysis_dir = os.path.join(output_dir, 'analysis', 'network_analysis')
-        if os.path.exists(analysis_dir):
-            # Verify that results.json was created
-            results_json = os.path.join(analysis_dir, 'results.json')
-            self.assertTrue(os.path.exists(results_json), f"Results JSON does not exist: {results_json}")
+        
+        if not os.path.exists(analysis_dir):
+            # Analysis directory doesn't exist - check metadata to see what happened
+            metadata_dir = os.path.join(output_dir, 'metadata')
+            if os.path.exists(metadata_dir):
+                import json
+                metadata_file = os.path.join(metadata_dir, 'final_results.json')
+                if os.path.exists(metadata_file):
+                    with open(metadata_file, 'r') as f:
+                        workflow_result = json.load(f)
+                    analysis_results = workflow_result.get('analysis_results', {})
+                    if 'network_analysis' in analysis_results:
+                        na_result = analysis_results['network_analysis']
+                        if na_result is None or (isinstance(na_result, dict) and na_result.get('success') is False):
+                            error_msg = na_result.get('error_message', 'Analysis not available') if isinstance(na_result, dict) else 'Analysis returned None'
+                            self.fail(f"❌ Network analysis was requested but did NOT run: {error_msg}\n"
+                                     f"Required dependencies: transformers (for embeddings), networkx and sklearn (for network analysis)\n"
+                                     f"This test REQUIRES these dependencies to verify real output generation.\n"
+                                     f"Install dependencies: pip install torch transformers networkx scikit-learn plotly")
             
-            import json
-            with open(results_json, 'r') as f:
-                results = json.load(f)
-            self.assertIn('success', results, "Results JSON missing 'success' field")
-            
-            # If analysis ran successfully, verify output files were created
-            if results.get('success'):
-                output_files = results.get('output_files', [])
-                if output_files:
-                    self.assertGreater(len(output_files), 0, "No output files were created by network analysis")
-                    for file_path in output_files:
-                        if isinstance(file_path, str):
-                            # Verify file exists and is not empty
-                            full_path = file_path if os.path.isabs(file_path) else os.path.join(output_dir, file_path)
-                            if not os.path.exists(full_path):
-                                # Try relative to analysis_dir
-                                full_path = os.path.join(analysis_dir, os.path.basename(file_path))
-                            if os.path.exists(full_path):
-                                self.assertGreater(os.path.getsize(full_path), 0, f"Output file is empty: {full_path}")
-            else:
-                # Analysis failed - check if it's due to missing dependencies
-                error_msg = results.get('error_message', 'Unknown error')
-                if 'networkx' not in error_msg.lower() and 'dependency' not in error_msg.lower():
-                    self.fail(f"Network analysis failed: {error_msg}")
-        # Note: If analysis_dir doesn't exist, it means network analysis didn't run
-        # This is expected when dependencies (networkx, sklearn) are missing in test environment
-        # The test still passes because workflow completed and zip was created
+            # If we can't determine why, fail with clear message
+            self.fail(f"❌ Network analysis output directory does not exist: {analysis_dir}\n"
+                     f"This means network analysis did NOT run.\n"
+                     f"Required dependencies: transformers, networkx, sklearn\n"
+                     f"Install: pip install torch transformers networkx scikit-learn plotly\n"
+                     f"Coverage report shows network_analysis.py has only 20% coverage - analysis code is NOT executing!")
+        
+        # Analysis directory exists - verify it contains real outputs
+        results_json = os.path.join(analysis_dir, 'results.json')
+        self.assertTrue(os.path.exists(results_json), f"Results JSON does not exist: {results_json}")
+        
+        import json
+        with open(results_json, 'r') as f:
+            results = json.load(f)
+        self.assertIn('success', results, "Results JSON missing 'success' field")
+        self.assertTrue(results.get('success'), 
+                       f"❌ Network analysis failed: {results.get('error_message', 'Unknown error')}")
+        
+        # Verify output files were created
+        output_files = results.get('output_files', [])
+        self.assertGreater(len(output_files), 0, 
+                          "❌ No output files were created by network analysis. Expected: HTML visualization, CSV files.")
+        
+        # Verify each output file exists and is not empty
+        for file_path in output_files:
+            if isinstance(file_path, str):
+                # Try absolute path first
+                full_path = file_path if os.path.isabs(file_path) else os.path.join(output_dir, file_path)
+                if not os.path.exists(full_path):
+                    # Try relative to analysis_dir
+                    full_path = os.path.join(analysis_dir, os.path.basename(file_path))
+                self.assertTrue(os.path.exists(full_path), 
+                              f"❌ Output file does not exist: {file_path} (tried: {full_path})")
+                file_size = os.path.getsize(full_path)
+                self.assertGreater(file_size, 0, 
+                                 f"❌ Output file is empty (0 bytes): {full_path}")
+        
+        # Verify specific file types were created
+        file_names = [os.path.basename(f) for f in output_files if isinstance(f, str)]
+        has_html = any('html' in f.lower() for f in file_names)
+        has_csv = any('csv' in f.lower() for f in file_names)
+        
+        if not has_html:
+            self.fail("❌ Network analysis did not create HTML visualization file. Expected: network_visualization_*.html")
+        if not has_csv:
+            self.fail("❌ Network analysis did not create CSV files. Expected: network_statistics_*.csv and/or network_edges_*.csv")
+        
+        # If we get here, analysis ran and created real outputs!
+        print(f"✅ Network analysis ran successfully and created {len(output_files)} output files")
+        print(f"   Files: {', '.join(file_names)}")
 
     def test_run_protein_query_analysis_protein_sequences(self):
         """Test workflow with protein sequences input."""
@@ -269,40 +308,79 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         output_dir = os.path.join(self.test_local_tmp, 'outputs')
         self.assertTrue(os.path.exists(output_dir), f"Output directory does not exist: {output_dir}")
         
-        # Verify that analysis output directory exists (if analysis ran)
+        # CRITICAL: Verify that analysis actually ran and created outputs
+        # Check if analysis output directory exists - if not, analysis didn't run
         analysis_dir = os.path.join(output_dir, 'analysis', 'network_analysis')
-        if os.path.exists(analysis_dir):
-            # Verify that results.json was created
-            results_json = os.path.join(analysis_dir, 'results.json')
-            self.assertTrue(os.path.exists(results_json), f"Results JSON does not exist: {results_json}")
+        
+        if not os.path.exists(analysis_dir):
+            # Analysis directory doesn't exist - check metadata to see what happened
+            metadata_dir = os.path.join(output_dir, 'metadata')
+            if os.path.exists(metadata_dir):
+                import json
+                metadata_file = os.path.join(metadata_dir, 'final_results.json')
+                if os.path.exists(metadata_file):
+                    with open(metadata_file, 'r') as f:
+                        workflow_result = json.load(f)
+                    analysis_results = workflow_result.get('analysis_results', {})
+                    if 'network_analysis' in analysis_results:
+                        na_result = analysis_results['network_analysis']
+                        if na_result is None or (isinstance(na_result, dict) and na_result.get('success') is False):
+                            error_msg = na_result.get('error_message', 'Analysis not available') if isinstance(na_result, dict) else 'Analysis returned None'
+                            self.fail(f"❌ Network analysis was requested but did NOT run: {error_msg}\n"
+                                     f"Required dependencies: transformers (for embeddings), networkx and sklearn (for network analysis)\n"
+                                     f"This test REQUIRES these dependencies to verify real output generation.\n"
+                                     f"Install dependencies: pip install torch transformers networkx scikit-learn plotly")
             
-            import json
-            with open(results_json, 'r') as f:
-                results = json.load(f)
-            self.assertIn('success', results, "Results JSON missing 'success' field")
-            
-            # If analysis ran successfully, verify output files were created
-            if results.get('success'):
-                output_files = results.get('output_files', [])
-                if output_files:
-                    self.assertGreater(len(output_files), 0, "No output files were created by network analysis")
-                    for file_path in output_files:
-                        if isinstance(file_path, str):
-                            # Verify file exists and is not empty
-                            full_path = file_path if os.path.isabs(file_path) else os.path.join(output_dir, file_path)
-                            if not os.path.exists(full_path):
-                                # Try relative to analysis_dir
-                                full_path = os.path.join(analysis_dir, os.path.basename(file_path))
-                            if os.path.exists(full_path):
-                                self.assertGreater(os.path.getsize(full_path), 0, f"Output file is empty: {full_path}")
-            else:
-                # Analysis failed - check if it's due to missing dependencies
-                error_msg = results.get('error_message', 'Unknown error')
-                if 'networkx' not in error_msg.lower() and 'dependency' not in error_msg.lower():
-                    self.fail(f"Network analysis failed: {error_msg}")
-        # Note: If analysis_dir doesn't exist, it means network analysis didn't run
-        # This is expected when dependencies (networkx, sklearn) are missing in test environment
-        # The test still passes because workflow completed and zip was created
+            # If we can't determine why, fail with clear message
+            self.fail(f"❌ Network analysis output directory does not exist: {analysis_dir}\n"
+                     f"This means network analysis did NOT run.\n"
+                     f"Required dependencies: transformers, networkx, sklearn\n"
+                     f"Install: pip install torch transformers networkx scikit-learn plotly\n"
+                     f"Coverage report shows network_analysis.py has only 20% coverage - analysis code is NOT executing!")
+        
+        # Analysis directory exists - verify it contains real outputs
+        results_json = os.path.join(analysis_dir, 'results.json')
+        self.assertTrue(os.path.exists(results_json), f"Results JSON does not exist: {results_json}")
+        
+        import json
+        with open(results_json, 'r') as f:
+            results = json.load(f)
+        self.assertIn('success', results, "Results JSON missing 'success' field")
+        self.assertTrue(results.get('success'), 
+                       f"❌ Network analysis failed: {results.get('error_message', 'Unknown error')}")
+        
+        # Verify output files were created
+        output_files = results.get('output_files', [])
+        self.assertGreater(len(output_files), 0, 
+                          "❌ No output files were created by network analysis. Expected: HTML visualization, CSV files.")
+        
+        # Verify each output file exists and is not empty
+        for file_path in output_files:
+            if isinstance(file_path, str):
+                # Try absolute path first
+                full_path = file_path if os.path.isabs(file_path) else os.path.join(output_dir, file_path)
+                if not os.path.exists(full_path):
+                    # Try relative to analysis_dir
+                    full_path = os.path.join(analysis_dir, os.path.basename(file_path))
+                self.assertTrue(os.path.exists(full_path), 
+                              f"❌ Output file does not exist: {file_path} (tried: {full_path})")
+                file_size = os.path.getsize(full_path)
+                self.assertGreater(file_size, 0, 
+                                 f"❌ Output file is empty (0 bytes): {full_path}")
+        
+        # Verify specific file types were created
+        file_names = [os.path.basename(f) for f in output_files if isinstance(f, str)]
+        has_html = any('html' in f.lower() for f in file_names)
+        has_csv = any('csv' in f.lower() for f in file_names)
+        
+        if not has_html:
+            self.fail("❌ Network analysis did not create HTML visualization file. Expected: network_visualization_*.html")
+        if not has_csv:
+            self.fail("❌ Network analysis did not create CSV files. Expected: network_statistics_*.csv and/or network_edges_*.csv")
+        
+        # If we get here, analysis ran and created real outputs!
+        print(f"✅ Network analysis ran successfully and created {len(output_files)} output files")
+        print(f"   Files: {', '.join(file_names)}")
 
 
 
