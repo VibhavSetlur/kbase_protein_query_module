@@ -84,9 +84,9 @@ class WorkflowOrchestrator:
                 kb_util=self.kb_util
             )
             
-            # Initialize analysis manager with output manager
+            # Initialize analysis manager with output manager and config
             logger.debug("Initializing AnalysisManager")
-            self.analysis_manager = AnalysisManager(output_manager=self.output_manager)
+            self.analysis_manager = AnalysisManager(output_manager=self.output_manager, config=self.config)
             
             logger.info("All workflow components initialized successfully")
             
@@ -165,7 +165,16 @@ class WorkflowOrchestrator:
             failed_analyses: List[str] = []
             for analysis_name in analyses_to_run:
                 logger.debug(f"Running analysis: {analysis_name}")
-                result = self.analysis_manager.run_analyses(analysis_name, processed_data, **kwargs)
+                
+                # Get analysis-specific output directory
+                analysis_output_dir = self.output_manager.get_analysis_dir(analysis_name)
+                
+                # Ensure processed_data has output_dir set to analysis directory
+                analysis_input_data = processed_data.copy() if processed_data else {}
+                analysis_input_data['output_dir'] = analysis_output_dir
+                
+                # Run analysis with analysis-specific output directory
+                result = self.analysis_manager.run_analyses(analysis_name, analysis_input_data, **kwargs)
                 if result is None:
                     logger.error(f"Analysis '{analysis_name}' returned None - analysis did not run")
                     failed_analyses.append(analysis_name)
@@ -181,9 +190,29 @@ class WorkflowOrchestrator:
                     if isinstance(result, dict) and result.get('success') is not False:
                         try:
                             logger.debug(f"Saving output for analysis {analysis_name}")
+                            # Save results.json to analysis directory
                             self.output_manager.save_analysis_output(
                                 analysis_name, result, self.output_manager.get_root_dir()
                             )
+                            
+                            # Copy output files to analysis directory if they're not already there
+                            output_files = result.get('output_files', [])
+                            if output_files:
+                                import shutil
+                                for file_path in output_files:
+                                    if isinstance(file_path, str) and os.path.exists(file_path):
+                                        # If file is not in analysis directory, copy it
+                                        file_basename = os.path.basename(file_path)
+                                        target_path = os.path.join(analysis_output_dir, file_basename)
+                                        if file_path != target_path:
+                                            shutil.copy2(file_path, target_path)
+                                            logger.debug(f"Copied output file to analysis directory: {file_basename}")
+                                            # Update file path in result
+                                            result['output_files'] = [
+                                                os.path.join(analysis_output_dir, os.path.basename(f)) 
+                                                if isinstance(f, str) and os.path.exists(f) else f
+                                                for f in output_files
+                                            ]
                         except Exception as e:
                             logger.error(f"Error saving analysis output for {analysis_name}: {e}", exc_info=True)
                             raise

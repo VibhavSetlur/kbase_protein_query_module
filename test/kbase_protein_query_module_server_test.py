@@ -235,7 +235,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Verify output files were created
         output_files = results.get('output_files', [])
         self.assertGreater(len(output_files), 0, 
-                          "❌ No output files were created by network analysis. Expected: HTML visualization, CSV files.")
+                          "❌ No output files were created by network analysis. Expected: HTML visualization, TSV files.")
         
         # Verify each output file exists and is not empty
         for file_path in output_files:
@@ -254,12 +254,12 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Verify specific file types were created
         file_names = [os.path.basename(f) for f in output_files if isinstance(f, str)]
         has_html = any('html' in f.lower() for f in file_names)
-        has_csv = any('csv' in f.lower() for f in file_names)
+        has_tsv = any('tsv' in f.lower() for f in file_names)
         
         if not has_html:
             self.fail("❌ Network analysis did not create HTML visualization file. Expected: network_visualization_*.html")
-        if not has_csv:
-            self.fail("❌ Network analysis did not create CSV files. Expected: network_statistics_*.csv and/or network_edges_*.csv")
+        if not has_tsv:
+            self.fail("❌ Network analysis did not create TSV files. Expected: network_statistics_*.tsv and/or network_edges_*.tsv")
         
         # If we get here, analysis ran and created real outputs!
         print(f"✅ Network analysis ran successfully and created {len(output_files)} output files")
@@ -352,7 +352,7 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Verify output files were created
         output_files = results.get('output_files', [])
         self.assertGreater(len(output_files), 0, 
-                          "❌ No output files were created by network analysis. Expected: HTML visualization, CSV files.")
+                          "❌ No output files were created by network analysis. Expected: HTML visualization, TSV files.")
         
         # Verify each output file exists and is not empty
         for file_path in output_files:
@@ -371,12 +371,12 @@ class kbase_protein_query_moduleTest(unittest.TestCase):
         # Verify specific file types were created
         file_names = [os.path.basename(f) for f in output_files if isinstance(f, str)]
         has_html = any('html' in f.lower() for f in file_names)
-        has_csv = any('csv' in f.lower() for f in file_names)
+        has_tsv = any('tsv' in f.lower() for f in file_names)
         
         if not has_html:
             self.fail("❌ Network analysis did not create HTML visualization file. Expected: network_visualization_*.html")
-        if not has_csv:
-            self.fail("❌ Network analysis did not create CSV files. Expected: network_statistics_*.csv and/or network_edges_*.csv")
+        if not has_tsv:
+            self.fail("❌ Network analysis did not create TSV files. Expected: network_statistics_*.tsv and/or network_edges_*.tsv")
         
         # If we get here, analysis ran and created real outputs!
         print(f"✅ Network analysis ran successfully and created {len(output_files)} output files")

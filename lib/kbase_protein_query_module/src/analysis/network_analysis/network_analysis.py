@@ -2,14 +2,15 @@
 Network Analysis Stage
 
 This stage provides comprehensive network analysis for protein similarity search results,
-including interactive network visualizations, CSV data outputs, and statistics.
+including interactive network visualizations, TSV data outputs, and statistics.
 
 Features:
 - Interactive Plotly network visualization with Kamada-Kawai layout
-- CSV outputs for network statistics and protein similarity data
+- TSV outputs for network statistics and protein similarity data
 - Network properties and clustering analysis
 - Top similar proteins analysis with metadata
-- Robust edge selection for connectivity
+- Edge selection for connectivity
+- Interactive hover metadata display
 """
 
 # Handle both script execution and module import - MUST BE FIRST
@@ -68,6 +69,78 @@ logger = logging.getLogger(__name__)
 NetworkVisualizer = None
 
 
+def _resolve_module_root() -> str:
+    """
+    Resolve the module root directory.
+    In Docker: /kb/module
+    In local dev: project root (parent of lib/)
+    """
+    # Check environment variable first (set by KBase SDK)
+    module_root = os.environ.get('KB_MODULE_DIR')
+    if module_root and os.path.exists(module_root):
+        if os.path.exists(os.path.join(module_root, 'data', 'embeddings')):
+            return module_root
+    
+    # Try standard Docker path
+    docker_path = '/kb/module'
+    if os.path.exists(docker_path):
+        if os.path.exists(os.path.join(docker_path, 'data', 'embeddings')):
+            return docker_path
+    
+    # Try to find module root by looking for common markers
+    current_file = os.path.abspath(__file__)
+    
+    # Navigate up from: lib/kbase_protein_query_module/src/analysis/network_analysis/network_analysis.py
+    # To module root (parent of lib/)
+    # Current file is at: .../lib/kbase_protein_query_module/src/analysis/network_analysis/network_analysis.py
+    # Module root should be 5 levels up
+    lib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))  # lib/
+    possible_roots = [
+        os.path.dirname(lib_dir),  # Parent of lib/ (most likely module root)
+        os.path.join(lib_dir, '..'),  # Same, but using join
+        os.getcwd(),  # Current working directory
+    ]
+    
+    # Normalize and check each possible root
+    for root in possible_roots:
+        root = os.path.abspath(os.path.normpath(root))
+        # Check for markers that indicate module root
+        data_embeddings = os.path.join(root, 'data', 'embeddings')
+        if os.path.exists(data_embeddings):
+            return root
+        # Also check for lib directory and Makefile
+        if os.path.exists(os.path.join(root, 'lib', 'kbase_protein_query_module')) and os.path.exists(os.path.join(root, 'Makefile')):
+            return root
+    
+    # Last resort: return parent of lib directory
+    return os.path.dirname(lib_dir) if os.path.exists(os.path.dirname(lib_dir)) else os.getcwd()
+
+
+def _resolve_data_path(relative_path: str, module_root: str = None) -> str:
+    """
+    Resolve a data file path relative to module root.
+    
+    Args:
+        relative_path: Relative path like 'data/embeddings/embeddings.tsv'
+        module_root: Module root directory (auto-detected if None)
+    
+    Returns:
+        Absolute path to the data file
+    """
+    if module_root is None:
+        module_root = _resolve_module_root()
+    
+    # If path is already absolute, return as-is
+    if os.path.isabs(relative_path):
+        return relative_path
+    
+    # Resolve relative to module root
+    abs_path = os.path.join(module_root, relative_path)
+    abs_path = os.path.normpath(abs_path)
+    
+    return abs_path
+
+
 class NetworkAnalysis:
     """Network analysis for protein similarity search results."""
     
@@ -80,14 +153,64 @@ class NetworkAnalysis:
         self.k_neighbors = self.config.get('k_neighbors', 10)
         self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
         
+        # Resolve module root for data paths
+        self.module_root = self.config.get('module_root') or _resolve_module_root()
+        logger.debug(f"NetworkAnalysis using module_root: {self.module_root}")
+        
         # Initialize utilities
         self.embedding_generator = ProteinEmbeddingGenerator()
+        
         # Storage for simple access + integrated similarity
-        embeddings_file = self.config.get('embeddings_file', 'data/embeddings/embeddings.tsv')
-        index_path = self.config.get('index_path', 'data/indexes/ivf_index.json')
-        self.storage = ProteinStorage(embeddings_file_path=embeddings_file, index_path=index_path)
+        # Resolve embeddings file path - try config first, then resolve relative to module root
+        embeddings_file = self.config.get('embeddings_file')
+        if not embeddings_file:
+            # Default relative path
+            embeddings_file = 'data/embeddings/embeddings.tsv'
+        
+        # Resolve to absolute path
+        embeddings_file = _resolve_data_path(embeddings_file, self.module_root)
+        logger.debug(f"NetworkAnalysis using embeddings_file: {embeddings_file}")
+        
+        # Resolve index path
+        index_path = self.config.get('index_path', 'data/indexes')
+        if not os.path.isabs(index_path):
+            index_path = _resolve_data_path(index_path, self.module_root)
+        logger.debug(f"NetworkAnalysis using index_path: {index_path}")
+        
+        # Store paths for lazy initialization
+        self.embeddings_file = embeddings_file
+        self.index_path = index_path
+        self.storage = None  # Will be initialized on first use
         self.fetch_metadata = fetch_metadata
         self.fetch_protein_sequence = fetch_protein_sequence
+        
+        # Check if embeddings file exists and log warning if not
+        if not os.path.exists(embeddings_file):
+            logger.warning(f"Embeddings file not found: {embeddings_file}")
+            logger.warning(f"Module root: {self.module_root}")
+            logger.warning(f"Tried paths: {embeddings_file}")
+            if os.path.exists(self.module_root):
+                try:
+                    contents = os.listdir(self.module_root)[:10]
+                    logger.warning(f"Contents of module root: {contents}")
+                except Exception:
+                    pass
+            # Don't raise error here - allow analysis to be loaded
+            # Storage will be initialized lazily when needed, and will raise then if file still missing
+        else:
+            logger.info(f"Found embeddings file: {embeddings_file}")
+    
+    def _ensure_storage(self):
+        """Ensure storage is initialized. Initialize lazily if not already done."""
+        if self.storage is None:
+            if not os.path.exists(self.embeddings_file):
+                raise FileNotFoundError(
+                    f"Embeddings file not found: {self.embeddings_file}\n"
+                    f"Module root: {self.module_root}\n"
+                    f"Please ensure the embeddings file exists at the specified path."
+                )
+            self.storage = ProteinStorage(embeddings_file_path=self.embeddings_file, index_path=self.index_path)
+            logger.info(f"Initialized ProteinStorage with {self.storage.n} proteins")
     
     def run_network_analysis(self, input_data: Dict[str, Any]):
         """Run network analysis for a list of proteins."""
@@ -99,6 +222,9 @@ class NetworkAnalysis:
         try:
             # Get input type from processed input data
             input_type = input_data.get('input_type')
+            
+            # Ensure storage is initialized
+            self._ensure_storage()
             
             if input_type == 'protein_sequence':
                 # Generate embedding for query protein sequence (mean-pooled for similarity search)
@@ -274,10 +400,10 @@ class NetworkAnalysis:
         if html_path:
             saved_files.append(html_path)
         
-        # Save network graph data - generate CSVs here
+        # Save network graph data - generate TSV files
         network_graph = visualization_results.get('network_graph')
         if network_graph:
-            # Generate network statistics CSV
+            # Generate network statistics TSV
             try:
                 stats = []
                 for node in network_graph.nodes():
@@ -289,14 +415,14 @@ class NetworkAnalysis:
                     })
                 
                 stats_df = pd.DataFrame(stats)
-                stats_path = os.path.join(output_dir, f"network_statistics_{query_protein_id}_{int(time.time())}.csv")
-                stats_df.to_csv(stats_path, index=False)
+                stats_path = os.path.join(output_dir, f"network_statistics_{query_protein_id}_{int(time.time())}.tsv")
+                stats_df.to_csv(stats_path, index=False, sep='\t')
                 logger.info(f"Network statistics saved to {stats_path}")
                 saved_files.append(stats_path)
             except Exception as e:
-                logger.warning(f"Failed to generate statistics CSV: {e}")
+                logger.warning(f"Failed to generate statistics TSV: {e}")
             
-            # Generate edges CSV
+            # Generate edges TSV
             try:
                 edges = []
                 for u, v, data in network_graph.edges(data=True):
@@ -308,12 +434,12 @@ class NetworkAnalysis:
                     })
                 
                 edges_df = pd.DataFrame(edges)
-                edges_path = os.path.join(output_dir, f"network_edges_{query_protein_id}_{int(time.time())}.csv")
-                edges_df.to_csv(edges_path, index=False)
+                edges_path = os.path.join(output_dir, f"network_edges_{query_protein_id}_{int(time.time())}.tsv")
+                edges_df.to_csv(edges_path, index=False, sep='\t')
                 logger.info(f"Network edges saved to {edges_path}")
                 saved_files.append(edges_path)
             except Exception as e:
-                logger.warning(f"Failed to generate edges CSV: {e}")
+                logger.warning(f"Failed to generate edges TSV: {e}")
         
         return saved_files
 

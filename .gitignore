@@ -1,4 +1,6 @@
 # Personal
+output/
+outputs/
 logs/
 test_env/
 work/

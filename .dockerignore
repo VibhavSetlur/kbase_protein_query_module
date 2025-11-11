@@ -35,3 +35,6 @@ node_modules/**
 
 test_local
 sdk.cfg
+
+# Note: data/ directory is NOT excluded - it will be copied if it exists
+# If data/embeddings/embeddings.tsv doesn't exist, test data will be generated during Docker build

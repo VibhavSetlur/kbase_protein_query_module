@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 class AnalysisManager:
     """Manages the execution of protein analysis workflows."""
     
-    def __init__(self, output_manager=None):
+    def __init__(self, output_manager=None, config: Optional[Dict[str, Any]] = None):
         """Initialize the Analysis Manager."""
         self.output_manager = output_manager
+        self.config = config or {}
         self.analyses: Dict[str, Any] = {}
         self.results: Dict[str, Any] = {}
         self._load_analysis_modules()
@@ -37,10 +38,10 @@ class AnalysisManager:
         """Load all available analysis modules dynamically."""
         enabled_analyses = get_enabled_analyses()
         
-        for analysis_name, config in enabled_analyses.items():
+        for analysis_name, analysis_config in enabled_analyses.items():
             try:
-                module_path = config.get("module_path")
-                class_name = config.get("class_name")
+                module_path = analysis_config.get("module_path")
+                class_name = analysis_config.get("class_name")
                 
                 if not module_path or not class_name:
                     logger.warning(f"Missing module_path or class_name for {analysis_name}")
@@ -49,7 +50,12 @@ class AnalysisManager:
                 module = importlib.import_module(module_path)
                 if hasattr(module, class_name):
                     analysis_class = getattr(module, class_name)
-                    self.analyses[analysis_name] = analysis_class()
+                    # Pass config to analysis instance - merge analysis-specific config with global config
+                    analysis_instance_config = self.config.copy()
+                    # Allow analysis-specific config overrides
+                    if 'config' in analysis_config:
+                        analysis_instance_config.update(analysis_config['config'])
+                    self.analyses[analysis_name] = analysis_class(config=analysis_instance_config)
                     logger.info(f"Loaded analysis: {analysis_name}")
                 else:
                     logger.warning(f"Class {class_name} not found in {module_path}")

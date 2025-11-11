@@ -98,10 +98,40 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         # Get analyses to run - handle both 'analyses' and 'analysis_stages' parameter names
         selected_analyses = params.get('analyses') or params.get('analysis_stages') or ['network_analysis']
         
+        # Resolve module root directory for data paths
+        # In Docker: /kb/module, in local: try to find project root
+        module_root = os.environ.get('KB_MODULE_DIR', '/kb/module')
+        if not os.path.exists(module_root):
+            # Try to find module root by looking for data directory
+            # Start from this file and navigate up
+            current_file = os.path.abspath(__file__)
+            # From: lib/kbase_protein_query_module/kbase_protein_query_moduleImpl.py
+            # To: module root (parent of lib/)
+            lib_dir = os.path.dirname(os.path.dirname(current_file))
+            possible_roots = [
+                os.path.dirname(lib_dir),  # Parent of lib/
+                os.path.join(os.path.dirname(lib_dir), '..'),  # One more level up
+                os.getcwd(),  # Current working directory
+            ]
+            for root in possible_roots:
+                root = os.path.abspath(root)
+                if os.path.exists(os.path.join(root, 'data', 'embeddings')):
+                    module_root = root
+                    break
+            else:
+                # Fallback: use parent of lib directory
+                module_root = os.path.dirname(lib_dir)
+        
+        logger.info(f"Using module_root: {module_root}")
+        
         workflow_config = {
             'output_dir': output_dir,
             'workspace_name': workspace_name,
             'selected_analyses': selected_analyses,
+            'module_root': module_root,
+            # Data paths - will be resolved relative to module_root in NetworkAnalysis
+            'embeddings_file': params.get('embeddings_file') or 'data/embeddings/embeddings.tsv',
+            'index_path': params.get('index_path') or 'data/indexes',
         }
         
         # Execute workflow through orchestrator
