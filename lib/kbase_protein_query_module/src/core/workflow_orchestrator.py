@@ -187,7 +187,8 @@ class WorkflowOrchestrator:
                 else:
                     analysis_results[analysis_name] = result
                     logger.debug(f"Analysis {analysis_name} completed")
-                    if isinstance(result, dict) and result.get('success') is not False:
+                    # Check if analysis actually succeeded
+                    if isinstance(result, dict) and result.get('success') is True:
                         try:
                             logger.debug(f"Saving output for analysis {analysis_name}")
                             # Save results.json to analysis directory
@@ -252,17 +253,71 @@ class WorkflowOrchestrator:
                             logger.error(f"Error saving analysis output for {analysis_name}: {e}", exc_info=True)
                             raise
                     else:
-                        logger.warning(f"Analysis {analysis_name} returned unsuccessful result: {result}")
+                        # Analysis failed - add to failed_analyses list
+                        error_msg = result.get('error_message', 'Unknown error') if isinstance(result, dict) else 'Analysis returned invalid result'
+                        logger.error(f"Analysis {analysis_name} failed: {error_msg}")
+                        failed_analyses.append(analysis_name)
             
-            # If any analyses failed to run, log warning
-            if failed_analyses:
-                logger.warning(f"The following analyses failed to run (likely missing dependencies): {failed_analyses}")
-                logger.warning("Required dependencies: transformers (for embeddings), networkx and sklearn (for network analysis)")
+            # Check if any analyses failed - if so, workflow should fail
+            workflow_success = len(failed_analyses) == 0
+            if not workflow_success:
+                error_messages = []
+                for analysis_name in failed_analyses:
+                    result = analysis_results.get(analysis_name, {})
+                    error_msg = result.get('error_message', 'Unknown error') if isinstance(result, dict) else 'Analysis failed'
+                    error_messages.append(f"{analysis_name}: {error_msg}")
+                
+                combined_error = f"The following analyses failed: {', '.join(failed_analyses)}. Errors: {'; '.join(error_messages)}"
+                logger.error(combined_error)
+                
+                # Still build outputs for debugging, but mark workflow as failed
+                protein_count = int(len((processed_data or {}).get("proteins", []) or []))
+                final_output = {
+                    "summary": f"Failed: {len(failed_analyses)} of {len(analyses_to_run)} analysis step(s) failed",
+                    "protein_count": protein_count,
+                    "error": combined_error
+                }
+                
+                # Compute execution time
+                exec_time_wall = time.time() - self.execution_start_time
+                input_time = float((processed_data or {}).get("processing_time", 0.0) or 0.0)
+                analyses_time = 0.0
+                for v in (analysis_results or {}).values():
+                    if isinstance(v, dict):
+                        analyses_time += float(v.get("processing_time", 0.0) or 0.0)
+                execution_time = max(exec_time_wall, input_time + analyses_time)
+                
+                # Persist metadata even on failure
+                try:
+                    if self.output_manager:
+                        self.output_manager.save_metadata(
+                            config=self.config,
+                            analyses_run=analyses_to_run,
+                            summary=final_output.get("summary", ""),
+                        )
+                        self.output_manager.save_process_info(analyses_to_run, execution_time)
+                except Exception as e:
+                    logger.warning(f"Failed to save run metadata: {e}")
+                
+                # Return failed result
+                output_directory_value = self.output_manager.get_root_dir() if self.output_manager else resolved_output_dir
+                return {
+                    "success": False,
+                    "run_id": self.run_id,
+                    "analyses_completed": [a for a in analyses_to_run if a not in failed_analyses],
+                    "analysis_results": analysis_results,
+                    "final_output": final_output,
+                    "execution_time": execution_time,
+                    "output_directory": output_directory_value,
+                    "stages_completed": [a for a in analyses_to_run if a not in failed_analyses],
+                    "error_message": combined_error,
+                    "failed_analyses": failed_analyses
+                }
 
-            # 4) Build final outputs and persist run metadata
+            # 4) Build final outputs and persist run metadata (only if all analyses succeeded)
             protein_count = int(len((processed_data or {}).get("proteins", []) or []))
             final_output = {
-                "summary": f"Completed {len(analyses_to_run)} analysis step(s)",
+                "summary": f"Completed {len(analyses_to_run)} analysis step(s) successfully",
                 "protein_count": protein_count,
             }
 

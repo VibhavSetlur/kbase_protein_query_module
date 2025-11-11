@@ -78,14 +78,12 @@ def _resolve_module_root() -> str:
     # Check environment variable first (set by KBase SDK)
     module_root = os.environ.get('KB_MODULE_DIR')
     if module_root and os.path.exists(module_root):
-        if os.path.exists(os.path.join(module_root, 'data', 'embeddings')):
-            return module_root
+        return module_root
     
     # Try standard Docker path
     docker_path = '/kb/module'
     if os.path.exists(docker_path):
-        if os.path.exists(os.path.join(docker_path, 'data', 'embeddings')):
-            return docker_path
+        return docker_path
     
     # Try to find module root by looking for common markers
     current_file = os.path.abspath(__file__)
@@ -104,11 +102,7 @@ def _resolve_module_root() -> str:
     # Normalize and check each possible root
     for root in possible_roots:
         root = os.path.abspath(os.path.normpath(root))
-        # Check for markers that indicate module root
-        data_embeddings = os.path.join(root, 'data', 'embeddings')
-        if os.path.exists(data_embeddings):
-            return root
-        # Also check for lib directory and Makefile
+        # Check for lib directory and Makefile (indicators of module root)
         if os.path.exists(os.path.join(root, 'lib', 'kbase_protein_query_module')) and os.path.exists(os.path.join(root, 'Makefile')):
             return root
     
@@ -118,21 +112,84 @@ def _resolve_module_root() -> str:
 
 def _resolve_data_path(relative_path: str, module_root: str = None) -> str:
     """
-    Resolve a data file path relative to module root.
+    Resolve a data file path, checking multiple locations for reference data.
+    
+    This function supports both test data (in Docker image) and reference data
+    (mounted at runtime). It checks in this order:
+    1. Environment variable override (KB_DATA_DIR or KB_REFDATA_DIR)
+    2. Absolute path (if already absolute)
+    3. Reference data directories (common KBase locations)
+    4. Module root data directory (for test data in image)
     
     Args:
-        relative_path: Relative path like 'data/embeddings/embeddings.tsv'
+        relative_path: Relative path like 'data/embeddings/embeddings.tsv' or absolute path
         module_root: Module root directory (auto-detected if None)
     
     Returns:
-        Absolute path to the data file
+        Absolute path to the data file (first location where it exists, or expected path)
     """
+    # If path is already absolute, check if it exists
+    if os.path.isabs(relative_path):
+        if os.path.exists(relative_path):
+            return relative_path
+        # Even if absolute path doesn't exist, return it (caller will handle error)
+        return relative_path
+    
+    # Check environment variables for reference data directory override
+    # KBase may set these for reference data mounts
+    ref_data_dirs = []
+    
+    # Check KB_DATA_DIR (common KBase reference data environment variable)
+    kb_data_dir = os.environ.get('KB_DATA_DIR')
+    if kb_data_dir and os.path.exists(kb_data_dir):
+        ref_data_dirs.append(kb_data_dir)
+    
+    # Check KB_REFDATA_DIR (alternative environment variable)
+    kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
+    if kb_refdata_dir and os.path.exists(kb_refdata_dir):
+        ref_data_dirs.append(kb_refdata_dir)
+    
+    # Check common KBase reference data mount points
+    common_refdata_paths = [
+        '/data',  # Common mount point for reference data
+        '/kb/data',  # Alternative KBase data directory
+        '/refdata',  # Another common reference data location
+    ]
+    for path in common_refdata_paths:
+        if os.path.exists(path):
+            ref_data_dirs.append(path)
+    
+    # Extract the data subpath from relative_path (e.g., 'embeddings/embeddings.tsv' from 'data/embeddings/embeddings.tsv')
+    # Remove 'data/' prefix if present
+    data_subpath = relative_path
+    if data_subpath.startswith('data/'):
+        data_subpath = data_subpath[5:]  # Remove 'data/' prefix
+    elif data_subpath.startswith('data\\'):
+        data_subpath = data_subpath[6:]  # Remove 'data\' prefix (Windows)
+    
+    # Check reference data directories first (for production reference data)
+    for ref_data_dir in ref_data_dirs:
+        # Try with 'data/' prefix
+        test_path1 = os.path.join(ref_data_dir, relative_path)
+        if os.path.exists(test_path1):
+            logger.info(f"Found data in reference data directory: {test_path1}")
+            return os.path.normpath(test_path1)
+        
+        # Try with just the subpath (without 'data/' prefix)
+        test_path2 = os.path.join(ref_data_dir, data_subpath)
+        if os.path.exists(test_path2):
+            logger.info(f"Found data in reference data directory: {test_path2}")
+            return os.path.normpath(test_path2)
+        
+        # Try in a 'kbase_protein_query_module' subdirectory
+        test_path3 = os.path.join(ref_data_dir, 'kbase_protein_query_module', data_subpath)
+        if os.path.exists(test_path3):
+            logger.info(f"Found data in reference data directory: {test_path3}")
+            return os.path.normpath(test_path3)
+    
+    # Fall back to module root (for test data in Docker image)
     if module_root is None:
         module_root = _resolve_module_root()
-    
-    # If path is already absolute, return as-is
-    if os.path.isabs(relative_path):
-        return relative_path
     
     # Resolve relative to module root
     abs_path = os.path.join(module_root, relative_path)
@@ -184,17 +241,49 @@ class NetworkAnalysis:
         self.fetch_metadata = fetch_metadata
         self.fetch_protein_sequence = fetch_protein_sequence
         
-        # Check if embeddings file exists and log warning if not
+        # Check if embeddings file exists and log helpful information
         if not os.path.exists(embeddings_file):
             logger.warning(f"Embeddings file not found: {embeddings_file}")
             logger.warning(f"Module root: {self.module_root}")
-            logger.warning(f"Tried paths: {embeddings_file}")
+            
+            # Log environment variables that might point to reference data
+            kb_data_dir = os.environ.get('KB_DATA_DIR')
+            kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
+            if kb_data_dir:
+                logger.info(f"KB_DATA_DIR environment variable: {kb_data_dir} (exists: {os.path.exists(kb_data_dir)})")
+            if kb_refdata_dir:
+                logger.info(f"KB_REFDATA_DIR environment variable: {kb_refdata_dir} (exists: {os.path.exists(kb_refdata_dir)})")
+            
+            # Check common reference data locations
+            common_paths = ['/data', '/kb/data', '/refdata']
+            for path in common_paths:
+                if os.path.exists(path):
+                    logger.info(f"Reference data directory exists: {path}")
+                    # Check if embeddings might be in this location
+                    test_path = os.path.join(path, 'embeddings', 'embeddings.tsv')
+                    if os.path.exists(test_path):
+                        logger.warning(f"Found embeddings at alternative location: {test_path}")
+            
+            # Log module root contents for debugging
             if os.path.exists(self.module_root):
                 try:
                     contents = os.listdir(self.module_root)[:10]
-                    logger.warning(f"Contents of module root: {contents}")
+                    logger.debug(f"Contents of module root: {contents}")
+                    # Check if data directory exists
+                    data_dir = os.path.join(self.module_root, 'data')
+                    if os.path.exists(data_dir):
+                        logger.debug(f"Data directory exists: {data_dir}")
+                        try:
+                            data_contents = os.listdir(data_dir)[:5]
+                            logger.debug(f"Contents of data directory: {data_contents}")
+                        except Exception:
+                            pass
                 except Exception:
                     pass
+            
+            logger.warning("Data file not found. This is OK if using reference data mounted at runtime.")
+            logger.warning("For reference data setup, see: docs/REFERENCE_DATA_SETUP.md")
+            logger.warning("Set KB_DATA_DIR environment variable to point to reference data directory.")
             # Don't raise error here - allow analysis to be loaded
             # Storage will be initialized lazily when needed, and will raise then if file still missing
         else:
@@ -204,11 +293,36 @@ class NetworkAnalysis:
         """Ensure storage is initialized. Initialize lazily if not already done."""
         if self.storage is None:
             if not os.path.exists(self.embeddings_file):
-                raise FileNotFoundError(
-                    f"Embeddings file not found: {self.embeddings_file}\n"
-                    f"Module root: {self.module_root}\n"
-                    f"Please ensure the embeddings file exists at the specified path."
-                )
+                # Build helpful error message with troubleshooting information
+                error_msg = f"Embeddings file not found: {self.embeddings_file}\n"
+                error_msg += f"Module root: {self.module_root}\n\n"
+                
+                # Check environment variables
+                kb_data_dir = os.environ.get('KB_DATA_DIR')
+                kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
+                if kb_data_dir:
+                    error_msg += f"KB_DATA_DIR: {kb_data_dir} (exists: {os.path.exists(kb_data_dir)})\n"
+                if kb_refdata_dir:
+                    error_msg += f"KB_REFDATA_DIR: {kb_refdata_dir} (exists: {os.path.exists(kb_refdata_dir)})\n"
+                
+                # Check common reference data locations
+                common_paths = ['/data', '/kb/data', '/refdata']
+                found_paths = [p for p in common_paths if os.path.exists(p)]
+                if found_paths:
+                    error_msg += f"Reference data directories found: {', '.join(found_paths)}\n"
+                    # Check if embeddings might be in these locations
+                    for path in found_paths:
+                        test_path = os.path.join(path, 'embeddings', 'embeddings.tsv')
+                        if os.path.exists(test_path):
+                            error_msg += f"  Found embeddings at: {test_path}\n"
+                
+                error_msg += "\nTroubleshooting:\n"
+                error_msg += "1. For test data: Ensure test data was generated during Docker build\n"
+                error_msg += "2. For reference data: Set KB_DATA_DIR environment variable to reference data directory\n"
+                error_msg += "3. For reference data: Mount reference data at /data, /kb/data, or /refdata\n"
+                error_msg += "4. See docs/REFERENCE_DATA_SETUP.md for detailed setup instructions\n"
+                
+                raise FileNotFoundError(error_msg)
             self.storage = ProteinStorage(embeddings_file_path=self.embeddings_file, index_path=self.index_path)
             logger.info(f"Initialized ProteinStorage with {self.storage.n} proteins")
     

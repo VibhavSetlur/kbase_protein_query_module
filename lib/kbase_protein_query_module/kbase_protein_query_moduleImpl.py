@@ -100,36 +100,38 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         
         # Resolve module root directory for data paths
         # In Docker: /kb/module, in local: try to find project root
+        # Note: Data path resolution in NetworkAnalysis will check for reference data
+        # in environment variables (KB_DATA_DIR, KB_REFDATA_DIR) and common mount points
         module_root = os.environ.get('KB_MODULE_DIR', '/kb/module')
         if not os.path.exists(module_root):
-            # Try to find module root by looking for data directory
+            # Try to find module root by looking for lib directory
             # Start from this file and navigate up
             current_file = os.path.abspath(__file__)
             # From: lib/kbase_protein_query_module/kbase_protein_query_moduleImpl.py
             # To: module root (parent of lib/)
             lib_dir = os.path.dirname(os.path.dirname(current_file))
-            possible_roots = [
-                os.path.dirname(lib_dir),  # Parent of lib/
-                os.path.join(os.path.dirname(lib_dir), '..'),  # One more level up
-                os.getcwd(),  # Current working directory
-            ]
-            for root in possible_roots:
-                root = os.path.abspath(root)
-                if os.path.exists(os.path.join(root, 'data', 'embeddings')):
-                    module_root = root
-                    break
-            else:
-                # Fallback: use parent of lib directory
-                module_root = os.path.dirname(lib_dir)
+            module_root = os.path.dirname(lib_dir)
         
         logger.info(f"Using module_root: {module_root}")
+        
+        # Log reference data environment variables if set
+        kb_data_dir = os.environ.get('KB_DATA_DIR')
+        kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
+        if kb_data_dir:
+            logger.info(f"KB_DATA_DIR environment variable set: {kb_data_dir}")
+        if kb_refdata_dir:
+            logger.info(f"KB_REFDATA_DIR environment variable set: {kb_refdata_dir}")
         
         workflow_config = {
             'output_dir': output_dir,
             'workspace_name': workspace_name,
             'selected_analyses': selected_analyses,
             'module_root': module_root,
-            # Data paths - will be resolved relative to module_root in NetworkAnalysis
+            # Data paths - will be resolved by NetworkAnalysis with reference data support
+            # NetworkAnalysis will check:
+            # 1. Environment variables (KB_DATA_DIR, KB_REFDATA_DIR)
+            # 2. Common reference data mount points (/data, /kb/data, /refdata)
+            # 3. Module root data directory (for test data in Docker image)
             'embeddings_file': params.get('embeddings_file') or 'data/embeddings/embeddings.tsv',
             'index_path': params.get('index_path') or 'data/indexes',
         }
@@ -142,6 +144,15 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             workspace_name=workspace_name,
             selected_analyses=selected_analyses,
         )
+        
+        # Check if workflow succeeded - if not, raise an error to fail the job
+        if not result.get('success', False):
+            error_message = result.get('error_message', 'Workflow execution failed')
+            failed_analyses = result.get('failed_analyses', [])
+            if failed_analyses:
+                error_message = f"Workflow failed: {', '.join(failed_analyses)} analysis(es) failed. {error_message}"
+            logger.error(error_message)
+            raise RuntimeError(error_message)
         
         # Create a zip archive of the output directory and upload to Shock
         try:
@@ -241,14 +252,23 @@ Protein query and analysis module with comprehensive network analysis capabiliti
             })
         
         # Create comprehensive report message
-        summary = (result.get('final_output') or {}).get('summary', 'Analysis completed successfully')
+        workflow_success = result.get('success', False)
+        summary = (result.get('final_output') or {}).get('summary', 'Analysis completed')
         protein_count = (result.get('final_output') or {}).get('protein_count', 0)
         stages_completed = result.get('analyses_completed', [])
+        error_message = result.get('error_message', '')
         
-        message = f"Protein Query Analysis completed successfully.\n\n"
+        if workflow_success:
+            message = f"Protein Query Analysis completed successfully.\n\n"
+        else:
+            message = f"Protein Query Analysis FAILED.\n\n"
+        
         message += f"Summary: {summary}\n"
         message += f"Proteins processed: {protein_count}\n"
-        message += f"Stages completed: {', '.join(stages_completed)}\n"
+        if stages_completed:
+            message += f"Stages completed: {', '.join(stages_completed)}\n"
+        if error_message:
+            message += f"Error: {error_message}\n"
         if file_links:
             message += f"Output files: {len(file_links)} file(s) available for download"
         
