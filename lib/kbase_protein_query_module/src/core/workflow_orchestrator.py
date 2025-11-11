@@ -199,20 +199,55 @@ class WorkflowOrchestrator:
                             output_files = result.get('output_files', [])
                             if output_files:
                                 import shutil
+                                updated_output_files = []
                                 for file_path in output_files:
                                     if isinstance(file_path, str) and os.path.exists(file_path):
-                                        # If file is not in analysis directory, copy it
-                                        file_basename = os.path.basename(file_path)
-                                        target_path = os.path.join(analysis_output_dir, file_basename)
-                                        if file_path != target_path:
-                                            shutil.copy2(file_path, target_path)
-                                            logger.debug(f"Copied output file to analysis directory: {file_basename}")
-                                            # Update file path in result
-                                            result['output_files'] = [
-                                                os.path.join(analysis_output_dir, os.path.basename(f)) 
-                                                if isinstance(f, str) and os.path.exists(f) else f
-                                                for f in output_files
-                                            ]
+                                        # Normalize paths for comparison
+                                        file_path_abs = os.path.abspath(os.path.normpath(file_path))
+                                        analysis_output_dir_abs = os.path.abspath(os.path.normpath(analysis_output_dir))
+                                        
+                                        # Check if file is already in analysis directory
+                                        if not file_path_abs.startswith(analysis_output_dir_abs):
+                                            # File is not in analysis directory, copy it
+                                            file_basename = os.path.basename(file_path)
+                                            target_path = os.path.join(analysis_output_dir, file_basename)
+                                            
+                                            # Handle potential filename conflicts by checking if target exists
+                                            if os.path.exists(target_path) and os.path.abspath(os.path.normpath(target_path)) != file_path_abs:
+                                                # File with same name exists but is different file - keep original name
+                                                # This should not happen with our naming scheme (protein_index makes names unique)
+                                                logger.warning(f"Target file already exists: {target_path}, keeping original: {file_path}")
+                                                updated_output_files.append(file_path)
+                                            else:
+                                                try:
+                                                    shutil.copy2(file_path, target_path)
+                                                    logger.info(f"Copied output file to analysis directory: {file_basename} -> {target_path}")
+                                                    updated_output_files.append(target_path)
+                                                except Exception as e:
+                                                    logger.error(f"Failed to copy file {file_path} to {target_path}: {e}")
+                                                    # Keep original path if copy fails
+                                                    updated_output_files.append(file_path)
+                                        else:
+                                            # File is already in analysis directory
+                                            logger.debug(f"File already in analysis directory: {file_path}")
+                                            updated_output_files.append(file_path)
+                                    else:
+                                        # Invalid file path, keep it as-is
+                                        logger.warning(f"Output file path does not exist or is invalid: {file_path}")
+                                        updated_output_files.append(file_path)
+                                
+                                # Update result with normalized file paths
+                                result['output_files'] = updated_output_files
+                                logger.info(f"Total output files for {analysis_name}: {len(updated_output_files)}")
+                                
+                                # Verify files exist in analysis directory
+                                for file_path in updated_output_files:
+                                    if isinstance(file_path, str):
+                                        if os.path.exists(file_path):
+                                            file_size = os.path.getsize(file_path)
+                                            logger.debug(f"Output file verified: {file_path} ({file_size} bytes)")
+                                        else:
+                                            logger.warning(f"Output file does not exist: {file_path}")
                         except Exception as e:
                             logger.error(f"Error saving analysis output for {analysis_name}: {e}", exc_info=True)
                             raise
