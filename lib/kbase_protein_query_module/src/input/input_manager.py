@@ -97,8 +97,18 @@ class InputManager:
             processing_time = time.time() - start_time
             output['processing_time'] = processing_time
             
+            # Ensure proteins is a dict and protein_count is set
+            proteins = output.get('proteins', {})
+            if not isinstance(proteins, dict):
+                raise ValueError(f"Expected proteins to be a dict, got {type(proteins)}")
+            
+            protein_count = output.get('protein_count', len(proteins))
+            if protein_count != len(proteins):
+                output['protein_count'] = len(proteins)
+                protein_count = len(proteins)
+            
             logger.info(f"Input processing completed in {processing_time:.2f} seconds")
-            logger.info(f"Processed {len(output.get('proteins', []))} proteins")
+            logger.info(f"Processed {protein_count} proteins")
             
             return output
             
@@ -112,7 +122,8 @@ class InputManager:
                 'protein_sequence': '',
                 'uniprot_id': [],
                 'analysis_name': '',
-                'proteins': [],
+                'proteins': {},
+                'protein_count': 0,
                 'processing_time': processing_time,
                 'error_message': str(e)
             }

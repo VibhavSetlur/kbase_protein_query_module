@@ -271,7 +271,10 @@ class WorkflowOrchestrator:
                 logger.error(combined_error)
                 
                 # Still build outputs for debugging, but mark workflow as failed
-                protein_count = int(len((processed_data or {}).get("proteins", []) or []))
+                proteins = (processed_data or {}).get("proteins", {})
+                if not isinstance(proteins, dict):
+                    raise ValueError(f"Expected proteins to be a dict, got {type(proteins)}")
+                protein_count = int(len(proteins))
                 final_output = {
                     "summary": f"Failed: {len(failed_analyses)} of {len(analyses_to_run)} analysis step(s) failed",
                     "protein_count": protein_count,
@@ -315,7 +318,10 @@ class WorkflowOrchestrator:
                 }
 
             # 4) Build final outputs and persist run metadata (only if all analyses succeeded)
-            protein_count = int(len((processed_data or {}).get("proteins", []) or []))
+            proteins = (processed_data or {}).get("proteins", {})
+            if not isinstance(proteins, dict):
+                raise ValueError(f"Expected proteins to be a dict, got {type(proteins)}")
+            protein_count = int(len(proteins))
             final_output = {
                 "summary": f"Completed {len(analyses_to_run)} analysis step(s) successfully",
                 "protein_count": protein_count,

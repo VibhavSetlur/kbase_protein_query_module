@@ -8,6 +8,9 @@ import requests
 from typing import Dict, Any, List, Optional
 import re
 
+from Bio.Seq import Seq
+from Bio.SeqUtils import IUPACData
+
 logger = logging.getLogger(__name__)
 
 class UniProtIdProcessor:
@@ -35,12 +38,19 @@ class UniProtIdProcessor:
                 uniprot_id = [uniprot_id.strip()]
             
             # Validate and fetch
-            proteins = []
+            proteins = {}
+            idx = 0
             for uid in uniprot_id:
                 if self._validate(uid):
-                    protein = self._fetch(uid)
-                    if protein:
-                        proteins.append(protein)
+                    protein_data = self._fetch(uid)
+                    if protein_data:
+                        protein_id = f"protein_{idx}"
+                        proteins[protein_id] = {
+                            'sequence': protein_data['sequence'],
+                            'source': 'uniprot',
+                            'original_id': protein_data['protein_id']
+                        }
+                        idx += 1
                 else:
                     logger.warning(f"Invalid UniProt ID: {uid}")
             
@@ -53,6 +63,7 @@ class UniProtIdProcessor:
             return {
                 'success': True,
                 'proteins': proteins,
+                'protein_count': len(proteins),
                 'processing_time': processing_time
             }
             
@@ -61,7 +72,8 @@ class UniProtIdProcessor:
             logger.error(f"UniProt ID processing failed: {e}")
             return {
                 'success': False,
-                'proteins': [],
+                'proteins': {},
+                'protein_count': 0,
                 'processing_time': processing_time,
                 'error_message': str(e)
             }
@@ -82,7 +94,6 @@ class UniProtIdProcessor:
                 response.raise_for_status()
                 data = response.json()
                 
-                # Extract sequence
                 sequence_data = data.get('sequence', {})
                 sequence = sequence_data.get('value', '')
                 protein_id = data.get('primaryAccession', '')
@@ -90,10 +101,14 @@ class UniProtIdProcessor:
                 if not protein_id or not sequence:
                     return None
                 
+                validated_sequence = self._validate_sequence(sequence)
+                if not validated_sequence:
+                    logger.warning(f"Invalid sequence for UniProt ID {uniprot_id}")
+                    return None
+                
                 return {
                     'protein_id': protein_id,
-                    'sequence': sequence,
-                    'source': 'uniprot'
+                    'sequence': validated_sequence
                 }
                 
             except requests.exceptions.HTTPError as e:
@@ -110,6 +125,36 @@ class UniProtIdProcessor:
                 time.sleep(1)
         
         return None
+    
+    def _validate_sequence(self, sequence: str) -> Optional[str]:
+        """Validate and clean protein sequence using BioSeq."""
+        if not sequence:
+            return None
+        
+        try:
+            seq_obj = Seq(sequence.upper())
+            
+            valid_chars = set(IUPACData.protein_letters)
+            valid_chars.update(['-', '*', 'X', 'B', 'Z', 'J', 'U', 'O'])
+            
+            cleaned_chars = []
+            for char in str(seq_obj):
+                if char in valid_chars or char.isspace():
+                    if not char.isspace():
+                        cleaned_chars.append(char)
+            
+            cleaned = ''.join(cleaned_chars)
+            
+            if not cleaned:
+                return None
+            
+            if len(cleaned) < 1:
+                return None
+            
+            return cleaned
+        except Exception as e:
+            logger.warning(f"Sequence validation error: {e}")
+            return None
     
     def standardize_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Standardize input_data format."""

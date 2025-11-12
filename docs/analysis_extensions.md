@@ -1,8 +1,10 @@
-# Adding New Analyses
+# Adding New Analyses (Advanced)
 
 ## Overview
 
-Add new analysis types by creating a module, registering it, adding output handlers, and writing tests. Keep tests concise, professional, and aligned with `kb-sdk test`.
+This is an advanced guide for adding new analyses. For a simpler step-by-step guide, see [CREATING_ANALYSES.md](CREATING_ANALYSES.md).
+
+Add new analysis types by creating a module, registering it, and writing self-tests. All analyses must include self-tests that print "ANALYSIS_OK" or "ANALYSIS_FAIL: <error>".
 
 ## Step-by-Step Guide
 

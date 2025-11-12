@@ -78,12 +78,12 @@ def _resolve_module_root() -> str:
     # Check environment variable first (set by KBase SDK)
     module_root = os.environ.get('KB_MODULE_DIR')
     if module_root and os.path.exists(module_root):
-        return module_root
+            return module_root
     
     # Try standard Docker path
     docker_path = '/kb/module'
     if os.path.exists(docker_path):
-        return docker_path
+            return docker_path
     
     # Try to find module root by looking for common markers
     current_file = os.path.abspath(__file__)
@@ -351,39 +351,56 @@ class NetworkAnalysis:
                 logger.error(f"Failed to create or verify output directory {output_dir}: {e}")
                 raise
             
-            # Check if we have a proteins list (from input processing)
-            proteins = input_data.get('proteins', [])
+            # Check if we have proteins dict (from input processing)
+            proteins = input_data.get('proteins', {})
             
-            if proteins and isinstance(proteins, list) and len(proteins) > 0:
+            if not isinstance(proteins, dict):
+                raise ValueError(f"Expected proteins to be a dict, got {type(proteins)}")
+            
+            if proteins and len(proteins) > 0:
                 # Process multiple proteins - run analysis for each protein separately
                 logger.info(f"Processing {len(proteins)} proteins for network analysis")
                 all_saved_files = []
                 all_network_stats = []
                 protein_results = []
                 
-                for idx, protein in enumerate(proteins):
+                protein_items = list(proteins.items())
+                for idx, (protein_id, protein_data) in enumerate(protein_items):
                     try:
-                        logger.info(f"Processing protein {idx + 1}/{len(proteins)}: {protein.get('protein_id', 'unknown')}")
+                        original_id = protein_data.get('original_id', protein_id)
+                        logger.info(f"Processing protein {idx + 1}/{len(proteins)}: {original_id} ({protein_id})")
+                        
+                        # Convert to format expected by _process_single_protein
+                        protein = {
+                            'protein_id': protein_id,
+                            'sequence': protein_data.get('sequence', ''),
+                            'source': protein_data.get('source', 'unknown'),
+                            'original_id': original_id
+                        }
+                        
                         result = self._process_single_protein(protein, output_dir, idx)
                         if result and result.get('success'):
                             all_saved_files.extend(result.get('output_files', []))
                             all_network_stats.append(result.get('network_stats', {}))
                             protein_results.append({
-                                'protein_id': protein.get('protein_id', 'unknown'),
+                                'protein_id': protein_id,
+                                'original_id': original_id,
                                 'success': True,
                                 'output_files': result.get('output_files', [])
                             })
                         else:
-                            logger.warning(f"Failed to process protein {protein.get('protein_id', 'unknown')}: {result.get('error_message', 'Unknown error')}")
+                            logger.warning(f"Failed to process protein {original_id}: {result.get('error_message', 'Unknown error') if result else 'No result'}")
                             protein_results.append({
-                                'protein_id': protein.get('protein_id', 'unknown'),
+                                'protein_id': protein_id,
+                                'original_id': original_id,
                                 'success': False,
-                                'error_message': result.get('error_message', 'Unknown error')
+                                'error_message': result.get('error_message', 'Unknown error') if result else 'No result'
                             })
                     except Exception as e:
-                        logger.error(f"Error processing protein {protein.get('protein_id', 'unknown')}: {e}", exc_info=True)
+                        logger.error(f"Error processing protein {protein_id}: {e}", exc_info=True)
                         protein_results.append({
-                            'protein_id': protein.get('protein_id', 'unknown'),
+                            'protein_id': protein_id,
+                            'original_id': protein_data.get('original_id', protein_id),
                             'success': False,
                             'error_message': str(e)
                         })
@@ -398,44 +415,7 @@ class NetworkAnalysis:
                     'protein_results': protein_results
                 }
             else:
-                # Legacy single protein processing (for backward compatibility)
-                logger.info("Processing single protein (legacy mode)")
-                input_type = input_data.get('input_type')
-                
-                if input_type == 'protein_sequence':
-                    query_protein_sequence = input_data.get('protein_sequence', '')
-                    if not query_protein_sequence:
-                        raise ValueError("No protein sequence provided")
-                    protein = {
-                        'protein_id': 'QUERY_PROTEIN',
-                        'sequence': query_protein_sequence,
-                        'source': 'protein_sequence'
-                    }
-                elif input_type == 'uniprot_id':
-                    uniprot_id = input_data.get('uniprot_id', [])
-                    if isinstance(uniprot_id, str):
-                        uniprot_id = [uniprot_id]
-                    if not uniprot_id:
-                        raise ValueError("No UniProt ID provided")
-                    query_uniprot_id = uniprot_id[0]
-                    
-                    # Fetch sequence
-                    query_sequence = self.fetch_protein_sequence(query_uniprot_id)
-                    if not query_sequence:
-                        raise ValueError(f"Failed to fetch sequence for UniProt ID: {query_uniprot_id}")
-                    protein = {
-                        'protein_id': query_uniprot_id,
-                        'sequence': query_sequence,
-                        'source': 'uniprot'
-                    }
-                else:
-                    raise ValueError(f"Unsupported input_type: {input_type}")
-                
-                result = self._process_single_protein(protein, output_dir, 0)
-                execution_time = time.time() - start_time
-                if result:
-                    result['processing_time'] = execution_time
-                return result
+                raise ValueError("No proteins provided for network analysis")
             
         except Exception as e:
             execution_time = time.time() - start_time
@@ -466,7 +446,7 @@ class NetworkAnalysis:
             query_embedding = self.embedding_generator.generate_embedding(protein_sequence, pooling="mean")
             if query_embedding is None or query_embedding.size == 0:
                 raise ValueError(f"Failed to generate embedding for protein {protein_id}")
-            
+                
             # Perform similarity search
             top = self.storage.find_top_k_similar(query_embedding, top_k=self.k_neighbors)
             if top is None or len(top) == 0:
@@ -493,7 +473,7 @@ class NetworkAnalysis:
                     'Protein families': 'N/A',
                     'Reviewed': 'N/A'
                 }
-            
+                
             # Get metadata and sequences for top k similar proteins
             top_k_similar_proteins_metadata = {}
             top_k_sequences = {}
@@ -604,12 +584,12 @@ class NetworkAnalysis:
                 else:
                     logger.warning(f"  - {os.path.basename(file_path)} (FILE NOT FOUND)")
             
-            return {
-                'success': True,
+                return {
+                    'success': True,
                 'output_files': saved_files,
                 'network_stats': network_stats,
                 'protein_id': protein_id
-            }
+                }
             
         except Exception as e:
             logger.error(f"Error processing single protein: {e}", exc_info=True)
