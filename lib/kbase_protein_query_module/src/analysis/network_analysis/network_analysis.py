@@ -17,12 +17,18 @@ Features:
 import sys
 import os
 
-# Set up path for script execution - add src directory to path
+# Set up path for script execution - add lib directory to path
 # File is at: src/analysis/network_analysis/network_analysis.py
-# We need: src/ (which contains util/)
 _script_file = os.path.abspath(__file__)
 _current_dir = os.path.dirname(_script_file)  # analysis/network_analysis
 _src_dir = os.path.dirname(os.path.dirname(_current_dir))  # src
+_module_dir = os.path.dirname(_src_dir) # kbase_protein_query_module
+_lib_dir = os.path.dirname(_module_dir) # lib
+
+if _lib_dir not in sys.path:
+    sys.path.insert(0, _lib_dir)
+
+# Also add src to path for direct imports if needed (though full package imports are preferred)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
@@ -36,8 +42,6 @@ import time
 # --- Third-party package imports (optional) ---
 try:
     import networkx as nx
-    from sklearn.metrics.pairwise import cosine_similarity
-    from sklearn.cluster import AgglomerativeClustering
     HAS_GRAPH_DEPS = True
 except Exception:
     HAS_GRAPH_DEPS = False
@@ -46,10 +50,10 @@ except Exception:
 # --- Utility module imports ---
 # When running as script, use absolute imports; when imported as module, use relative
 if __name__ == "__main__":
-    # Script execution - use absolute imports with path we just set up
-    from util.storage.storage import ProteinStorage
-    from util.embeddings.generator import ProteinEmbeddingGenerator
-    from util.uniprot.api import fetch_metadata, fetch_protein_sequence
+    # Script execution - use full package imports
+    from kbase_protein_query_module.src.util.storage.storage import ProteinStorage
+    from kbase_protein_query_module.src.util.embeddings.generator import ProteinEmbeddingGenerator
+    from kbase_protein_query_module.src.util.uniprot.api import fetch_metadata, fetch_protein_sequence
 else:
     # Module import - use relative imports
     try:
@@ -58,144 +62,15 @@ else:
         from ...util.uniprot.api import fetch_metadata, fetch_protein_sequence
     except ImportError:
         # Fallback to absolute if relative fails
-        from util.storage.storage import ProteinStorage
-        from util.embeddings.generator import ProteinEmbeddingGenerator
-        from util.uniprot.api import fetch_metadata, fetch_protein_sequence
+        from kbase_protein_query_module.src.util.storage.storage import ProteinStorage
+        from kbase_protein_query_module.src.util.embeddings.generator import ProteinEmbeddingGenerator
+        from kbase_protein_query_module.src.util.uniprot.api import fetch_metadata, fetch_protein_sequence
 
 
 logger = logging.getLogger(__name__)
 
 # Lazy import for visualizer
 NetworkVisualizer = None
-
-
-def _resolve_module_root() -> str:
-    """
-    Resolve the module root directory.
-    In Docker: /kb/module
-    In local dev: project root (parent of lib/)
-    """
-    # Check environment variable first (set by KBase SDK)
-    module_root = os.environ.get('KB_MODULE_DIR')
-    if module_root and os.path.exists(module_root):
-            return module_root
-    
-    # Try standard Docker path
-    docker_path = '/kb/module'
-    if os.path.exists(docker_path):
-            return docker_path
-    
-    # Try to find module root by looking for common markers
-    current_file = os.path.abspath(__file__)
-    
-    # Navigate up from: lib/kbase_protein_query_module/src/analysis/network_analysis/network_analysis.py
-    # To module root (parent of lib/)
-    # Current file is at: .../lib/kbase_protein_query_module/src/analysis/network_analysis/network_analysis.py
-    # Module root should be 5 levels up
-    lib_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))  # lib/
-    possible_roots = [
-        os.path.dirname(lib_dir),  # Parent of lib/ (most likely module root)
-        os.path.join(lib_dir, '..'),  # Same, but using join
-        os.getcwd(),  # Current working directory
-    ]
-    
-    # Normalize and check each possible root
-    for root in possible_roots:
-        root = os.path.abspath(os.path.normpath(root))
-        # Check for lib directory and Makefile (indicators of module root)
-        if os.path.exists(os.path.join(root, 'lib', 'kbase_protein_query_module')) and os.path.exists(os.path.join(root, 'Makefile')):
-            return root
-    
-    # Last resort: return parent of lib directory
-    return os.path.dirname(lib_dir) if os.path.exists(os.path.dirname(lib_dir)) else os.getcwd()
-
-
-def _resolve_data_path(relative_path: str, module_root: str = None) -> str:
-    """
-    Resolve a data file path, checking multiple locations for reference data.
-    
-    This function supports both test data (in Docker image) and reference data
-    (mounted at runtime). It checks in this order:
-    1. Environment variable override (KB_DATA_DIR or KB_REFDATA_DIR)
-    2. Absolute path (if already absolute)
-    3. Reference data directories (common KBase locations)
-    4. Module root data directory (for test data in image)
-    
-    Args:
-        relative_path: Relative path like 'data/embeddings/embeddings.tsv' or absolute path
-        module_root: Module root directory (auto-detected if None)
-    
-    Returns:
-        Absolute path to the data file (first location where it exists, or expected path)
-    """
-    # If path is already absolute, check if it exists
-    if os.path.isabs(relative_path):
-        if os.path.exists(relative_path):
-            return relative_path
-        # Even if absolute path doesn't exist, return it (caller will handle error)
-        return relative_path
-    
-    # Check environment variables for reference data directory override
-    # KBase may set these for reference data mounts
-    ref_data_dirs = []
-    
-    # Check KB_DATA_DIR (common KBase reference data environment variable)
-    kb_data_dir = os.environ.get('KB_DATA_DIR')
-    if kb_data_dir and os.path.exists(kb_data_dir):
-        ref_data_dirs.append(kb_data_dir)
-    
-    # Check KB_REFDATA_DIR (alternative environment variable)
-    kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
-    if kb_refdata_dir and os.path.exists(kb_refdata_dir):
-        ref_data_dirs.append(kb_refdata_dir)
-    
-    # Check common KBase reference data mount points
-    common_refdata_paths = [
-        '/data',  # Common mount point for reference data
-        '/kb/data',  # Alternative KBase data directory
-        '/refdata',  # Another common reference data location
-    ]
-    for path in common_refdata_paths:
-        if os.path.exists(path):
-            ref_data_dirs.append(path)
-    
-    # Extract the data subpath from relative_path (e.g., 'embeddings/embeddings.tsv' from 'data/embeddings/embeddings.tsv')
-    # Remove 'data/' prefix if present
-    data_subpath = relative_path
-    if data_subpath.startswith('data/'):
-        data_subpath = data_subpath[5:]  # Remove 'data/' prefix
-    elif data_subpath.startswith('data\\'):
-        data_subpath = data_subpath[6:]  # Remove 'data\' prefix (Windows)
-    
-    # Check reference data directories first (for production reference data)
-    for ref_data_dir in ref_data_dirs:
-        # Try with 'data/' prefix
-        test_path1 = os.path.join(ref_data_dir, relative_path)
-        if os.path.exists(test_path1):
-            logger.info(f"Found data in reference data directory: {test_path1}")
-            return os.path.normpath(test_path1)
-        
-        # Try with just the subpath (without 'data/' prefix)
-        test_path2 = os.path.join(ref_data_dir, data_subpath)
-        if os.path.exists(test_path2):
-            logger.info(f"Found data in reference data directory: {test_path2}")
-            return os.path.normpath(test_path2)
-        
-        # Try in a 'kbase_protein_query_module' subdirectory
-        test_path3 = os.path.join(ref_data_dir, 'kbase_protein_query_module', data_subpath)
-        if os.path.exists(test_path3):
-            logger.info(f"Found data in reference data directory: {test_path3}")
-            return os.path.normpath(test_path3)
-    
-    # Fall back to module root (for test data in Docker image)
-    if module_root is None:
-        module_root = _resolve_module_root()
-    
-    # Resolve relative to module root
-    abs_path = os.path.join(module_root, relative_path)
-    abs_path = os.path.normpath(abs_path)
-    
-    return abs_path
 
 
 class NetworkAnalysis:
@@ -210,121 +85,18 @@ class NetworkAnalysis:
         self.k_neighbors = self.config.get('k_neighbors', 10)
         self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
         
-        # Resolve module root for data paths
-        self.module_root = self.config.get('module_root') or _resolve_module_root()
-        logger.debug(f"NetworkAnalysis using module_root: {self.module_root}")
-        
         # Initialize utilities
         self.embedding_generator = ProteinEmbeddingGenerator()
         
-        # Storage for simple access + integrated similarity
-        # Resolve embeddings file path - try config first, then resolve relative to module root
-        embeddings_file = self.config.get('embeddings_file')
-        if not embeddings_file:
-            # Default relative path
-            embeddings_file = 'data/embeddings/embeddings.tsv'
+        # Initialize Storage
+        # Note: ProteinStorage now uses KBUtilLib/PLM API and doesn't require local embeddings file
+        plm_api_url = self.config.get('plm_api_url', "https://kbase.us/services/llm_homology_api")
+        self.storage = ProteinStorage(plm_api_url=plm_api_url, config=self.config)
         
-        # Resolve to absolute path
-        embeddings_file = _resolve_data_path(embeddings_file, self.module_root)
-        logger.debug(f"NetworkAnalysis using embeddings_file: {embeddings_file}")
-        
-        # Resolve index path
-        index_path = self.config.get('index_path', 'data/indexes')
-        if not os.path.isabs(index_path):
-            index_path = _resolve_data_path(index_path, self.module_root)
-        logger.debug(f"NetworkAnalysis using index_path: {index_path}")
-        
-        # Store paths for lazy initialization
-        self.embeddings_file = embeddings_file
-        self.index_path = index_path
-        self.storage = None  # Will be initialized on first use
         self.fetch_metadata = fetch_metadata
         self.fetch_protein_sequence = fetch_protein_sequence
         
-        # Check if embeddings file exists and log helpful information
-        if not os.path.exists(embeddings_file):
-            logger.warning(f"Embeddings file not found: {embeddings_file}")
-            logger.warning(f"Module root: {self.module_root}")
-            
-            # Log environment variables that might point to reference data
-            kb_data_dir = os.environ.get('KB_DATA_DIR')
-            kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
-            if kb_data_dir:
-                logger.info(f"KB_DATA_DIR environment variable: {kb_data_dir} (exists: {os.path.exists(kb_data_dir)})")
-            if kb_refdata_dir:
-                logger.info(f"KB_REFDATA_DIR environment variable: {kb_refdata_dir} (exists: {os.path.exists(kb_refdata_dir)})")
-            
-            # Check common reference data locations
-            common_paths = ['/data', '/kb/data', '/refdata']
-            for path in common_paths:
-                if os.path.exists(path):
-                    logger.info(f"Reference data directory exists: {path}")
-                    # Check if embeddings might be in this location
-                    test_path = os.path.join(path, 'embeddings', 'embeddings.tsv')
-                    if os.path.exists(test_path):
-                        logger.warning(f"Found embeddings at alternative location: {test_path}")
-            
-            # Log module root contents for debugging
-            if os.path.exists(self.module_root):
-                try:
-                    contents = os.listdir(self.module_root)[:10]
-                    logger.debug(f"Contents of module root: {contents}")
-                    # Check if data directory exists
-                    data_dir = os.path.join(self.module_root, 'data')
-                    if os.path.exists(data_dir):
-                        logger.debug(f"Data directory exists: {data_dir}")
-                        try:
-                            data_contents = os.listdir(data_dir)[:5]
-                            logger.debug(f"Contents of data directory: {data_contents}")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-            
-            logger.warning("Data file not found. This is OK if using reference data mounted at runtime.")
-            logger.warning("For reference data setup, see: docs/REFERENCE_DATA_SETUP.md")
-            logger.warning("Set KB_DATA_DIR environment variable to point to reference data directory.")
-            # Don't raise error here - allow analysis to be loaded
-            # Storage will be initialized lazily when needed, and will raise then if file still missing
-        else:
-            logger.info(f"Found embeddings file: {embeddings_file}")
-    
-    def _ensure_storage(self):
-        """Ensure storage is initialized. Initialize lazily if not already done."""
-        if self.storage is None:
-            if not os.path.exists(self.embeddings_file):
-                # Build helpful error message with troubleshooting information
-                error_msg = f"Embeddings file not found: {self.embeddings_file}\n"
-                error_msg += f"Module root: {self.module_root}\n\n"
-                
-                # Check environment variables
-                kb_data_dir = os.environ.get('KB_DATA_DIR')
-                kb_refdata_dir = os.environ.get('KB_REFDATA_DIR')
-                if kb_data_dir:
-                    error_msg += f"KB_DATA_DIR: {kb_data_dir} (exists: {os.path.exists(kb_data_dir)})\n"
-                if kb_refdata_dir:
-                    error_msg += f"KB_REFDATA_DIR: {kb_refdata_dir} (exists: {os.path.exists(kb_refdata_dir)})\n"
-                
-                # Check common reference data locations
-                common_paths = ['/data', '/kb/data', '/refdata']
-                found_paths = [p for p in common_paths if os.path.exists(p)]
-                if found_paths:
-                    error_msg += f"Reference data directories found: {', '.join(found_paths)}\n"
-                    # Check if embeddings might be in these locations
-                    for path in found_paths:
-                        test_path = os.path.join(path, 'embeddings', 'embeddings.tsv')
-                        if os.path.exists(test_path):
-                            error_msg += f"  Found embeddings at: {test_path}\n"
-                
-                error_msg += "\nTroubleshooting:\n"
-                error_msg += "1. For test data: Ensure test data was generated during Docker build\n"
-                error_msg += "2. For reference data: Set KB_DATA_DIR environment variable to reference data directory\n"
-                error_msg += "3. For reference data: Mount reference data at /data, /kb/data, or /refdata\n"
-                error_msg += "4. See docs/REFERENCE_DATA_SETUP.md for detailed setup instructions\n"
-                
-                raise FileNotFoundError(error_msg)
-            self.storage = ProteinStorage(embeddings_file_path=self.embeddings_file, index_path=self.index_path)
-            logger.info(f"Initialized ProteinStorage with {self.storage.n} proteins")
+        logger.info("NetworkAnalysis initialized")
     
     def run_network_analysis(self, input_data: Dict[str, Any]):
         """Run network analysis for a list of proteins."""
@@ -334,9 +106,6 @@ class NetworkAnalysis:
             raise ValueError("Input data is required for network analysis")
         
         try:
-            # Ensure storage is initialized
-            self._ensure_storage()
-            
             # Get output directory - this should be analysis/network_analysis
             output_dir = input_data.get('output_dir', 'outputs')
             try:
@@ -354,6 +123,16 @@ class NetworkAnalysis:
             # Check if we have proteins dict (from input processing)
             proteins = input_data.get('proteins', {})
             
+            # Handle single protein sequence input (for testing or simple calls)
+            if not proteins and 'protein_sequence' in input_data:
+                proteins = {
+                    'query_protein': {
+                        'sequence': input_data['protein_sequence'],
+                        'source': 'user_input',
+                        'original_id': 'Query'
+                    }
+                }
+
             if not isinstance(proteins, dict):
                 raise ValueError(f"Expected proteins to be a dict, got {type(proteins)}")
             
@@ -442,15 +221,46 @@ class NetworkAnalysis:
             if not protein_sequence:
                 raise ValueError(f"No sequence provided for protein {protein_id}")
             
-            # Generate embedding for query protein sequence
-            query_embedding = self.embedding_generator.generate_embedding(protein_sequence, pooling="mean")
-            if query_embedding is None or query_embedding.size == 0:
-                raise ValueError(f"Failed to generate embedding for protein {protein_id}")
-                
-            # Perform similarity search
-            top = self.storage.find_top_k_similar(query_embedding, top_k=self.k_neighbors)
-            if top is None or len(top) == 0:
-                raise ValueError(f"Failed to perform similarity search for protein {protein_id}")
+            # Generate embedding for query protein sequence (local fallback)
+            local_query_embedding = self.embedding_generator.generate_embedding(protein_sequence, pooling="mean")
+            query_embedding = local_query_embedding
+            
+            # Perform similarity search using ProteinStorage
+            # Construct proteins dict for query
+            proteins_query = {
+                protein_id: {
+                    'id': protein_id,
+                    'sequence': protein_sequence
+                }
+            }
+            
+            # Query PLM API
+            # Note: return_embeddings=True ensures we get embeddings for hits AND query if available
+            search_results = self.storage.query_similar_proteins(
+                proteins=proteins_query,
+                max_hits=self.k_neighbors,
+                similarity_threshold=self.similarity_threshold,
+                return_embeddings=True
+            )
+            
+            if protein_id not in search_results:
+                raise ValueError(f"No search results returned for protein {protein_id}")
+            
+            result_entry = search_results[protein_id]
+            
+            # Use server-provided query embedding if available (avoids dimension mismatch)
+            if 'query_embedding' in result_entry:
+                query_embedding = result_entry['query_embedding']
+                logger.info(f"Using server-provided query embedding (shape: {query_embedding.shape})")
+            elif query_embedding is None or query_embedding.size == 0:
+                 raise ValueError(f"Failed to generate embedding for protein {protein_id}")
+            
+            hits = result_entry.get('hits', [])
+            
+            if not hits:
+                logger.warning(f"No similar proteins found for {protein_id}")
+                # We can still proceed with just the query protein if desired, or raise error
+                # For network analysis, a single node is boring but valid
             
             # Get query protein metadata
             if protein_source == 'uniprot' and protein_id:
@@ -474,44 +284,57 @@ class NetworkAnalysis:
                     'Reviewed': 'N/A'
                 }
                 
-            # Get metadata and sequences for top k similar proteins
+            # Process hits
             top_k_similar_proteins_metadata = {}
             top_k_sequences = {}
             top_k_similarity_scores = {}
+            top_k_embeddings = {}
             
-            # Extract similarity scores from top results
-            for uniprot_id, similarity_score in top:
-                top_k_similarity_scores[uniprot_id] = float(similarity_score)
+            # Collect UniProt IDs for batch metadata fetch
+            uniprot_ids = [hit.get('id') or hit.get('uniprot_id') for hit in hits if hit.get('id') or hit.get('uniprot_id')]
+            
+            # Fetch metadata in batch
+            if uniprot_ids:
                 try:
-                    metadata_list = self.fetch_metadata([uniprot_id])
-                    if metadata_list and len(metadata_list) > 0:
-                        top_k_similar_proteins_metadata[uniprot_id] = metadata_list[0]
-                    else:
-                        top_k_similar_proteins_metadata[uniprot_id] = {'Entry': uniprot_id}
+                    metadata_list = self.fetch_metadata(uniprot_ids)
+                    for meta in metadata_list:
+                        uid = meta.get('Entry')
+                        if uid:
+                            top_k_similar_proteins_metadata[uid] = meta
                 except Exception as e:
-                    logger.warning(f"Could not fetch metadata for UniProt ID {uniprot_id}: {e}")
+                    logger.warning(f"Batch metadata fetch failed: {e}")
+
+            for hit in hits:
+                uniprot_id = hit.get('id') or hit.get('uniprot_id')
+                if not uniprot_id:
+                    continue
+                    
+                score = hit.get('score') or hit.get('plm_score', 0.0)
+                top_k_similarity_scores[uniprot_id] = float(score)
+                
+                # Ensure metadata exists
+                if uniprot_id not in top_k_similar_proteins_metadata:
                     top_k_similar_proteins_metadata[uniprot_id] = {'Entry': uniprot_id}
                 
-                # Fetch sequence for each match
+                # Fetch sequence (one by one for now, or could use batch if available)
+                # KBUtilLib has get_uniprot_sequences but we are using util.uniprot.api here
+                # We'll stick to util.uniprot.api for consistency within this module for now
                 try:
                     seq = self.fetch_protein_sequence(uniprot_id)
-                    if seq:
-                        top_k_sequences[uniprot_id] = seq
-                    else:
-                        top_k_sequences[uniprot_id] = ''
+                    top_k_sequences[uniprot_id] = seq if seq else ''
                 except Exception as e:
-                    logger.warning(f"Could not fetch sequence for UniProt ID {uniprot_id}: {e}")
+                    logger.warning(f"Could not fetch sequence for {uniprot_id}: {e}")
                     top_k_sequences[uniprot_id] = ''
-            
-            # Get embeddings for top k proteins
-            top_k_embeddings = {}
-            for uniprot_id, _ in top:
-                try:
+                
+                # Get embedding
+                # Try to get from hit first
+                embedding = hit.get('embedding')
+                if embedding is None:
+                    # Try getting from storage cache
                     embedding = self.storage.get_embedding(uniprot_id)
-                    if embedding is not None:
-                        top_k_embeddings[uniprot_id] = embedding
-                except Exception as e:
-                    logger.warning(f"Could not get embedding for UniProt ID {uniprot_id}: {e}")
+                
+                if embedding is not None:
+                    top_k_embeddings[uniprot_id] = embedding
             
             # Combine embeddings: query + top k
             query_protein_id_key = query_protein_metadata.get('Entry', protein_id)
@@ -519,15 +342,30 @@ class NetworkAnalysis:
             embeddings_list = [query_embedding]
             all_metadata = {query_protein_id_key: query_protein_metadata}
             
-            for uniprot_id in top_k_embeddings.keys():
+            for uniprot_id, embedding in top_k_embeddings.items():
                 protein_ids.append(uniprot_id)
-                embeddings_list.append(top_k_embeddings[uniprot_id])
+                embeddings_list.append(embedding)
                 all_metadata[uniprot_id] = top_k_similar_proteins_metadata.get(uniprot_id, {'Entry': uniprot_id})
             
             if len(embeddings_list) == 0:
                 raise ValueError(f"No embeddings available for protein {protein_id}")
             
-            embeddings = np.vstack([np.asarray(v, dtype=np.float32) for v in embeddings_list])
+            # Stack embeddings
+            # Ensure all are numpy arrays of same shape
+            try:
+                # Check shapes
+                shapes = [e.shape for e in embeddings_list]
+                if len(set(shapes)) > 1:
+                    logger.warning(f"Embedding shapes mismatch: {shapes}. Truncating or skipping.")
+                    # Simple fix: filter out mismatches (assuming query is correct)
+                    target_shape = query_embedding.shape
+                    valid_indices = [i for i, e in enumerate(embeddings_list) if e.shape == target_shape]
+                    embeddings_list = [embeddings_list[i] for i in valid_indices]
+                    protein_ids = [protein_ids[i] for i in valid_indices]
+                
+                embeddings = np.vstack([np.asarray(v, dtype=np.float32) for v in embeddings_list])
+            except Exception as e:
+                raise ValueError(f"Failed to stack embeddings: {e}")
             
             # Create visualization and save results
             saved_files = []
@@ -536,7 +374,16 @@ class NetworkAnalysis:
             if HAS_GRAPH_DEPS:
                 global NetworkVisualizer
                 if NetworkVisualizer is None:
-                    from .network_visualizer import NetworkVisualizer
+                    try:
+                        from .network_visualizer import NetworkVisualizer
+                    except ImportError:
+                        # Fallback for script execution where relative import might fail
+                        # Try absolute import assuming src is in path
+                        try:
+                            from analysis.network_analysis.network_visualizer import NetworkVisualizer
+                        except ImportError:
+                            # Try direct import if in same directory
+                            from network_visualizer import NetworkVisualizer
                 visualizer = NetworkVisualizer({
                     'k_neighbors': self.k_neighbors,
                     'similarity_threshold': self.similarity_threshold
@@ -584,12 +431,12 @@ class NetworkAnalysis:
                 else:
                     logger.warning(f"  - {os.path.basename(file_path)} (FILE NOT FOUND)")
             
-                return {
-                    'success': True,
+            return {
+                'success': True,
                 'output_files': saved_files,
                 'network_stats': network_stats,
                 'protein_id': protein_id
-                }
+            }
             
         except Exception as e:
             logger.error(f"Error processing single protein: {e}", exc_info=True)
@@ -621,17 +468,12 @@ class NetworkAnalysis:
                     shutil.copy2(html_path, new_html_path)
                     logger.info(f"Saved HTML visualization to {new_html_path}")
                     saved_files.append(new_html_path)
-                    # Optionally remove the original file if it's in a temp location
-                    # (but keep it if it's already in output_dir with a different name)
                 except Exception as e:
                     logger.warning(f"Could not copy/rename HTML file: {e}")
-                    # Fall back to original path if copy fails
                     if os.path.exists(html_path):
                         saved_files.append(html_path)
             else:
-                # File is already at the correct location with correct name
                 saved_files.append(html_path)
-                logger.debug(f"HTML visualization already at correct location: {html_path}")
         
         # Save network graph data - generate TSV files
         network_graph = visualization_results.get('network_graph')
@@ -747,26 +589,34 @@ def main():
     ok = True
     output_dir = os.path.join('/tmp', f"kpqm_network_test_{int(time.time())}")
     try:
-        test_sequence = "ACDEFGHIKLMNPQRSTVWY"
+        # Test sequence (Human Insulin)
+        test_sequence = "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN"
+        
         input_data = {
             'input_type': 'protein_sequence',
             'protein_sequence': test_sequence,
             'output_dir': output_dir
         }
-        os.makedirs(output_dir, exist_ok=True)
+        
+        print(f"Starting NetworkAnalysis self-test with output dir: {output_dir}")
         analysis = NetworkAnalysis(config={})
         result = analysis.run_network_analysis(input_data)
         
         if not isinstance(result, dict) or result.get('success') is not True:
-            raise RuntimeError(f"Network analysis failed: {result}")
-        
-        if HAS_GRAPH_DEPS:
-            files = result.get('output_files') or []
-            missing = [p for p in files if not (isinstance(p, str) and os.path.exists(p))]
-            if missing:
-                raise RuntimeError(f"Some output files were not found on disk: {missing}")
-        
-        print("ANALYSIS_OK")
+            # Check if it failed due to missing dependencies (e.g. KBPLMUtils) which is expected in some envs
+            error = result.get('error_message', '')
+            if "KBPLMUtils not available" in error:
+                print(f"ANALYSIS_SKIP: {error}")
+            else:
+                raise RuntimeError(f"Network analysis failed: {result}")
+        else:
+            if HAS_GRAPH_DEPS:
+                files = result.get('output_files') or []
+                missing = [p for p in files if not (isinstance(p, str) and os.path.exists(p))]
+                if missing:
+                    raise RuntimeError(f"Some output files were not found on disk: {missing}")
+            print("ANALYSIS_OK")
+            
     except Exception as e:
         ok = False
         print(f"ANALYSIS_FAIL: {e}")

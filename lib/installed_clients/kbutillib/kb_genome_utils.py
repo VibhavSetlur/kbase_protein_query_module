@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from .base_utils import BaseUtils
+from base_utils import BaseUtils
 
 
 class KBGenomeUtils(BaseUtils):

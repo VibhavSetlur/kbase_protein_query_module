@@ -13,11 +13,16 @@ from typing import Dict, Any, Optional
 # Handle both script execution and module import
 if __name__ == "__main__" or __package__ is None:
     # Add parent directories to path for script execution
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.dirname(current_dir)
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-    from analysis.config import get_enabled_analyses
+    # We need to add 'lib' to path so 'kbase_protein_query_module' is importable
+    current_dir = os.path.dirname(os.path.abspath(__file__)) # src/analysis
+    src_dir = os.path.dirname(current_dir) # src
+    module_dir = os.path.dirname(src_dir) # kbase_protein_query_module
+    lib_dir = os.path.dirname(module_dir) # lib
+    
+    if lib_dir not in sys.path:
+        sys.path.insert(0, lib_dir)
+        
+    from kbase_protein_query_module.src.analysis.config import get_enabled_analyses
 else:
     from .config import get_enabled_analyses
 
