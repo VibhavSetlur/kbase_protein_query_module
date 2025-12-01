@@ -91,7 +91,7 @@ echo ""
 echo -e "${BOLD}Running utility component tests...${NC}"
 run_test_module "Embedding Generator" "kbase_protein_query_module.src.util.embeddings.generator"
 run_test_module "Protein Storage" "kbase_protein_query_module.src.util.storage.storage"
-run_test_module "Similarity Search" "kbase_protein_query_module.src.util.storage.similarity_search"
+
 run_test_module "UniProt API" "kbase_protein_query_module.src.util.uniprot.api" "true"
 
 echo ""

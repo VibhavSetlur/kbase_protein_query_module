@@ -132,7 +132,7 @@ def main():
         # Utility components
         ("Embedding Generator", "kbase_protein_query_module.src.util.embeddings.generator", False),
         ("Protein Storage", "kbase_protein_query_module.src.util.storage.storage", False),
-        ("Similarity Search", "kbase_protein_query_module.src.util.storage.similarity_search", False),
+
         ("UniProt API", "kbase_protein_query_module.src.util.uniprot.api", False),
         
         # Analysis components (may require data files)

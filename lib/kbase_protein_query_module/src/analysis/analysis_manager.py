@@ -80,17 +80,16 @@ class AnalysisManager:
 
         try:
             analysis = self.analyses[analysis_name]
-            if hasattr(analysis, "run"):
-                result = analysis.run(input_data, **kwargs)
-            elif hasattr(analysis, "run_network_analysis"):
+            
+            # Standardize execution method
+            if hasattr(analysis, "run_network_analysis"):
                 result = analysis.run_network_analysis(input_data)
-            # Add other analysis methods here as needed
-            # elif analysis_name == "your_analysis":
-            #     result = analysis.analyze(input_data, **kwargs)
+            elif hasattr(analysis, "run"):
+                result = analysis.run(input_data, **kwargs)
             elif hasattr(analysis, "analyze"):
                 result = analysis.analyze(input_data, **kwargs)
             else:
-                raise AttributeError(f"Analysis '{analysis_name}' has no runnable method")
+                raise AttributeError(f"Analysis '{analysis_name}' has no runnable method (run_network_analysis, run, or analyze)")
 
             self.results[analysis_name] = result
             logger.info(f"Analysis '{analysis_name}' completed")

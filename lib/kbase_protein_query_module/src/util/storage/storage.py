@@ -22,7 +22,7 @@ The hierarchical protein dictionary structure:
 import sys
 import os
 import logging
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 
 import numpy as np
 
@@ -165,9 +165,34 @@ class ProteinStorage:
             )
         except Exception as e:
             logger.error(f"PLM API query failed: {e}")
-            raise
+            raise RuntimeError(f"PLM API query failed: {e}") from e
         
-        # Standardize and organize results
+        return self._standardize_results(
+            plm_results, 
+            proteins, 
+            query_id_to_protein_id, 
+            return_embeddings
+        )
+
+    def _standardize_results(
+        self,
+        plm_results: Dict[str, Any],
+        proteins: Dict[str, Dict[str, Any]],
+        query_id_to_protein_id: Dict[str, str],
+        return_embeddings: bool
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Standardize raw PLM API results.
+        
+        Args:
+            plm_results: Raw results from PLM API
+            proteins: Original hierarchical protein dictionary
+            query_id_to_protein_id: Mapping from query ID to protein ID
+            return_embeddings: Whether to process embeddings
+            
+        Returns:
+            Standardized results dictionary
+        """
         standardized_results = {}
         
         for hits_data in plm_results.get("hits", []):
@@ -220,12 +245,16 @@ class ProteinStorage:
             
             # Cache embeddings if available
             if return_embeddings:
-                for hit in standardized_hits:
-                    uniprot_id = hit.get('uniprot_id')
-                    if uniprot_id and 'embedding' in hit:
-                        self._embedding_cache[uniprot_id] = hit['embedding']
+                self._cache_embeddings(standardized_hits)
         
         return standardized_results
+
+    def _cache_embeddings(self, hits: List[Dict[str, Any]]) -> None:
+        """Cache embeddings from hits."""
+        for hit in hits:
+            uniprot_id = hit.get('uniprot_id')
+            if uniprot_id and 'embedding' in hit:
+                self._embedding_cache[uniprot_id] = hit['embedding']
     
     def find_top_k_similar(
         self,
@@ -238,9 +267,6 @@ class ProteinStorage:
     ) -> List[Tuple[str, float]]:
         """
         Find top K similar proteins for a given protein ID.
-        
-        This method provides compatibility with existing analysis code that expects
-        results in the format: List[Tuple[uniprot_id, similarity_score]]
         
         Args:
             protein_id: Protein ID from the proteins dictionary
@@ -329,10 +355,6 @@ class ProteinStorage:
         """
         Get embedding for a UniProt ID.
         
-        This method first checks the cache, then attempts to retrieve
-        from UniProt if not cached. Note: PLM API may not provide embeddings
-        directly - this is a placeholder for when embeddings are available.
-        
         Args:
             uniprot_id: UniProt ID
         
@@ -343,8 +365,6 @@ class ProteinStorage:
         if uniprot_id in self._embedding_cache:
             return self._embedding_cache[uniprot_id]
         
-        # If not in cache, we can't retrieve embeddings directly
-        # This would require querying PLM API with return_embeddings=True
         logger.debug(f"Embedding for {uniprot_id} not in cache")
         return None
     
@@ -406,59 +426,6 @@ class ProteinStorage:
         
         return batch_results
     
-    def standardize_plm_results(
-        self,
-        plm_results: Dict[str, Any],
-        proteins: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, Dict[str, Any]]:
-        """
-        Standardize raw PLM API results for use in analysis workflows.
-        
-        This method converts PLM API output into a consistent format
-        that analysis code can consume.
-        
-        Args:
-            plm_results: Raw results from PLM API query_plm_api
-            proteins: Original hierarchical protein dictionary for context
-        
-        Returns:
-            Standardized results dictionary
-        """
-        standardized = {}
-        
-        # Create query_id -> protein_id mapping
-        query_id_to_protein_id = {}
-        for protein_id, protein_data in proteins.items():
-            query_id = protein_data.get('original_id', protein_id)
-            query_id_to_protein_id[query_id] = protein_id
-        
-        # Process hits
-        for hits_data in plm_results.get("hits", []):
-            query_id = hits_data.get("query_id", "")
-            protein_id = query_id_to_protein_id.get(query_id, query_id)
-            
-            hits = hits_data.get("hits", [])
-            protein_data = proteins.get(protein_id, {})
-            
-            standardized[protein_id] = {
-                'query_id': query_id,
-                'query_sequence': protein_data.get('sequence', ''),
-                'source': protein_data.get('source', 'unknown'),
-                'original_id': protein_data.get('original_id', protein_id),
-                'hits': [
-                    {
-                        'uniprot_id': hit.get("id", ""),
-                        'plm_score': float(hit.get("score", 0.0)),
-                        'metadata': {k: v for k, v in hit.items() if k not in ['id', 'score', 'embedding']}
-                    }
-                    for hit in hits
-                ],
-                'hit_count': len(hits)
-            }
-        
-        return standardized
-
-
     def get_top_similar_proteins(
         self,
         proteins: Dict[str, Dict[str, Any]],
@@ -518,12 +485,6 @@ def main() -> int:
                 'original_id': 'test_protein'
             }
         }
-        
-        # We won't actually call the API in the test to avoid network dependency/auth issues in CI
-        # unless we are sure it's safe. For now, we verify the method exists and runs.
-        # However, the user asked to "test this functionality once working... by running the py script".
-        # So we should try to run it if possible, or at least mock it.
-        # Given I cannot easily mock without a library, I will try to run it and catch errors.
         
         print("STORAGE_TEST: Attempting API query (may fail if no auth/network)...")
         try:
