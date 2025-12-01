@@ -19,6 +19,18 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Try importing FaissIndexManager
+try:
+    # Adjust import based on relative path
+    from ..faiss.faiss import FaissIndexManager
+except ImportError:
+    try:
+        # Fallback for different execution contexts
+        from lib.kbase_protein_query_module.src.util.faiss.faiss import FaissIndexManager
+    except ImportError:
+        logger.warning("Could not import FaissIndexManager. FAISS functionality will be disabled.")
+        FaissIndexManager = None
+
 
 class SimilaritySearch:
     """
@@ -322,6 +334,103 @@ class SimilaritySearch:
             
             results[query_id] = query_results
         
+        return results
+    
+    def find_top_k_with_faiss(
+        self,
+        query_embedding: np.ndarray,
+        index_path: Optional[str] = None,
+        top_k: int = 5,
+        faiss_manager: Optional[Any] = None
+    ) -> List[Tuple[str, float]]:
+        """
+        Find top-K similar items using FAISS index.
+        
+        Args:
+            query_embedding: Query embedding (1D array)
+            index_path: Path to the FAISS index (without extension). Required if faiss_manager is None.
+            top_k: Number of top similar items to return
+            faiss_manager: Optional pre-loaded FaissIndexManager instance
+            
+        Returns:
+            List of tuples (target_id, distance/score)
+        """
+        if FaissIndexManager is None:
+            raise ImportError("FaissIndexManager is not available")
+            
+        if faiss_manager is None:
+            if not index_path:
+                raise ValueError("Must provide either index_path or faiss_manager")
+            # Load index
+            faiss_manager = FaissIndexManager.load_index(index_path)
+            
+        # Ensure query is 2D [1, D]
+        if query_embedding.ndim == 1:
+            query_array = query_embedding.reshape(1, -1)
+        else:
+            query_array = query_embedding
+            
+        # Search
+        distances, indices, external_ids = faiss_manager.search(query_array, k=top_k)
+        
+        # Format results
+        results = []
+        # search returns list of lists, we take the first one
+        row_ids = external_ids[0]
+        row_dists = distances[0]
+        
+        for ext_id, dist in zip(row_ids, row_dists):
+            if ext_id is not None:
+                results.append((ext_id, float(dist)))
+                
+        return results
+
+    def batch_find_top_k_with_faiss(
+        self,
+        query_embeddings: Union[np.ndarray, List[np.ndarray], Dict[str, np.ndarray]],
+        index_path: Optional[str] = None,
+        top_k: int = 5,
+        faiss_manager: Optional[Any] = None
+    ) -> Dict[str, List[Tuple[str, float]]]:
+        """
+        Batch find top-K similar items using FAISS index.
+        
+        Args:
+            query_embeddings: Query embeddings (array, list, or dict)
+            index_path: Path to the FAISS index (without extension). Required if faiss_manager is None.
+            top_k: Number of top similar items to return
+            faiss_manager: Optional pre-loaded FaissIndexManager instance
+            
+        Returns:
+            Dict mapping query_id to list of (target_id, distance) tuples
+        """
+        if FaissIndexManager is None:
+            raise ImportError("FaissIndexManager is not available")
+            
+        if faiss_manager is None:
+            if not index_path:
+                raise ValueError("Must provide either index_path or faiss_manager")
+            faiss_manager = FaissIndexManager.load_index(index_path)
+            
+        # Convert queries to array
+        query_array, query_ids = self._to_array_with_ids(query_embeddings)
+        
+        # Search
+        distances, indices, external_ids = faiss_manager.search(query_array, k=top_k)
+        
+        # Format results
+        results = {}
+        for i, query_id in enumerate(query_ids):
+            row_ids = external_ids[i]
+            row_dists = distances[i]
+            
+            query_results = []
+            for ext_id, dist in zip(row_ids, row_dists):
+                if ext_id is not None:
+                    query_results.append((ext_id, float(dist)))
+            
+            results[query_id] = query_results
+            
         return results
     
     def _to_array_with_ids(
