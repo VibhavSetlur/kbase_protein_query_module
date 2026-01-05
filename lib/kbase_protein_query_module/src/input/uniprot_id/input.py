@@ -16,14 +16,28 @@ logger = logging.getLogger(__name__)
 class UniProtIdProcessor:
     """Handles UniProt ID input processing."""
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the UniProt ID Processor.
+        
+        Args:
+            config: Configuration dictionary.
+        """
         self.config = config or {}
         self.max_retries = self.config.get('max_retries', 3)
         self.timeout = self.config.get('timeout', 30)
         self.api_base_url = "https://rest.uniprot.org/uniprotkb"
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process UniProt ID input."""
+        """
+        Process UniProt ID input.
+        
+        Args:
+            input_data: Raw input dictionary containing 'uniprot_id'.
+            
+        Returns:
+            Dictionary containing processed proteins and metadata.
+        """
         start_time = time.time()
         
         try:
@@ -79,14 +93,30 @@ class UniProtIdProcessor:
             }
     
     def _validate(self, uniprot_id: str) -> bool:
-        """Validate UniProt ID format."""
+        """
+        Validate UniProt ID format.
+        
+        Args:
+            uniprot_id: UniProt ID string.
+            
+        Returns:
+            True if valid, False otherwise.
+        """
         if not uniprot_id or not isinstance(uniprot_id, str):
             return False
         uid = uniprot_id.strip().upper()
         return bool(re.match(r'^[A-Z][0-9A-Z]{5,9}$', uid))
     
     def _fetch(self, uniprot_id: str) -> Optional[Dict[str, Any]]:
-        """Fetch protein data from UniProt API."""
+        """
+        Fetch protein data from UniProt API.
+        
+        Args:
+            uniprot_id: UniProt ID string.
+            
+        Returns:
+            Dictionary with protein data or None if failed.
+        """
         for attempt in range(self.max_retries):
             try:
                 url = f"{self.api_base_url}/{uniprot_id}"
@@ -127,7 +157,15 @@ class UniProtIdProcessor:
         return None
     
     def _validate_sequence(self, sequence: str) -> Optional[str]:
-        """Validate and clean protein sequence using BioSeq."""
+        """
+        Validate and clean protein sequence using BioSeq.
+        
+        Args:
+            sequence: Input sequence string.
+            
+        Returns:
+            Cleaned sequence string or None if invalid.
+        """
         if not sequence:
             return None
         
@@ -157,7 +195,15 @@ class UniProtIdProcessor:
             return None
     
     def standardize_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Standardize input_data format."""
+        """
+        Standardize input_data format.
+        
+        Args:
+            input_data: Raw input dictionary.
+            
+        Returns:
+            Standardized input dictionary.
+        """
         input_type = input_data.get('input_type', 'uniprot_id')
         
         standardized = {

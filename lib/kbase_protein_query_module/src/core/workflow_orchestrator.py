@@ -25,7 +25,7 @@ class WorkflowOrchestrator:
     Coordinates input handling, analysis execution, and output generation.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None, kb_util=None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, kb_util: Optional[Any] = None):
         """
         Initialize the Workflow Orchestrator.
         
@@ -53,7 +53,7 @@ class WorkflowOrchestrator:
         
         logger.info(f"WorkflowOrchestrator initialized with run_id: {self.run_id}")
     
-    def initialize_components(self, output_dir: str, workspace_name: Optional[str] = None):
+    def initialize_components(self, output_dir: str, workspace_name: Optional[str] = None) -> None:
         """
         Initialize all workflow components.
         
@@ -93,7 +93,6 @@ class WorkflowOrchestrator:
         except Exception as e:
             logger.error(f"Error initializing workflow components: {e}", exc_info=True)
             raise
-    
     
     def run_workflow(
         self,
@@ -381,8 +380,6 @@ class WorkflowOrchestrator:
                 "stages_completed": [],
                 "error_message": str(e),
             }
-    
-
 
     def save_results(self, results: Dict[str, Any]) -> Optional[str]:
         """
@@ -395,7 +392,7 @@ class WorkflowOrchestrator:
         except Exception as e:
             logger.warning(f"Failed to save final results snapshot: {e}")
             return None
-    
+
 
 def main() -> int:
     """

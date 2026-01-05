@@ -4,6 +4,7 @@ import os
 import logging
 import time
 import shutil
+import re
 from typing import Dict, Any, List, Optional, Union
 
 from installed_clients.KBaseReportClient import KBaseReport
@@ -276,7 +277,7 @@ Protein query and analysis module with comprehensive network analysis capabiliti
         report_params = {
             'message': message,
             'workspace_name': workspace_name,
-            'report_object_name': f"{analysis_name}_report",
+            'report_object_name': f"{re.sub(r'[^a-zA-Z0-9_]', '_', analysis_name)}_report",
             'objects_created': [],
             'warnings': [],
             'file_links': file_links,

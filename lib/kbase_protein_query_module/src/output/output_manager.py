@@ -13,11 +13,31 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger(__name__)
 
 class OutputManager:
-    """Manages output directory structure for the protein query module."""
+    """
+    Manages output directory structure for the protein query module.
     
-    def __init__(self, base_output_dir: str, run_id: str, 
-                 workspace_name: Optional[str] = None, kb_util=None):
-        """Initialize the Output Manager."""
+    This class handles:
+    - Creating standardized output directory structures
+    - Saving analysis results, metadata, and process logs
+    - Writing JSON and text files safely
+    """
+    
+    def __init__(
+        self, 
+        base_output_dir: str, 
+        run_id: str, 
+        workspace_name: Optional[str] = None, 
+        kb_util: Optional[Any] = None
+    ):
+        """
+        Initialize the Output Manager.
+        
+        Args:
+            base_output_dir: Base directory for outputs
+            run_id: Unique identifier for the run
+            workspace_name: Optional KBase workspace name
+            kb_util: Optional KBase utility instance
+        """
         logger.debug(f"Initializing OutputManager with base_dir={base_output_dir}, run_id={run_id}")
         self.base_output_dir = base_output_dir
         self.run_id = run_id
@@ -44,7 +64,15 @@ class OutputManager:
         return self.root_dir
     
     def get_analysis_dir(self, analysis_name: str) -> str:
-        """Get or create directory for a specific analysis."""
+        """
+        Get or create directory for a specific analysis.
+        
+        Args:
+            analysis_name: Name of the analysis module
+            
+        Returns:
+            Path to the analysis directory
+        """
         logger.debug(f"Getting analysis directory for: {analysis_name}")
         analysis_path = os.path.join(self.analysis_dir, analysis_name)
         os.makedirs(analysis_path, exist_ok=True)
@@ -52,7 +80,17 @@ class OutputManager:
         return analysis_path
     
     def write_json(self, rel_path: str, filename: str, data: Dict[str, Any]) -> str:
-        """Write JSON data to a file."""
+        """
+        Write JSON data to a file.
+        
+        Args:
+            rel_path: Relative path within root directory (can be empty)
+            filename: Name of the file
+            data: Dictionary data to write
+            
+        Returns:
+            Absolute path to the written file
+        """
         logger.debug(f"Writing JSON file: {filename} in {rel_path}")
         dir_path = os.path.join(self.root_dir, rel_path) if rel_path else self.root_dir
         os.makedirs(dir_path, exist_ok=True)
@@ -65,7 +103,17 @@ class OutputManager:
         return path
     
     def write_text(self, rel_path: str, filename: str, text: str) -> str:
-        """Write text data to a file."""
+        """
+        Write text data to a file.
+        
+        Args:
+            rel_path: Relative path within root directory
+            filename: Name of the file
+            text: Text content to write
+            
+        Returns:
+            Absolute path to the written file
+        """
         dir_path = os.path.join(self.root_dir, rel_path) if rel_path else self.root_dir
         os.makedirs(dir_path, exist_ok=True)
         path = os.path.join(dir_path, filename)
@@ -75,8 +123,12 @@ class OutputManager:
         
         return path
     
-    def save_analysis_output(self, analysis_name: str, result: Dict[str, Any], 
-                           output_dir: str) -> Dict[str, Any]:
+    def save_analysis_output(
+        self, 
+        analysis_name: str, 
+        result: Dict[str, Any], 
+        output_dir: str
+    ) -> Dict[str, Any]:
         """
         Save output from a specific analysis.
         
@@ -121,9 +173,25 @@ class OutputManager:
         
         return saved_files
     
-    def save_metadata(self, config: Dict[str, Any], analyses_run: List[str], 
-                     summary: str = "", process_log: Optional[List[Dict[str, Any]]] = None) -> str:
-        """Save metadata about the run."""
+    def save_metadata(
+        self, 
+        config: Dict[str, Any], 
+        analyses_run: List[str], 
+        summary: str = "", 
+        process_log: Optional[List[Dict[str, Any]]] = None
+    ) -> str:
+        """
+        Save metadata about the run.
+        
+        Args:
+            config: Configuration dictionary used for the run
+            analyses_run: List of analyses executed
+            summary: Summary string of the run
+            process_log: Optional log of process steps
+            
+        Returns:
+            Path to the saved metadata file
+        """
         metadata = {
             "run_id": self.run_id,
             "workspace_name": self.workspace_name,
@@ -138,9 +206,21 @@ class OutputManager:
         
         return self.write_json("metadata", "run_metadata.json", metadata)
     
-    def save_process_info(self, stages_completed: List[str], 
-                         execution_time: float) -> str:
-        """Save process execution information."""
+    def save_process_info(
+        self, 
+        stages_completed: List[str], 
+        execution_time: float
+    ) -> str:
+        """
+        Save process execution information.
+        
+        Args:
+            stages_completed: List of completed stages
+            execution_time: Total execution time in seconds
+            
+        Returns:
+            Path to the saved process info file
+        """
         process_info = {
             "run_id": self.run_id,
             "timestamp": self.timestamp,

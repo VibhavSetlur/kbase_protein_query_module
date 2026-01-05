@@ -28,8 +28,14 @@ logger = logging.getLogger(__name__)
 class InputManager:
     """Manages all input processing for the protein query module."""
     
-    def __init__(self, config: Dict[str, Any], kb_util=None):
-        """Initialize the Input Manager."""
+    def __init__(self, config: Dict[str, Any], kb_util: Optional[Any] = None):
+        """
+        Initialize the Input Manager.
+        
+        Args:
+            config: Configuration dictionary.
+            kb_util: KBase utility library instance.
+        """
         self.config = config or {}
         self.kb_util = kb_util
         
@@ -42,6 +48,12 @@ class InputManager:
         Handles:
         - uniprot_ids -> uniprot_id
         - protein_input -> protein_sequence
+        
+        Args:
+            input_data: Raw input dictionary.
+            
+        Returns:
+            Normalized input dictionary.
         """
         normalized = input_data.copy()
         
@@ -66,7 +78,15 @@ class InputManager:
         return normalized
     
     def process_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process input data through the complete input pipeline."""
+        """
+        Process input data through the complete input pipeline.
+        
+        Args:
+            input_data: Raw input dictionary.
+            
+        Returns:
+            Processed input dictionary with standardized structure.
+        """
         start_time = time.time()
         
         try:

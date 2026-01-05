@@ -68,14 +68,19 @@ NetworkVisualizer = None
 class NetworkAnalysis:
     """Network analysis for protein similarity search results."""
     
-    def __init__(self, config: Dict[str, Any] = None):
-        """Initialize the NetworkAnalysis class."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the NetworkAnalysis class.
+        
+        Args:
+            config: Configuration dictionary.
+        """
         self.config = config or {}
         self.analysis_name = "network_analysis"
         
         # Initialize network parameters 
         self.k_neighbors = self.config.get('k_neighbors', 10)
-        self.similarity_threshold = self.config.get('similarity_threshold', 0.1)
+        self.similarity_threshold = self.config.get('similarity_threshold', 0.995)
         
         # Initialize utilities
         self.embedding_generator = ProteinEmbeddingGenerator()
@@ -90,7 +95,15 @@ class NetworkAnalysis:
         logger.info("NetworkAnalysis initialized")
     
     def run_network_analysis(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Run network analysis for a list of proteins."""
+        """
+        Run network analysis for a list of proteins.
+        
+        Args:
+            input_data: Dictionary containing input proteins and parameters.
+            
+        Returns:
+            Dictionary containing analysis results.
+        """
         start_time = time.time()
         
         if not input_data:
@@ -274,6 +287,18 @@ class NetworkAnalysis:
             return_embeddings=True
         )
         
+        # Debug logging for missing query ID investigation
+        if protein_id in results:
+            hits = results[protein_id].get('hits', [])
+            logger.info(f"Search returned {len(hits)} hits for {protein_id}")
+            hit_ids = [h.get('id') or h.get('uniprot_id') for h in hits]
+            logger.info(f"Hit IDs: {hit_ids}")
+            
+            # Check if query ID is in hits (it might be filtered out if it's a perfect match and we exclude self, or if the ID format differs)
+            # If the user provides a sequence that matches a UniProt ID, we expect that ID to be in the hits.
+        else:
+            logger.warning(f"No results entry for {protein_id}")
+        
         if protein_id not in results:
             raise ValueError(f"No search results returned for protein {protein_id}")
             
@@ -307,7 +332,18 @@ class NetworkAnalysis:
                 metadata_list = self.fetch_metadata(uniprot_ids)
                 for meta in metadata_list:
                     if uid := meta.get('Entry'):
-                        top_k_metadata[uid] = meta
+                        # Ensure we keep all relevant fields
+                        top_k_metadata[uid] = {
+                            'Entry': uid,
+                            'Protein names': meta.get('Protein names', 'N/A'),
+                            'Organism': meta.get('Organism', 'N/A'),
+                            'EC number': meta.get('EC number', 'N/A'),
+                            'Protein families': meta.get('Protein families', 'N/A'),
+                            'Reviewed': meta.get('Reviewed', 'N/A'),
+                            'Function [CC]': meta.get('Function [CC]', 'N/A'),
+                            'Gene Names': meta.get('Gene Names', 'N/A'),
+                            'Length': meta.get('Length', 'N/A')
+                        }
             except Exception as e:
                 logger.warning(f"Batch metadata fetch failed: {e}")
 
@@ -319,7 +355,26 @@ class NetworkAnalysis:
             top_k_scores[uniprot_id] = float(hit.get('score') or hit.get('plm_score', 0.0))
             
             if uniprot_id not in top_k_metadata:
-                top_k_metadata[uniprot_id] = {'Entry': uniprot_id}
+                # Try individual fetch if missed in batch
+                try:
+                    meta_list = self.fetch_metadata([uniprot_id])
+                    if meta_list and (meta := meta_list[0]):
+                         top_k_metadata[uniprot_id] = {
+                            'Entry': uniprot_id,
+                            'Protein names': meta.get('Protein names', 'N/A'),
+                            'Organism': meta.get('Organism', 'N/A'),
+                            'EC number': meta.get('EC number', 'N/A'),
+                            'Protein families': meta.get('Protein families', 'N/A'),
+                            'Reviewed': meta.get('Reviewed', 'N/A'),
+                            'Function [CC]': meta.get('Function [CC]', 'N/A'),
+                            'Gene Names': meta.get('Gene Names', 'N/A'),
+                            'Length': meta.get('Length', 'N/A')
+                        }
+                    else:
+                        top_k_metadata[uniprot_id] = {'Entry': uniprot_id}
+                except Exception as e:
+                    logger.warning(f"Individual metadata fetch failed for {uniprot_id}: {e}")
+                    top_k_metadata[uniprot_id] = {'Entry': uniprot_id}
             
             # Fetch sequence
             try:
@@ -418,6 +473,7 @@ class NetworkAnalysis:
                     metadata=all_metadata,
                     query_embedding=query_embedding,
                     query_protein_id=query_id_key,
+                    query_sequence=query_sequence, # Added to display in sidebar
                     output_dir=output_dir
                 )
                 
@@ -542,6 +598,8 @@ class NetworkAnalysis:
                 'ec_number': query_metadata.get('EC number', ''),
                 'protein_families': query_metadata.get('Protein families', ''),
                 'reviewed': query_metadata.get('Reviewed', ''),
+                'gene_names': query_metadata.get('Gene Names', ''),
+                'length': query_metadata.get('Length', ''),
                 'similarity_score': 1.0,
                 'protein_sequence': query_sequence,
                 'is_query': True
@@ -550,6 +608,10 @@ class NetworkAnalysis:
             sorted_matches = sorted(top_k_similarity_scores.items(), key=lambda x: x[1], reverse=True)
             
             for uniprot_id, score in sorted_matches:
+                # Skip if this hit IS the query protein (prevent duplicate rows)
+                if uniprot_id == query_protein_id or uniprot_id == safe_protein_id:
+                    continue
+
                 meta = top_k_metadata.get(uniprot_id, {'Entry': uniprot_id})
                 rows.append({
                     'uniprot_id': uniprot_id,
@@ -558,6 +620,8 @@ class NetworkAnalysis:
                     'ec_number': meta.get('EC number', ''),
                     'protein_families': meta.get('Protein families', ''),
                     'reviewed': meta.get('Reviewed', ''),
+                    'gene_names': meta.get('Gene Names', ''),
+                    'length': meta.get('Length', ''),
                     'similarity_score': score,
                     'protein_sequence': top_k_sequences.get(uniprot_id, ''),
                     'is_query': False
@@ -576,7 +640,11 @@ def main():
     """Self-test for network analysis."""
     import shutil
     ok = True
-    output_dir = os.path.join('/tmp', f"kpqm_network_test_{int(time.time())}")
+    # Create readable timestamp
+    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    base_output_dir = os.path.join(os.getcwd(), 'test_local', 'output')
+    output_dir = os.path.join(base_output_dir, f"run_{timestamp}")
+    
     try:
         # Test sequence (Human Insulin)
         test_sequence = "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN"
@@ -612,11 +680,8 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
-        try:
-            if os.path.isdir(output_dir):
-                shutil.rmtree(output_dir, ignore_errors=True)
-        except Exception:
-            pass
+        # User requested to keep files for review
+        pass
     return 0 if ok else 1
 
 

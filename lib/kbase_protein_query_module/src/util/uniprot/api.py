@@ -6,7 +6,7 @@ Designed to avoid heavy dependencies and work in KBase runtime.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import requests
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,8 @@ UNIPROT_REST = "https://rest.uniprot.org"
 
 
 def fetch_sequences(uniprot_ids: List[str]) -> Dict[str, str]:
-    """Fetch amino acid sequences for UniProt IDs.
+    """
+    Fetch amino acid sequences for UniProt IDs.
 
     Args:
         uniprot_ids: List of UniProt accession IDs
@@ -41,9 +42,14 @@ def fetch_sequences(uniprot_ids: List[str]) -> Dict[str, str]:
 
 
 def fetch_metadata(uniprot_ids: List[str]) -> List[Dict[str, str]]:
-    """Fetch minimal metadata for UniProt IDs via REST API.
+    """
+    Fetch minimal metadata for UniProt IDs via REST API.
 
-    Returns list of dicts suitable for building a DataFrame with an 'Entry' column.
+    Args:
+        uniprot_ids: List of UniProt accession IDs
+
+    Returns:
+        List of dicts suitable for building a DataFrame with an 'Entry' column.
     """
     rows: List[Dict[str, str]] = []
     if not uniprot_ids:
@@ -57,6 +63,8 @@ def fetch_metadata(uniprot_ids: List[str]) -> List[Dict[str, str]]:
         "ec",
         "protein_families",
         "reviewed",
+        "gene_names",
+        "length"
     ]
     params = {
         "query": query,
@@ -82,15 +90,17 @@ def fetch_metadata(uniprot_ids: List[str]) -> List[Dict[str, str]]:
                 'EC number': rec.get('EC number', ''),
                 'Protein families': rec.get('Protein families', ''),
                 'Reviewed': rec.get('Reviewed', ''),
+                'Gene Names': rec.get('Gene Names', ''),
+                'Length': rec.get('Length', '')
             })
     except Exception as e:
         logger.warning(f"Failed fetching UniProt metadata: {e}")
     return rows
 
 
-
 def fetch_protein_sequence(uniprot_id: str) -> Optional[str]:
-    """Fetch a single protein sequence by UniProt accession.
+    """
+    Fetch a single protein sequence by UniProt accession.
 
     This method is designed for per-protein use (no batching). Call it in a loop
     from higher-level analyses as needed.
@@ -121,15 +131,21 @@ def fetch_protein_sequence(uniprot_id: str) -> Optional[str]:
         logger.warning(f"Failed fetching UniProt sequence for {uniprot_id}: {e}")
         return None
 
+
 def fetch_protein_metadata(uniprot_id: str) -> Dict[str, str]:
-    """Fetch minimal metadata for a single UniProt accession via REST API.
+    """
+    Fetch minimal metadata for a single UniProt accession via REST API.
 
     This method is designed for per-protein use (no batching). Call it in a loop
     from higher-level analyses as needed.
 
-    Returns a dict with the same keys produced by the batch `fetch_metadata`:
-    'Entry', 'Protein names', 'Organism', 'EC number', 'Protein families', 'Reviewed'.
-    Missing values will be empty strings.
+    Args:
+        uniprot_id: UniProt accession ID
+
+    Returns:
+        A dict with the same keys produced by the batch `fetch_metadata`:
+        'Entry', 'Protein names', 'Organism', 'EC number', 'Protein families', 'Reviewed'.
+        Missing values will be empty strings.
     """
     if not uniprot_id:
         return {}
@@ -141,7 +157,9 @@ def fetch_protein_metadata(uniprot_id: str) -> Dict[str, str]:
         "organism_name",
         "ec",
         "protein_families",
-        "reviewed"
+        "reviewed",
+        "gene_names",
+        "length"
     ]
 
     # Query parameters
@@ -180,6 +198,8 @@ def fetch_protein_metadata(uniprot_id: str) -> Dict[str, str]:
             'EC number': rec.get('EC number', ''),
             'Protein families': rec.get('Protein families', ''),
             'Reviewed': rec.get('Reviewed', ''),
+            'Gene Names': rec.get('Gene Names', ''),
+            'Length': rec.get('Length', '')
         }
 
     except Exception as e:
@@ -188,7 +208,8 @@ def fetch_protein_metadata(uniprot_id: str) -> Dict[str, str]:
 
 
 def main() -> int:
-    """Test the UniProt API.
+    """
+    Test the UniProt API.
 
     Returns:
         int: 0 on success, 1 on failure

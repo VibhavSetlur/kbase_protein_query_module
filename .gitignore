@@ -1,5 +1,6 @@
 # Personal
 output/
+!lib/kbase_protein_query_module/src/output/
 outputs/
 logs/
 test_env/

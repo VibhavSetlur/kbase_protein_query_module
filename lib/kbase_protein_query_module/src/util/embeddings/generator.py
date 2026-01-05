@@ -58,7 +58,8 @@ class ProteinEmbeddingGenerator:
         plm_api_url: str = "https://kbase.us/services/llm_homology_api",
         use_server: bool = False
     ):
-        """Initialize the embedding generator.
+        """
+        Initialize the embedding generator.
         
         Args:
             model_name: ESM model name (e.g., "esm2_t6_8M_UR50D")
@@ -137,9 +138,17 @@ class ProteinEmbeddingGenerator:
             logger.warning(f"Failed to load local model: {e}. Will use server.")
     
     def generate_embedding(self, sequence: str, pooling: str = "mean") -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Generate embeddings for a single protein sequence.
+        """
+        Generate embeddings for a single protein sequence.
         
         Tries server first if configured, then falls back to local.
+        
+        Args:
+            sequence: Protein sequence string
+            pooling: Pooling strategy ("mean" or "none")
+            
+        Returns:
+            Embedding array or tuple of (residue_embeddings, mean_embedding)
         """
         if self.use_server and self.plm_utils:
             try:
@@ -150,7 +159,16 @@ class ProteinEmbeddingGenerator:
         return self.generate_embedding_local(sequence, pooling)
 
     def get_embedding_from_server(self, sequence: str, pooling: str = "mean") -> np.ndarray:
-        """Get embedding from KBase PLM API."""
+        """
+        Get embedding from KBase PLM API.
+        
+        Args:
+            sequence: Protein sequence string
+            pooling: Pooling strategy (ignored for server, usually returns mean)
+            
+        Returns:
+            Embedding array
+        """
         if not self.plm_utils:
             raise RuntimeError("KBPLMUtils not initialized")
             
@@ -168,14 +186,8 @@ class ProteinEmbeddingGenerator:
         
         # Extract embedding from result
         # The structure depends on API response. Assuming standard format.
-        # If the API returns query embeddings separately or in the hits structure.
-        # Usually it's in the response root or associated with the query.
-        # For now, assuming the API returns it in a standard way or we might need to adjust.
-        # If the API doesn't support returning query embeddings explicitly in the client wrapper,
-        # we might be limited. But let's assume it does as per user request.
         
-        # Mocking extraction if specific field is not documented in the client code I read.
-        # But let's assume 'queries' or similar field in result.
+        # Check 'queries' field
         if "queries" in result:
              for q in result["queries"]:
                  if q.get("id") == "query" and "embedding" in q:
@@ -192,7 +204,16 @@ class ProteinEmbeddingGenerator:
         raise RuntimeError("Could not extract embedding from server response")
 
     def generate_embedding_local(self, sequence: str, pooling: str = "mean") -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Generate embeddings using local ESM model."""
+        """
+        Generate embeddings using local ESM model.
+        
+        Args:
+            sequence: Protein sequence string
+            pooling: Pooling strategy ("mean" or "none")
+            
+        Returns:
+            Embedding array or tuple of (residue_embeddings, mean_embedding)
+        """
         if not self.model:
             raise RuntimeError("Local model not loaded")
             
@@ -229,7 +250,15 @@ class ProteinEmbeddingGenerator:
             raise ValueError(f"Unknown pooling strategy: {pooling}")
 
     def _preprocess_sequence(self, sequence: str) -> str:
-        """Preprocess protein sequence."""
+        """
+        Preprocess protein sequence.
+        
+        Args:
+            sequence: Raw protein sequence
+            
+        Returns:
+            Cleaned sequence
+        """
         if not sequence or not isinstance(sequence, str):
             raise ValueError("Sequence must be a non-empty string")
         sequence_clean = sequence.strip().upper()
@@ -241,7 +270,17 @@ class ProteinEmbeddingGenerator:
         return sequence_clean
 
     def run_esm_cli(self, fasta_path: str, output_dir: str, include: List[str] = ["mean"]) -> bool:
-        """Run esm-extract CLI command."""
+        """
+        Run esm-extract CLI command.
+        
+        Args:
+            fasta_path: Path to input FASTA file
+            output_dir: Directory to save embeddings
+            include: List of features to include (e.g., ["mean", "per_tok"])
+            
+        Returns:
+            True if successful, False otherwise
+        """
         if not HAS_ESM:
             raise RuntimeError("fair-esm not installed")
             

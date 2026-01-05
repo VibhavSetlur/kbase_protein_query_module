@@ -10,7 +10,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 def _check_deps(requires_deps: List[str]) -> bool:
-    """Check if required dependencies are available."""
+    """
+    Check if required dependencies are available.
+    
+    Args:
+        requires_deps: List of module names to check.
+        
+    Returns:
+        True if all dependencies are importable, False otherwise.
+    """
     logger.debug(f"Checking dependencies: {requires_deps}")
     for dep in requires_deps:
         try:
@@ -28,13 +36,18 @@ _ANALYSIS_BASE: Dict[str, Dict[str, Any]] = {
         "description": "Protein similarity network analysis with interactive visualizations",
         "category": "network",
         "module_path": "kbase_protein_query_module.src.analysis.network_analysis.network_analysis",
-        "class_name": "NetworkAnalysis"
-#        "requires_deps": ["networkx", "sklearn"],
+        "class_name": "NetworkAnalysis",
+        # "requires_deps": ["networkx", "sklearn"], # Uncomment if dependencies are strictly required
     }
 }
 
 def get_enabled_analyses() -> Dict[str, Dict[str, Any]]:
-    """Return enabled analyses based on dependency availability."""
+    """
+    Return enabled analyses based on dependency availability.
+    
+    Returns:
+        Dictionary of enabled analyses and their configuration.
+    """
     logger.debug("Getting enabled analyses")
     enabled: Dict[str, Dict[str, Any]] = {}
 
@@ -51,7 +64,6 @@ def get_enabled_analyses() -> Dict[str, Dict[str, Any]]:
     
     logger.info(f"Found {len(enabled)} enabled analyses: {list(enabled.keys())}")
     return enabled
-
 
 
 def main() -> int:

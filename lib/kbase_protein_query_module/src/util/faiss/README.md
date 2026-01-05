@@ -18,8 +18,8 @@ This utility provides a high-level interface for managing FAISS indexes for prot
 ### 1. Initialization
 
 ```python
-from lib.kbase_protein_query_module.src.util.faiss.faiss import FaissIndexManager
-from lib.kbase_protein_query_module.src.util.embeddings.generator import ProteinEmbeddingGenerator
+from kbase_protein_query_module.src.util.faiss.faiss import FaissIndexManager
+from kbase_protein_query_module.src.util.embeddings.generator import ProteinEmbeddingGenerator
 
 # Initialize embedding generator (optional, but needed for sequence/ID inputs)
 generator = ProteinEmbeddingGenerator(model_name="esm2_t6_8M_UR50D")
@@ -88,7 +88,7 @@ distances, indices, external_ids = manager.search(query_vector, k=5)
 ## CLI Usage
 
 ```bash
-python3 -m lib.kbase_protein_query_module.src.util.faiss.faiss \
+python3 -m kbase_protein_query_module.src.util.faiss.faiss \
     --mode create \
     --index_path /path/to/output_index \
     --files /path/to/proteins.csv \
@@ -96,4 +96,4 @@ python3 -m lib.kbase_protein_query_module.src.util.faiss.faiss \
     --dim 320
 ```
 
-> **Note**: The file is named `faiss.py`. When importing it, ensure you use the full package path (e.g., `from lib.kbase_protein_query_module.src.util.faiss.faiss import ...`) or ensure the directory containing `faiss.py` is NOT in your `sys.path` to avoid conflicts with the `faiss` library.
+> **Note**: The file is named `faiss.py`. When importing it, ensure you use the full package path (e.g., `from kbase_protein_query_module.src.util.faiss.faiss import ...`) or ensure the directory containing `faiss.py` is NOT in your `sys.path` to avoid conflicts with the `faiss` library.

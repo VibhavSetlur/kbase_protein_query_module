@@ -16,11 +16,25 @@ logger = logging.getLogger(__name__)
 class ProteinSequenceProcessor:
     """Handles protein sequence input processing."""
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the Protein Sequence Processor.
+        
+        Args:
+            config: Configuration dictionary.
+        """
         self.config = config or {}
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process protein sequence input."""
+        """
+        Process protein sequence input.
+        
+        Args:
+            input_data: Raw input dictionary containing 'protein_sequence'.
+            
+        Returns:
+            Dictionary containing processed proteins and metadata.
+        """
         start_time = time.time()
         
         try:
@@ -57,9 +71,16 @@ class ProteinSequenceProcessor:
             }
     
     def _parse_and_validate(self, sequence: str) -> Dict[str, Dict[str, Any]]:
-        """Parse and validate protein sequences using BioSeq.
+        """
+        Parse and validate protein sequences using BioSeq.
         
-        Returns nested dictionary: {'protein_0': {...}, 'protein_1': {...}, ...}
+        Supports FASTA format and raw sequences (comma/tab/newline separated).
+        
+        Args:
+            sequence: Input sequence string.
+            
+        Returns:
+            Nested dictionary: {'protein_0': {...}, 'protein_1': {...}, ...}
         """
         proteins = {}
         
@@ -106,7 +127,15 @@ class ProteinSequenceProcessor:
         return proteins
     
     def _parse_multiple_formats(self, sequence: str) -> List[str]:
-        """Parse sequence from multiple formats: comma-separated, tab-separated, or newline-separated."""
+        """
+        Parse sequence from multiple formats: comma-separated, tab-separated, or newline-separated.
+        
+        Args:
+            sequence: Input sequence string.
+            
+        Returns:
+            List of sequence strings.
+        """
         sequences = []
         
         if not sequence:
@@ -126,7 +155,15 @@ class ProteinSequenceProcessor:
         return sequences
     
     def _validate_sequence(self, sequence: str) -> Optional[str]:
-        """Validate and clean protein sequence using BioSeq."""
+        """
+        Validate and clean protein sequence using BioSeq.
+        
+        Args:
+            sequence: Input sequence string.
+            
+        Returns:
+            Cleaned sequence string or None if invalid.
+        """
         if not sequence:
             return None
         
@@ -155,9 +192,16 @@ class ProteinSequenceProcessor:
             logger.warning(f"Sequence validation error: {e}")
             return None
     
-    
     def standardize_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Standardize input_data format."""
+        """
+        Standardize input_data format.
+        
+        Args:
+            input_data: Raw input dictionary.
+            
+        Returns:
+            Standardized input dictionary.
+        """
         input_type = input_data.get('input_type', 'protein_sequence')
         
         standardized = {

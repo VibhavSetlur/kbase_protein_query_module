@@ -31,15 +31,21 @@ logger = logging.getLogger(__name__)
 class AnalysisManager:
     """Manages the execution of protein analysis workflows."""
     
-    def __init__(self, output_manager=None, config: Optional[Dict[str, Any]] = None):
-        """Initialize the Analysis Manager."""
+    def __init__(self, output_manager: Optional[Any] = None, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the Analysis Manager.
+        
+        Args:
+            output_manager: Optional OutputManager instance.
+            config: Optional configuration dictionary.
+        """
         self.output_manager = output_manager
         self.config = config or {}
         self.analyses: Dict[str, Any] = {}
         self.results: Dict[str, Any] = {}
         self._load_analysis_modules()
     
-    def _load_analysis_modules(self):
+    def _load_analysis_modules(self) -> None:
         """Load all available analysis modules dynamically."""
         enabled_analyses = get_enabled_analyses()
         
@@ -68,12 +74,32 @@ class AnalysisManager:
                 logger.error(f"Failed to load {analysis_name}: {e}")
     
     def get_available_analyses(self) -> Dict[str, Dict[str, Any]]:
-        """Get list of available analyses."""
+        """
+        Get list of available analyses.
+        
+        Returns:
+            Dictionary of available analyses.
+        """
         return get_enabled_analyses()
     
     def run_analyses(self, analysis_name: str, input_data: Dict[str, Any],
-                    output_dir: str = None, **kwargs) -> Dict[str, Any]:
-        """Run a specific analysis with input_data."""
+                    output_dir: Optional[str] = None, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Run a specific analysis with input_data.
+        
+        Args:
+            analysis_name: Name of the analysis to run.
+            input_data: Dictionary containing input data.
+            output_dir: Optional directory for output.
+            **kwargs: Additional arguments for the analysis.
+            
+        Returns:
+            Result dictionary from the analysis, or None if analysis not found.
+            
+        Raises:
+            AttributeError: If analysis class has no runnable method.
+            Exception: If analysis execution fails.
+        """
         if analysis_name not in self.analyses:
             logger.error(f"Analysis '{analysis_name}' not found")
             return None
@@ -99,7 +125,15 @@ class AnalysisManager:
             raise
     
     def get_analysis_results(self, analysis_name: Optional[str] = None) -> Dict[str, Any]:
-        """Get results from completed analyses."""
+        """
+        Get results from completed analyses.
+        
+        Args:
+            analysis_name: Optional name of specific analysis result to retrieve.
+            
+        Returns:
+            Dictionary of results.
+        """
         if analysis_name:
             return self.results.get(analysis_name)
         return self.results.copy()
