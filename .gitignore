@@ -18,7 +18,8 @@ backup
 .pytest_cache_kpqm_server_test_e2e
 .pytest_cache_kpqm_server_test_kbase
 .pytest_cache_kpqm_server_test_server
-.cursor
+.cursor/
+.agent/
 
 # KBase SDK
 test_local
