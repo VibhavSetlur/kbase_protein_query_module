@@ -5,7 +5,7 @@ outputs/
 logs/
 test_env/
 work/
-backup
+backup/
 .venv
 .venv_kpqm
 .pytest_cache
